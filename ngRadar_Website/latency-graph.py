@@ -3,6 +3,15 @@ from collections import defaultdict
 import matplotlib.pyplot as plt
 
 
+"""
+I am not sure where to put this logic just yet. I have a feeling it should probably go in the views 
+so we can display the graph on the web page, but not sure.
+If displaying a latency graph is important, should we create another partial in the templates 
+specifically for the latency graph?
+
+"""
+
+
 def load_stats(csv_file="ddm_stats.csv"):
     """Load latency and byte-size records from a CSV file."""
     records = []

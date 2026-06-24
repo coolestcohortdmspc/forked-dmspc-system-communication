@@ -1,8 +1,10 @@
 from django.urls import path
-from .views import views
-
+from . import views
 
 urlpatterns = [
-    # Maps the root URL of this app to the index view function
-    path('', views.index, name='index'),
+    # Have not tested if this works as expected
+    path('dashboard/', views.dashboard_view, name='dashboard_home'),
+    
+    # Have not tested if this works as expected
+    path('dashboard/update/', views.event_table_partial, name='event_table_update'),
 ]

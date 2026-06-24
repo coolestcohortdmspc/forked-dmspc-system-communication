@@ -1,3 +1,3 @@
 from django.test import TestCase
 
-# Create your tests here.
+# Maybe we could consider writing some unit tests for throughput and latency metrics here...?

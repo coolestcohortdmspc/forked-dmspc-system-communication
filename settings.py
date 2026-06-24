@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 import os
 from pathlib import Path
 from dotenv import load_dotenv
+import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / '.env')
@@ -19,13 +20,15 @@ load_dotenv(BASE_DIR / '.env')
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
 DEBUG = os.environ.get('DJANGO_DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = []
+# Allow local Docker containers AND Render's domain depending on environment
+# Have not tested this yet
+ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1,django-consumer').split(',')
 
 
 # Application definition
 
 INSTALLED_APPS = [
-    "unfold",
+    # "unfold", # do we need this? what is this?
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -36,6 +39,8 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    # the order of these is VERY important. 
+    # if making changes, ensure the order is correct
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -65,16 +70,22 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'wsgi.application'
 
-
-# Database
-# https://docs.djangoproject.com/en/6.0/ref/settings/#databases
-
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+# If DATABASE_URL exists (which it does in our docker-compose), dj_database_url parses it automatically.
+if os.environ.get('DATABASE_URL'):
+    DATABASES = {
+        'default': dj_database_url.config(
+            conn_max_age=600,
+            conn_health_checks=True,
+        )
     }
-}
+else:
+    # Local fallback option just in case we need to run manage.py outside of Docker
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 
 # Password validation
@@ -119,3 +130,11 @@ LOGIN_URL = '/login/'
 LOGIN_REQUIRED_IGNORE_PATHS = [
     r'^login/$',
 ]
+
+# ==============================================================================
+# LOCAL WORKSTATION OBJECT STORAGE (ACTIVE FOR PROTOTYPING)
+# For prototype purposes only, to be replaved with cloud object storage later
+# ==============================================================================
+# not sure if the path is correct on these, have not tested
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+MEDIA_URL = '/media/'
