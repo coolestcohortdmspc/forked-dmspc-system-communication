@@ -1,0 +1,4 @@
+# This folder is where we will store our images coming from kafka.
+# The mock assets we will send images to kafka
+# The media/ddm_payloads we will use as object storage
+# for images coming from kafka.
