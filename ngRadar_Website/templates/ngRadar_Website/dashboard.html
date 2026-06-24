@@ -1,4 +1,15 @@
-# this is the main dashboard template
-# bring over most of the UI design from the existing base + index templates
-# but will need to embed the partial here too for the observatory event table
-# and the partial for the user inputted data to update the waveform
+<!-- this is the main dashboard template
+bring over most of the UI design from the existing base + index templates
+but will need to embed the partial here too for the observatory event table
+and the partial for the user inputted data to update the waveform -->
+
+<!-- Consider HTMX for a more dynamic user experience, but there may be better options available.
+Something like this: -->
+
+    <!-- <div id="dashboard-content" 
+         hx-get="{% url 'event_table_update' %}" 
+         hx-trigger="every 3s" 
+         hx-target="#dashboard-content"
+         class="container-fluid px-0 mt-4">
+        {% include 'partials/dashboard_updates.html' %}
+    </div> -->
