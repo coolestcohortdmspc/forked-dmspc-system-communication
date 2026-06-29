@@ -44,6 +44,20 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: ngradar_website
+    develop:
+      watch:
+        - action: sync
+          path: .
+          target: /app
+          initial_sync: true
+          ignore:
+            - .git
+            - .venv
+            - __pycache__
+            - .vscode
+        - action: rebuild
+          path: requirements.txt
+
     # command: python manage.py run_consumer -> need to uncomment later!!! For our consumer to actively "listen" for new messages, this is what triggers it to start listening
     environment:
       # - KAFKA_BOOTSTRAP_SERVERS=kafka:9092 -> idk???
