@@ -70,28 +70,21 @@
           getTime();
           setInterval(getTime, 1000);
       </script>
-	  
-	  
-      <section aria-label="Observation details">
-        <p class="target-molniya"><span class="text-wrapper">Target: </span><strong class="span">Molniya</strong></p>
-        <p class="obs-ID-obs"><span class="text-wrapper">Obs_ID: </span><strong class="span">obs_001</strong></p>
-        <p class="text-wrapper-6">TLE:</p>
-        <p class="transmitter-ON"><span class="text-wrapper-2">Transmitter: </span><strong
-            class="text-wrapper-3">ON</strong></p>
-        <p class="transmitted-waveform"><span class="text-wrapper">Transmitted Waveform: </span><strong class="span">W49
-            (120 MHz LFM, 2ms PRP)</strong></p>
-        <p class="recorded-waveform"><span class="text-wrapper">Recorded Waveform: </span><strong class="span">W49 (120
-            MHz LFM, 2ms PRP)</strong></p>
-      </section>
-      <section aria-label="Plots">
-        <img class="cw-plot" src="/static/ngRadar_Website/images/cw_plot.jpg"
-          alt="CW plot for the current observation" />
-        <img class="molniya" src="/static/ngRadar_Website/images/molniya.png"
-          alt="DDM visualization for target Molniya" />
-      </section>
+
+      <!-- HTMX Engine Injection -->
+      <script src="https://unpkg.com/htmx.org@1.9.12/dist/htmx.min.js"></script>
+
+      <div id = "Latest-Observation"
+        hx-get="{% url 'latest_data_update' %}"
+        hx-trigger="every 3s"
+        hx-target="#Latest-Observation">
+        {% include 'ngRadar_Website/partials/homepage_updates.html' %}
+      </div>
+
       <footer>
         <p class="text-wrapper-7">Developed by Cohort 1</p>
       </footer>
+
     </main>
   </body>
 </body>
@@ -102,23 +95,21 @@
 
 
 
-
 <!--NEW HTML INCLUDING USER INPUT FIELD. DELETE ABOVE IF NOT NEEDED-->>
-
-
 <!DOCTYPE html>
 <html>
 
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta charset="utf-8" />
-  <link rel="stylesheet" href="globals.css">
-  <link rel="stylesheet" href="styleguide.css">
-  <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="../../static/ngRadar_Website/css/globals.css">
+    <link rel="stylesheet" href="../../static/ngRadar_Website/css/styleguide.css">
+    <link rel="stylesheet" href="../../static/ngRadar_Website/css/style.css">
+    <link rel="stylesheet" href="../../static/ngRadar_Website/css/customStyles.css">
 </head>
 
 <body>
-  <div class="desktop"><img class="line" src="img/line-2.svg" />
+  <div class="desktop">
     <p class="target-moretus"><span class="text-wrapper">Target: </span>
       <span class="span">Moretus</span>
     </p>
@@ -152,11 +143,8 @@
     <button class="button-5">
       <div class="button-2">Tx Logs</div>
     </button>
-    <img class="img" src="img/line-1.svg" />
-    <img class="logogroupcolor" src="img/logogroupcolor-1.png" />
     <div class="text-wrapper-5">System Communication Demo</div>
     <div class="text-wrapper-6">Developed by Cohort 1</div>
-    <img class="arrow" src="img/arrow-1.svg" />
   </div>
 </body>
 

@@ -44,6 +44,10 @@ def get_homepage_index(request):
     # this is the initial view to load the homepage
     return render(request, 'ngRadar_Website/index.html')
 
+def get_latest_data(request):
+    #get the database message for the home page
+    latest_data = ObservatoryEvent.objects.all().order_by('-event_time')[:1] 
+    return render(request, 'ngRadar_Website/partials/homepage_updates.html', {'latest_data': latest_data})
 
 def get_dashboard_context():
     """Helper function to keep data uniform across view updates"""
@@ -53,7 +57,6 @@ def get_dashboard_context():
     avg_latency = latest_events.aggregate(Avg('latency_ms'))['latency_ms__avg'] or 0.0
 
     # Calculate anything else we need for the initial load of the dashboard
-    
     return {
         'events': latest_events,
         'avg_latency': round(avg_latency, 2)
@@ -63,12 +66,6 @@ def get_Message_Latency():
     last_message_latency_str = str(ObservatoryEvent.objects.last().latency_ms)
     last_message_time_str = str(ObservatoryEvent.objects.last().event_time)
     last_message_time_str = last_message_time_str[:DATE_TIME_STRING]  # Truncate to first 20 characters
-    
-    data_to_send = {
-        "latency": last_message_latency_str,
-        "time_sent": last_message_time_str
-    }
-    yield f"data: {json.dumps(data_to_send)}\n\n"
 
     data_to_send = {
         "latency": last_message_latency_str,
@@ -95,7 +92,6 @@ def event_table_partial(request):
     return render(request, 'ngRadar_Website/partials/dashboard_updates.html', context)
 
 def serve_image(request, event_id):
-
     # get draw bytes from DB 
     raw = ObservatoryEvent.objects.filter(id=event_id).values_list('image_file', flat=True).first()
 
@@ -113,5 +109,3 @@ def serve_image(request, event_id):
 #     # can we store user inputted data to the database here? should we?
 #     # how should we handle sending the user inputted payload to the Kafka topic?
 #     return render(request, 'user_input.html') # just an example .html, have not actually created this
-
-
