@@ -38,6 +38,8 @@ def login_view(request):
 #import the producer
 outside_dir = str(Path(__file__).resolve().parents[2])
 sys.path.append(outside_dir)
+
+@login_required #ensure login is required and users can't access any other web address directly
 def get_homepage_index(request):
     # this is the initial view to load the homepage
     return render(request, 'ngRadar_Website/index.html')
