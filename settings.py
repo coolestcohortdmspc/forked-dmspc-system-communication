@@ -143,7 +143,7 @@ STATICFILES_DIRS = [
 # https://docs.djangoproject.com/en/6.0/topics/auth/default/
 
 LOGIN_URL = 'login'            # name of the login route in urls.py
-LOGIN_REDIRECT_URL = 'dashboard_home'    # after login -> /ngRadar_Website/dashboard.html
+LOGIN_REDIRECT_URL = 'index'    # after login -> /ngRadar_Website/index.html
 LOGOUT_REDIRECT_URL = 'login'  # after logout -> back to the login page
 
 # Let everyone see the login page; LoginRequiredMiddleware guards every other page.

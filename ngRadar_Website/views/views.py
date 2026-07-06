@@ -27,7 +27,7 @@ def login_view(request):
         
         if user is not None:
             login(request, user)
-            return redirect('dashboard_home')
+            return redirect('index')
         else:
             messages.error(request, "Invalid username or password.")
             return render(request, 'registration/login.html')
@@ -38,7 +38,9 @@ def login_view(request):
 #import the producer
 outside_dir = str(Path(__file__).resolve().parents[2])
 sys.path.append(outside_dir)
-
+def get_homepage_index(request):
+    # this is the initial view to load the homepage
+    return render(request, 'ngRadar_Website/index.html')
 
 
 def get_dashboard_context():
@@ -80,11 +82,8 @@ def latency_graphing(request):
     response["Cache-Control"] = "no-cache"
     return response
 
-@login_required
 def dashboard_view(request):
-    # this is the initial view to load the dashboard
     context = get_dashboard_context()
-
     return render(request, 'ngRadar_Website/dashboard.html', context) # pass any other vars to frontend here
 
 def event_table_partial(request):

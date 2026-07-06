@@ -1,6 +1,3 @@
-<!-- DELETE THIS TEMPLATE-->
-
-
 {% extends 'ngRadar_Website/base.html' %}
 
 {% block title %}ngRadar Website{% endblock %}
@@ -12,10 +9,11 @@
   <head>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta charset="utf-8" />
-    <title>System Communication Demo</title>
-    <link rel="stylesheet" href="globals.css">
-    <link rel="stylesheet" href="styleguide.css">
-    <link rel="stylesheet" href="style.css">
+    <title>System Communication Homepage
+    </title>
+    <link rel="stylesheet" href="../../static/ngRadar_Website/css/globals.css">
+    <link rel="stylesheet" href="../../static/ngRadar_Website/css/styleguide.css">
+    <link rel="stylesheet" href="../../static/ngRadar_Website/css/style.css">
   </head>
 
   <body>
@@ -25,11 +23,9 @@
           alt="NSF, Associated Universities, Inc., and National Radio Astronomy Observatory logos" />
         <h1 class="text-wrapper-5">System Communication Demo</h1>
       </header>
-      <img class="img" src="img/line-1.svg" alt="" aria-hidden="true" />
-      <img class="line" src="img/line-2.svg" alt="" aria-hidden="true" />
       <nav aria-label="Primary">
-        <button class="button-5" type="button" aria-label="Open Tx Logs">
-          <span class="button-2">Tx Logs</span>
+        <button onclick="window.location.href='/dashboard'" class="button-5" type="button" aria-label="Open Dashboard">
+          <span class="button-2">Dashboard</span>
         </button>
         <button class="button-4" type="button" aria-label="Open PRDX Files">
           <span class="button-2">PRDX Files</span>
