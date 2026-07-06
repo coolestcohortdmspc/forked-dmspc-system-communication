@@ -6,7 +6,7 @@ import time
 from datetime import datetime
 from PIL import Image
 from confluent_kafka import Consumer
-import psycopg2
+import psycopg
 from dotenv import load_dotenv
 import ast
 
@@ -15,7 +15,7 @@ load_dotenv()  # loads .env from current working dir
 database = os.environ["POSTGRES_DB"]
 user = os.environ["POSTGRES_USER"]
 password = os.environ["POSTGRES_PASSWORD"]
-host = os.environ["POSTGRES_URL"]
+host = os.environ["POSTGRES_HOST"]
 port = os.environ["POSTGRES_PORT"]
 
 config = {
@@ -29,7 +29,7 @@ config = {
 
 
 #Connecting to the team's render database (fill in password):
-conn = psycopg2.connect(database=database, user=user, password=password, host=host, port=port)
+conn = psycopg.connect(dbname=database, user=user, password=password, host=host, port=port)
 cursor = conn.cursor()
 
 topic = ["GBT_data", "DSOC_data"]  #NOTE The topic which the messages will be received from, rename accordingly to whatever topic you are using

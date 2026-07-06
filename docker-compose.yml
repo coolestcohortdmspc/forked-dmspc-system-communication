@@ -1,75 +1,122 @@
+# ===========================================================================
+# We use 1 Dockerfile and 1 docker-compose.yml file to build and 
+# run the Django application in a containerized environment.
+# If hosted locallly, it uses the local Postgres database. If in production, 
+# it uses the Render-hosted Postgres database.
+# ===========================================================================
+
 services:
-  
-#=====================================================
-# Should this go in a separate docker-compose file
-# on the workstation computer only?
-#=====================================================
-  # kafka:
-  #   image: apache/kafka:3.7.0
-  #   container_name: local_kafka
-  #   ports:
-  #     - "9092:9092"   # Traffic inside the internal Docker Network
-  #     - "9094:9094"   # Traffic from outside via ngrok
-  #   environment:
-  #     KAFKA_NODE_ID: 1
-  #     KAFKA_PROCESS_ROLES: 'broker,controller'
-  #     KAFKA_CONTROLLER_QUORUM_VOTERS: '1@localhost:9093'
-  #     KAFKA_LISTENERS: 'PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093,EXTERNAL://0.0.0.0:9094'
-  #     KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
-  #     KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
-  #     KAFKA_LOG_DIRS: '/tmp/kraft-combined-logs'
-  #     KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka:9092,EXTERNAL://4.tcp.ngrok.io:22010'
-  #     KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT'
-
-
-#=====================================================
-# Should this go in a separate docker-compose file
-# on the workstation computer only?
-#=====================================================
-  # kafka-ui:
-  #   image: provectuslabs/kafka-ui:latest
-  #   container_name: kafka_dashboard
-  #   ports:
-  #     - "8080:8080" # Open http://localhost:8080 in web browser to access the Kafka UI
-  #   environment:
-  #     DYNAMIC_CONFIG_ENABLED: 'true'
-  #     KAFKA_CLUSTERS_0_NAME: 'local-cluster'
-  #     KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: 'kafka:9092'
-  #   depends_on:
-  #     - kafka
-
-
   ngradar_website:
+    build: .
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+          condition: service_healthy
+    volumes:
+      - .:/service
+    ports:
+      - 8000:8000
+    networks:
+      - ngradar_website_network
+    stdin_open: true
+    tty: true
+
+  postgres:
+    image: postgres:18-alpine
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    ports:
+      - 5432:5432
+    environment:
+      - POSTGRES_USER=ngradar_website
+      - POSTGRES_PASSWORD=ngradar_website
+      - POSTGRES_DB=localdev
+    networks:
+      - ngradar_website_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ngradar_website -d localdev"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  staging_loader:
     build:
       context: .
-      dockerfile: Dockerfile
-    container_name: ngradar_website
-    # command: python manage.py run_consumer -> need to uncomment later!!! For our consumer to actively "listen" for new messages, this is what triggers it to start listening
-    environment:
-      # - KAFKA_BOOTSTRAP_SERVERS=kafka:9092 -> idk???
-      - DATABASE_URL=${DATABASE_URL}
-    # depends_on:
-      # - kafka -> idk???
-    ports:
-      - "8000:8000"
+      dockerfile: load-staging-data.Dockerfile
+    env_file:
+      - .env
+    networks:
+      - ngradar_website_network
+    depends_on:
+      - postgres
     volumes:
-      - ./media:/app/media
+      - staging_dump:/dump
+    profiles:
+      - tools
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.1
+    profiles: ["kafka"]
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - ngradar_website_network
+
+  broker:
+    image: confluentinc/cp-kafka:7.5.1
+    profiles: ["kafka"]
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+
+      KAFKA_LISTENERS: PLAINTEXT://broker:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://broker:29092
+
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    networks:
+      - ngradar_website_network
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    profiles: ["kafka"]
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: broker:29092
+    depends_on:
+      - broker
+    networks:
+      - ngradar_website_network
+
+  ngrok:
+    image: ngrok/ngrok:latest
+    profiles: ["ngrok"]
+    command: tcp broker:29092 --log stdout --authtoken ${NGROK_AUTH_TOKEN}
+    ports:
+      - "4040:4040"
+    networks:
+      - ngradar_website_network
+
+  worker:
+    build: .
+    command: python manage.py consumer
+    volumes:
+      - .:/service
+    networks:
+      - ngradar_website_network
+    profiles:
+      - kafka
 
 
+volumes:
+  postgres_data:
+  staging_dump:
 
-#=====================================================
-# Should this go in a separate docker-compose file
-# on the workstation computer only?
-#=====================================================
-  # A TCP Tunneling Engine
-  #ngrok:
-  #  image: ngrok/ngrok:latest
-  #  container_name: local_tunnel
-  #  restart: unless-stopped
-  #  environment:
-  #    - NGROK_AUTHTOKEN=
-  #  command:
-  #    - "tcp"
-  #    - "kafka:9094" # Directs raw binary TCP traffic straight to the Kafka container
-  #  depends_on:
-  #    - kafka
+networks:
+  ngradar_website_network:
+    driver: bridge

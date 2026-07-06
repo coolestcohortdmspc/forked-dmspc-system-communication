@@ -1,29 +1,31 @@
-# This has not been tested at all.
-
-FROM python:3.11-slim
+FROM python:3.11-alpine
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-# Set the working directory inside the container
-WORKDIR /app
+RUN mkdir /service
+WORKDIR /service
 
-# Install system dependencies required for Postgres compiled drivers
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    libpq-dev \
-    gcc \
-    && rm -rf /var/lib/apt/lists/*
+RUN apk update && apk add --no-cache \
+    bash curl gcc g++ make libc-dev libffi-dev \
+    git \
+    make \
+    build-base \
+    postgresql-dev \
+    musl-dev \
+    librdkafka-dev \
+    openssl-dev \
+    cyrus-sasl-dev \
+    && rm -rf /var/cache/apk/*
 
-# Copy and install Python dependencies
-COPY requirements.txt /app/requirements.txt
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+COPY requirements.txt .
 
-COPY . /app/
+RUN pip install --upgrade pip \
+ && pip install -r requirements.txt
+
+COPY . .
+
 RUN python manage.py collectstatic --noinput
 
-# Expose port 8000 for web delivery configurations
-EXPOSE 8000
 
-CMD ["gunicorn", "wsgi:application", "--bind", "0.0.0.0:8000"]
+CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]

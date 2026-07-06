@@ -19,7 +19,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / '.env')
 
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
-DEBUG = os.environ.get('DJANGO_DEBUG', 'True') == 'True'
+DEBUG = os.environ.get('DJANGO_DEBUG')
 
 # Allow local Docker containers AND Render's domain depending on environment
 # Have not tested this yet
@@ -29,9 +29,7 @@ ALLOWED_HOSTS = [
 ]
 
 # Application definition
-
 INSTALLED_APPS = [
-    # "unfold", # do we need this? what is this?
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -81,22 +79,14 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'wsgi.application'
 
-# If DATABASE_URL exists (which it does in our docker-compose), dj_database_url parses it automatically.
-if os.environ.get('DATABASE_URL'):
-    DATABASES = {
-        'default': dj_database_url.config(
-            conn_max_age=600,
-            conn_health_checks=True,
-        )
-    }
-else:
-    # Local fallback option just in case we need to run manage.py outside of Docker
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
-        }
-    }
+# This will allow for easy switching between local and demo databases without changing the code.
+# When local, it will use the local Postgres database from our non-commited .env file. 
+# When our code base is deployed on the cloud, and since we don't commit our .env file to Github,
+# Render will default to the DATABASE_URL that we will configure via the Render dashboard to connect 
+# to the Render-hosted Postgres database.
+DATABASES = {
+    "default": dj_database_url.config()
+}
 
 
 # Password validation
