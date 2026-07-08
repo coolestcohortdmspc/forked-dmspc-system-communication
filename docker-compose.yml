@@ -153,17 +153,33 @@ services:
       - kafka
 
   seaweedfs:
-    build: .
+    build: 
+      context: .
+      dockerfile: seaweed.Dockerfile
     ports:
-      - "9333:9333"
-      - "8080:8080"
-      - "8333:8333"
+      - "${LOCAL_FILER_PORT:-8888}:8888"
+      - "${LOCAL_MASTER_PORT:-9333}:9333"
+      - "${LOCAL_S3_PORT:-8333}:8333"
     volumes:
       - seaweed_data:/data
     networks:
       - ngradar_website_network
     env_file:
       - .env
+
+  storage-ui:
+    image: mastertinner/s3manager:latest
+    platform: linux/amd64
+    ports:
+      - "${LOCAL_GUI_PORT:-3000}:8080" 
+    environment:
+      - ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-anykey}
+      - SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-anysecret}
+      - ENDPOINT=seaweedfs:8333 
+      - USE_SSL=false
+    networks:
+      - ngradar_website_network
+
 
 
 volumes:
