@@ -157,9 +157,9 @@ services:
       context: .
       dockerfile: seaweed.Dockerfile
     ports:
-      - "${LOCAL_FILER_PORT:-8888}:8888"
-      - "${LOCAL_MASTER_PORT:-9333}:9333"
-      - "${LOCAL_S3_PORT:-8333}:8333"
+      - "${FILER_PORT:-8888}:8888"
+      - "${MASTER_PORT:-9333}:9333"
+      - "${S3_PORT:-8333}:8333"
     volumes:
       - seaweed_data:/data
     networks:
@@ -171,7 +171,7 @@ services:
     image: mastertinner/s3manager:latest
     platform: linux/amd64
     ports:
-      - "${LOCAL_GUI_PORT:-3000}:8080" 
+      - "${GUI_PORT:-3000}:8080" 
     environment:
       - ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-anykey}
       - SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-anysecret}

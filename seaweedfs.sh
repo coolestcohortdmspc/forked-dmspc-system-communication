@@ -6,7 +6,7 @@
 if [ -n "$RENDER" ] || [ "$APP_ENV" = "demo" ]; then
     echo "--- Demo Cloud Environment Detected ---"
     # Fallback syntax uses :- instead of ://
-    S3_DOMAIN="${WEED_S3_DOMAIN:-your-app.onrender.com}" 
+    S3_DOMAIN="${WEED_S3_DOMAIN:-https://system-communication-prototype.onrender.com/}" 
 else
     echo "--- Local Development Environment Detected ---"
     S3_DOMAIN="localhost"
