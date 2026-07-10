@@ -1,6 +1,7 @@
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from PIL import Image
+import uuid
 from django.core.management.base import BaseCommand
 from confluent_kafka import Consumer
 from dotenv import load_dotenv
@@ -14,13 +15,15 @@ from pathlib import Path
 from ngRadar_Website.enums import Stations
 import time
 from botocore.exceptions import EndpointConnectionError
-# from django.db import close_old_connections
+from django.utils import timezone
+
 
 """
 This code will:
 - consume a message from the GBT
 - create an image file
-- load the image data + the uuid into the DB
+- save image file to seaweedfs object store
+- load the image key + the uuid into the DB
 """
 
 load_dotenv()  # Load environment variables from .env file
@@ -49,55 +52,51 @@ config = {
 
 topic = ["GBT_data"]  #consumes from the GBT's topic
 
-''' We aren't currently calculating latency at this step
-We have to decide how to implement latency in addition to having a simulated delay
-
 def latency_calc(event_time):
   #calculates the latency of the message from the time it was sent to the time it was received
   #returns latency in milliseconds
 
-  event_time = datetime.strptime(event_time, "%Y-%m-%d %H:%M:%S.%f")
-  current_time = datetime.now()
+  current_time = datetime.now(timezone.utc)
   latency = current_time - event_time
   latency_ms = latency.total_seconds() * 1000
   return latency_ms
-'''
 
 
 def DB_import(uuid):
     
-  gbt_data = gbtEvent.objects.filter(uuid=uuid).values_list('uuid', 'object_id', 'target', 'tx_waveform', 'event_time', 'latency_ms').first()
+  gbt_data = gbtEvent.objects.filter(uuid=uuid).values_list('object_id', 'target', 'tx_waveform', 'event_time').first()
 
   return gbt_data
 
 
 def DB_columns(gbt_data):
-  #defines the column values specific to DSOC/images
-
     data = {
-        "event_time": datetime.now() - timedelta(seconds=5),
-        "object_id": gbt_data[1],  # object_id
-        "target": gbt_data[2],  # target
+        "event_time": datetime.now(timezone.utc),
+        "object_id": gbt_data[0], # object_id
+        "target": gbt_data[1],    # target
     }
 
     return data
 
 
 def publish_DB(image_key, num_bytes, data):
-  #saves the image path to the database
-  data.update({
-      "image_key": image_key,
-      "num_bytes": num_bytes
-  })
+    # Copy the dictionary so we don't accidentally mutate data out-of-scope
+    # since we are not using class based methods
+    payload_data = data.copy()
+    payload_data.update({
+        "image_key": image_key,
+        "num_bytes": num_bytes
+    })
 
-  try:
-          dsocEvent.objects.create(**data)
-          msg = "Payload saved to database successfully."
+    try:
+        # Create and capture the instantiated record model
+        record = dsocEvent.objects.create(**payload_data)
+        print("Payload saved to database successfully.")
+        return record  # <-- Return the actual object record
 
-  except Exception as e:
-          msg = f"Database error: {e}"
-
-  return print(msg)
+    except Exception as e:
+        print(f"Database error: {e}")
+        return None  # <-- Return None if something broke
 
 
 def create_img(tx_waveform):
@@ -105,13 +104,13 @@ def create_img(tx_waveform):
     matplotlib.use('Agg')  # Use a non-interactive backend for matplotlib
         
     #generating random data and formatting the graph:
-    x_data = np.random.uniform(-30, 30, 20)
-    y_data = np.random.uniform(-300, 300, 20)
+    x_data = np.random.uniform(-30, 30, 40)
+    y_data = np.random.uniform(-300, 300, 40)
 
-    plt.scatter(x_data, y_data)
+    plt.scatter(x_data, y_data, color='red')
     plt.axhline(0, color='black', linewidth=0.5)
     plt.axvline(0, color='black', linewidth=0.5)
-    plt.title(f"DDM for {tx_waveform}")
+    plt.title(f"DDM for {tx_waveform}", size=20)
     plt.xlabel("Doppler Freq (Hz)")
     plt.ylabel("Range (km)")
     plt.grid(True)
@@ -129,7 +128,7 @@ def create_img(tx_waveform):
 
     return image_file, num_bytes
 
-def save_image_to_seaweedfs(target, image_file, uuid):
+def save_image_to_seaweedfs(target, image_file, dsoc_uuid):
     # Save the image to SeaweedFS using S3 API
     import boto3
     from botocore.exceptions import NoCredentialsError
@@ -141,85 +140,93 @@ def save_image_to_seaweedfs(target, image_file, uuid):
         aws_secret_access_key=os.environ.get('WEED_S3_SECRET_KEY')
     )
 
-    image_key = f"ddm/{target}/{uuid}.png"
+    image_key = f"ddm/{target}/{dsoc_uuid}.png"
 
     for attempt in range(5):
-      print("attempting...")
-      try:
-          if hasattr(image_file, 'read'):
-              image_file.seek(0) # Reset stream pointer to the beginning of the file
-              file_data = image_file.read()
-          else:
-              file_data = image_file
-          s3.put_object(
-              Bucket=os.environ.get('WEED_S3_BUCKET'),
-              Key=image_key,
-              Body=file_data,
-              ContentType='image/png'
-          )
-          break
-      except EndpointConnectionError:
+        try:
+            if hasattr(image_file, 'read'):
+                image_file.seek(0) # Reset stream pointer to the beginning of the file
+                file_data = image_file.read()
+            else:
+                file_data = image_file
+            s3.put_object(
+                Bucket=os.environ.get('WEED_S3_BUCKET'),
+                Key=image_key,
+                Body=file_data,
+                ContentType='image/png'
+            )
+            break
+        except EndpointConnectionError:
             if attempt == 4:
                 raise
             time.sleep(2)
-      print(f"Success: Image saved to SeaweedFS at {image_key}") #TODO: might need to re-indent this back into except
+            print(f"Success: Image saved to SeaweedFS at {image_key}")
 
     return image_key
 
 
 def consume(topic, config):
-  #creates a new consumer instance
-  consumer = Consumer(config)
+    #creates a new consumer instance
+    consumer = Consumer(config)
 
-  #subscribes to the specified topic
-  consumer.subscribe(topic)
+    #subscribes to the specified topic
+    consumer.subscribe(topic)
+    
+    try:
+        while True:
+            #consumer polls the topic and prints any incoming messages
+            msg = consumer.poll(1.0) #polls for messages for 1 second
+            #if msg is not None and msg.error() is None:
+            if msg is None:
+                continue
+            if msg.error() is not None:
+                print("Consumer error:", msg.error())
+                continue
 
-  try:
-    while True:
-      #consumer polls the topic and prints any incoming messages
-        msg = consumer.poll(1.0) #polls for messages for 1 second
-      #if msg is not None and msg.error() is None:
-        if msg is None:
-            continue
-        if msg.error() is not None:
-            print("Consumer error:", msg.error())
-            continue
+            #decode the GBT payload that is a single string of just the uuid:
+            gbt_uuid = msg.key().decode("utf-8")
 
-        #decode the GBT payload that is a single string of just the uuid:
-        uuid = msg.key().decode("utf-8")
+            #use the uuid from the payload to import the correct line of data from the GBT table:
+            gbt_data = DB_import(gbt_uuid)
 
-        #use the uuid from the payload to import the correct line of data from the GBT table:
-        gbt_data = DB_import(uuid)
+            #calculate latency with event_time from the GBT import, before we update the event_time value in DB_columns
+            dsoc_latency = latency_calc(gbt_data['event_time'])
 
-        #create the rest of the column values specific to DSOC/images:
-        data = DB_columns(gbt_data)
+            #create the rest of the column values specific to DSOC/images:
+            data = DB_columns(gbt_data)
+            data['latency_ms'] = dsoc_latency
 
-        uuid, object_id, target, tx_waveform, event_time, latency_ms = gbt_data
-        image_file, num_bytes = create_img(tx_waveform)
+            # 1. Gather data and create the image file and dsoc_uuid first:
+            object_id, target, tx_waveform, event_time = gbt_data
+            image_file, num_bytes = create_img(tx_waveform)
+            dsoc_uuid = str(uuid.uuid4())
 
-        image_key = save_image_to_seaweedfs(target, image_file, uuid)
+             # 2. Upload the image to SeaweedFS using your pre-generated uuid
+            image_key = save_image_to_seaweedfs(target, image_file, dsoc_uuid)
 
-        publish_DB(image_key, num_bytes, data)
+            # 3. Inject the UUID and image_key directly into the payload data
+            data['uuid'] = dsoc_uuid
 
-        print(f"Received message from {Stations.GBT.label}; DDM is ready in SeaweedFS (Image Path: {data['image_key']}).")
+            # 4. Save everything at once
+            # To trigger the signal events to obsevent table
+            publish_DB(image_key=image_key, num_bytes=num_bytes, data=data)
 
-        ''' Previous code using old functions:
-        #create the rest of the column values specific to DSOC/images:
-        product_type, product_id, station,created_at, xmit_station, rcvr_station = DB_columns()
-
-        publish_DB(uuid, product_type, product_id, station, created_at, xmit_station, rcvr_station, image_file, num_bytes)
-        '''
-        #unique = hashlib.sha256(str(value['Image']).encode('utf-8')).hexdigest()
-        #filename = f"{value['Type']}-{value['Image_ID']}-{value['Timestamp']}-{unique:.15}.png"
-        #print(f"Image saved as {filename}")
+            print(f"Received message from {Stations.GBT.label} for object {object_id}; DDM is ready in SeaweedFS (Image Path: {image_key}.")
+    
+    except Exception as e:
+        import traceback
+        print("An unhandled exception occurred in the consumer loop:")
+        traceback.print_exc()
 
 
-  except KeyboardInterrupt: 
-    pass
-  finally:
-    #closes the consumer connection
-    print("reached the end")
-    #consumer.close()
+
+
+
+#   except KeyboardInterrupt: 
+#     pass
+#   finally:
+#     print("reached the end")
+  
 
 
 class Command(BaseCommand):

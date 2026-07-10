@@ -35,7 +35,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'ngRadar_Website',
+    'ngRadar_Website.apps.apps.NgradarWebAppConfig',
 ]
 
 MIDDLEWARE = [

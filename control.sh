@@ -17,8 +17,8 @@ start)
     ;;
 
 rebuild)
-    echo "Starting development environment..."
-    docker compose up -d --build
+    echo "Rebuilding development environment..."
+    docker compose build --no-cache && docker compose up -d
     ;;
 
 stop)
@@ -43,12 +43,12 @@ load-staging-data)
     ;;
 
 kafka-up)
-    echo "Starting kafka broker, zookeeper, kafka-ui, ngrok..."
+    echo "Starting kafka broker, zookeeper, kafka-ui, ngrok, seaweedfs, workers..."
     docker compose $KAFKA_PROFILES up -d
     ;;
 
 kafka-down)
-    echo "Stopping kafka broker, zookeeper, kafka-ui, ngrok..."
+    echo "Stopping kafka broker, zookeeper, kafka-ui, ngrok, seaweedfs, workers..."
     docker compose stop $KAFKA_SERVICES
     docker compose rm -f $KAFKA_SERVICES
     ;;
@@ -65,7 +65,7 @@ hard-reset)
 
     docker system prune -f
 
-    docker compose up -d --build
+    docker compose build --no-cache && docker compose up -d
     ;;
 
 *)

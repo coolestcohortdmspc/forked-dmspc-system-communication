@@ -4,16 +4,16 @@ from .views import views
 urlpatterns = [
     # Home page URLs
     path('home/', views.home_view, name='home'),
-    path('home/', views.gbt_event_partial, name='gbt_events'),
-    path('home/', views.dsoc_event_partial, name='dsoc_events'),
-    path('home/', views.submit_waveform, name='submit_waveform'),
+    path('home/gbtevent', views.gbt_event_partial, name='gbt_events'),
+    path('home/dsocevent', views.dsoc_event_partial, name='dsoc_events'),
+    path('submit-waveform/', views.submit_waveform, name='submit_waveform'),
 
     # Dashboard page URLs
     path('dashboard/', views.dashboard_view, name='dashboard_home'),
+    # Need seperate paths for the update pages so they doesn't overwrite the website
     path('dashboard/updates', views.event_table_partial, name='event_table_update'),
-    # Need a seperate path for the updated page so it doesn't overwrite the website
-    path('dashboard/', views.latency_graphing, name='latency_graphing'),
-    path('dashboard/', views.serve_image, name ='serve_image'),
+    path('dashboard/latency', views.latency_graphing, name='latency_graphing'),
+    path('dashboard/image', views.serve_image, name ='serve_image'),
 
 
     # Keep as placeholder when we develop this

@@ -99,7 +99,6 @@ def serve_image(request, event_id):
     )
 
 
-
 # Need a function AND another partial template for handling the user inputted payload
 def submit_waveform(request):
     if request.method == "POST":
