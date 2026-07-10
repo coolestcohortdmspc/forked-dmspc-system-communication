@@ -1,7 +1,9 @@
 from django.shortcuts import redirect, render
 from django.contrib.auth.decorators import login_required
 
+#Libraries used for the login/logout
 from django.views.decorators.cache import cache_control
+from django.views.decorators.http import require_POST, require_GET
 
 #libraries to get files from the outside directory
 import sys
@@ -15,11 +17,10 @@ import boto3
 from ngRadar_Website.enums import Stations
 from ngRadar_Website.models.models import ObservatoryEvent, uiEvent, gbtEvent, dsocEvent
 from django.contrib import messages
-from django.contrib.auth import authenticate, login
+from django.contrib.auth import authenticate, login, logout
 from django.db.models import Avg
 from confluent_kafka import Producer
-import os 
-import uuid
+import os, uuid
 from datetime import datetime, timezone 
 from dotenv import load_dotenv
 
@@ -98,7 +99,6 @@ def serve_image(request, event_id):
     )
 
 
-    
 
 # Need a function AND another partial template for handling the user inputted payload
 def submit_waveform(request):
@@ -151,9 +151,10 @@ def submit_waveform(request):
 # Render the templates
 #====================================================
 
-
 @cache_control(no_cache=True, must_revalidate=True, no_store=True) #Desmond's Auth token fix - comment if we decide not to use
 def login_view(request):
+    logout_view(request)
+    
     if request.method == 'POST':
         username_input = request.POST['username']
         password_input = request.POST['password']
@@ -172,10 +173,19 @@ def login_view(request):
     # response = render(request, 'registration/login.html')
     # response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
 
-    return render(request, 'registration/login.html')
+    response  = render(request, 'registration/login.html')
+    response["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response["Pragma"] = "no-cache"
+    response["Expires"] = "0"
+    return response
 
 
-@login_required
+def logout_view(request):
+    logout(request)
+    response = redirect(login_view)
+    return response
+
+@login_required()
 def home_view(request):
     # this is the view for the homepage, which will display the most recent observatory event
     latest_events = get_obs_events()['latest_events']
@@ -183,16 +193,26 @@ def home_view(request):
     context = {
         'latest_event': most_recent_event
     }
-    return render(request, 'ngRadar_Website/home.html', context)
+    response = render(request, 'ngRadar_Website/home.html', context)
+
+    #code used to prevent this page being accessed using broswer buttons if logged out
+    response["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response["Pragma"] = "no-cache"
+    response["Expires"] = "0"
+
+    return response
 
 
 @login_required
 def dashboard_view(request):
-    return render(
-        request,
-        "ngRadar_Website/dashboard.html",
-        get_obs_events(),
-    )
+    response = render(request, "ngRadar_Website/dashboard.html", get_obs_events())
+
+    #code used to prevent this page being accessed using broswer buttons if logged out
+    response["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response["Pragma"] = "no-cache"
+    response["Expires"] = "0"
+
+    return response
 
 
 def event_table_partial(request):

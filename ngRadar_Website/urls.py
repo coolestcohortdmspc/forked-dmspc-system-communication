@@ -1,6 +1,5 @@
 from django.urls import path
 from .views import views
-from django.contrib.auth.views import LogoutView
 
 urlpatterns = [
     # Home page URLs
@@ -11,7 +10,8 @@ urlpatterns = [
 
     # Dashboard page URLs
     path('dashboard/', views.dashboard_view, name='dashboard_home'),
-    path('dashboard/', views.event_table_partial, name='event_table_update'),
+    path('dashboard/updates', views.event_table_partial, name='event_table_update'),
+    # Need a seperate path for the updated page so it doesn't overwrite the website
     path('dashboard/', views.latency_graphing, name='latency_graphing'),
     path('dashboard/', views.serve_image, name ='serve_image'),
 
@@ -21,5 +21,5 @@ urlpatterns = [
     # path('new_observation/',views.create_observation, name='create_new_observation'),
     
     # add logout path 
-    path('logout/', LogoutView.as_view(), name='logout')
+    path('logout/', views.logout_view, name='logout')
 ]
