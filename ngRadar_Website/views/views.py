@@ -92,8 +92,8 @@ def serve_image(request, uuid):
     s3 = boto3.client(
         "s3",
         endpoint_url=os.environ["WEED_S3_DOMAIN"],
-        aws_access_key_id=os.environ["AWS_ACCESS_KEY_ID"],
-        aws_secret_access_key=os.environ["AWS_SECRET_ACCESS_KEY"],
+        aws_access_key_id=os.environ["WEED_S3_ACCESS_KEY"],
+        aws_secret_access_key=os.environ["WEED_S3_SECRET_KEY"],
     )
 
     response = s3.get_object(
