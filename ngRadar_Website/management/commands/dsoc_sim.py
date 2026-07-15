@@ -15,7 +15,7 @@ from pathlib import Path
 from ngRadar_Website.enums import Stations
 import time
 from botocore.exceptions import EndpointConnectionError
-from ngRadar_Website.utils import latency_calc
+from ngRadar_Website.utils import latency_calc, bootstrap
 
 
 """
@@ -26,31 +26,7 @@ This code will:
 - load the image key + the uuid into the DB
 """
 
-load_dotenv()  # Load environment variables from .env file
-
-p = Path("../../../../out/ngrok_endpoint.env")
-text = p.read_text().strip()
-
-bootstrap = None
-for line in text.splitlines():
-    if line.startswith("BOOTSTRAP_SERVER="):
-        bootstrap = line.split("=", 1)[1].strip()
-        break
-
-if not bootstrap:
-    raise RuntimeError("BOOTSTRAP_SERVER not found in /out/ngrok_endpoint.env")
-
-config = {
-    "bootstrap.servers": bootstrap,
-    "fetch.max.bytes": 8388608,
-    "session.timeout.ms": 45000,
-    "client.id": "dsoc-consumer",
-    "group.id": "consumer-group",
-    "auto.offset.reset": "earliest",
-  }
-
-
-topic = ["GBT_data"]  #consumes from the GBT's topic
+topic, config = bootstrap("DSOC")
 
 def DB_import(uuid):
     
