@@ -18,3 +18,5 @@ matplotlib
 boto3
 botocore
 numpy
+pytest
+pytest-django
