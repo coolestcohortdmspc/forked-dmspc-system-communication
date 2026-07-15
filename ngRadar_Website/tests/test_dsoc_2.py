@@ -1,6 +1,5 @@
 from datetime import datetime, timezone
 from unittest.mock import patch, MagicMock
-import pytest
 
 
 # =============================================
@@ -10,8 +9,8 @@ import pytest
 
 # ==============================================================================
 # IMPORTANT:
-# Because we read "ngrok_endpoint.env" on import, we need to path the Path globally
-# before importing the components.
+# Because we read "ngrok_endpoint.env" on import, we need to patch the Path globally
+# before importing all the functions we want to test.
 # ==============================================================================
 mock_env_data = "BOOTSTRAP_SERVER=localhost:9092\nSOME_OTHER_VAR=value" # idk what this var is called
 with patch("pathlib.Path.read_text", return_value=mock_env_data):
@@ -24,6 +23,8 @@ with patch("pathlib.Path.read_text", return_value=mock_env_data):
         save_image_to_seaweedfs,
         consume,
     )
+
+    
 
 # ==============================================================================
 # 1. DB_import Test
@@ -39,13 +40,13 @@ def test_db_import_success(mock_gbt_event):
     mock_values = mock_query.values_list.return_value
     mock_values.first.return_value = mock_record
 
-    result = DB_import("test-uuid")
+    result = DB_import("9c85a7c7-0506-44f3-9792-63b1867c6f97") # random uuid I pulled from render DB to test with
     
     assert result == mock_record
-    mock_gbt_event.objects.filter.assert_called_once_with(uuid="test-uuid")
+    mock_gbt_event.objects.filter.assert_called_once_with(uuid="9c85a7c7-0506-44f3-9792-63b1867c6f97")
 
 
-@patch("ngRadar_Website.management.commands.dsoc_sim.gbtEvent")
+@patch("ngRadar_Website.management.commands.dsoc_sim.gbtEvent") # fake a gbtEvent record, let's you bypass having to connect to postres to test logic
 def test_db_import_empty_result(mock_gbt_event):
     """Scenario 2: Returns None when no matching UUID exists in the table."""
     mock_gbt_event.objects.filter.return_value.values_list.return_value.first.return_value = None
@@ -76,9 +77,8 @@ def test_db_columns_mapping(mock_datetime):
 # 3. publish_DB COMPONENT TESTS
 # ==============================================================================
 
-@patch("ngRadar_Website.management.commands.dsoc_sim.dsocEvent")
-@patch("ngRadar_Website.management.commands.dsoc_sim.time.sleep") # Skip the 3 second delay
-def test_publish_db_success(mock_sleep, mock_dsoc_event):
+@patch("ngRadar_Website.management.commands.dsoc_sim.dsocEvent") # fake a dsocEvent record, let's you bypass having to connect to postres to test logic
+def test_publish_db_success(mock_dsoc_event):
     """Scenario 1: Valid payload correctly creates and outputs the model instance."""
     input_data = {"object_id": "obj_1", "target": "Venus"}
     mock_instance = MagicMock()
@@ -93,8 +93,7 @@ def test_publish_db_success(mock_sleep, mock_dsoc_event):
 
 
 @patch("ngRadar_Website.management.commands.dsoc_sim.dsocEvent")
-@patch("ngRadar_Website.management.commands.dsoc_sim.time.sleep")
-def test_publish_db_exception(mock_sleep, mock_dsoc_event):
+def test_publish_db_exception(mock_dsoc_event):
     """Scenario 2: Handled database crash returns None instead of crashing runtime."""
     mock_dsoc_event.objects.create.side_effect = Exception("DB Connection Timeout")
 
