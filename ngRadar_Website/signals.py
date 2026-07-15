@@ -43,6 +43,6 @@ def create_observatory_from_dsoc(sender, instance, created, **kwargs):
         event_time=instance.event_time,
         latency_ms=instance.latency_ms,
         station=Stations.DSOC,      
-        xmit_station=Stations.DSOC, 
+        xmit_station=Stations.GBT, 
         rcvr_station=Stations.DSOC,
     )

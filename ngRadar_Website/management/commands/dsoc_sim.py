@@ -10,11 +10,12 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import io
-from ngRadar_Website.models.models import gbtEvent, dsocEvent
+from ngRadar_Website.models import gbtEvent, dsocEvent
 from pathlib import Path
 from ngRadar_Website.enums import Stations
 import time
 from botocore.exceptions import EndpointConnectionError
+from ngRadar_Website.utils import latency_calc
 
 
 """
@@ -50,16 +51,6 @@ config = {
 
 
 topic = ["GBT_data"]  #consumes from the GBT's topic
-
-def latency_calc(event_time):
-  #calculates the latency of the message from the time it was sent to the time it was received
-  #returns latency in milliseconds
-
-  current_time = datetime.now(timezone.utc)
-  latency = current_time - event_time
-  latency_ms = latency.total_seconds() * 1000
-  return latency_ms
-
 
 def DB_import(uuid):
     
