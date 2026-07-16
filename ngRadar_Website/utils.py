@@ -20,8 +20,6 @@ def config_func(sim, bootstrap):
     # Designed to be called in conjunction with bootstrap function
     if sim == "GBT":
         
-        #NOTE - Ty, I don't know what this section is for. Is this a remnant of confluent cloud?
-        
         #bootstrap = os.environ["BOOTSTRAP_SERVER"] 
         admin = AdminClient({"bootstrap.servers": bootstrap})
         topics = [
@@ -34,8 +32,6 @@ def config_func(sim, bootstrap):
             # f is a Future; result() will raise if creation failed for reasons other than "already exists"
             f.result()
         
-        #NOTE - end of confusing section
-        
         producer_topic = "GBT_data"  # NOTE The topic to which the messages will be sent, rename accordingly to whatever topic you want to send to
         producer_config = {
             "bootstrap.servers": bootstrap,
@@ -43,7 +39,7 @@ def config_func(sim, bootstrap):
             "client.id": "GBT-producer"
         }
 
-        consumer_topic = "user_input"  # NOTE Might want to change name
+        consumer_topic = "user_input"
         consumer_config = {
             "bootstrap.servers": bootstrap,
             "fetch.max.bytes": 8388608,
