@@ -13,7 +13,7 @@ from unittest.mock import patch, MagicMock
 # Because we read "ngrok_endpoint.env" on import, we need to patch the Path globally
 # before importing all the functions we want to test.
 # ==============================================================================
-mock_env_data = "BOOTSTRAP_SERVER=localhost:9092\nSOME_OTHER_VAR=value\nWEED_S3_DOMAIN=seaweedfs.fake.com\nWEED_S3_ACCESS_KEY=fake_access_key\nWEED_S3_SECRET_KEY=fake_key\nWEED_S3_BUCKET=fake_bucket" 
+mock_env_data = "BOOTSTRAP_SERVER=localhost:9092\nSOME_OTHER_VAR=value" 
 with patch("pathlib.Path.read_text", return_value=mock_env_data):
     from ngRadar_Website.management.commands.dsoc_sim import (
         Command,
@@ -121,6 +121,15 @@ def test_create_img_output():
 # 5. save_image_to_seaweedfs Test
 # ==============================================================================
 
+@patch.dict(
+    "os.environ",
+    {
+        "WEED_S3_DOMAIN": "seaweedfs.fake.com",
+        "WEED_S3_ACCESS_KEY": "fake_access_key",
+        "WEED_S3_SECRET_KEY": "fake_key",
+        "WEED_S3_BUCKET": "fake_bucket",
+    },
+)
 @patch("ngRadar_Website.management.commands.dsoc_sim.boto3") #fake the boto3 module which interacts with seaweedfs
 def test_save_image_to_seaweedfs_success(mock_boto3):
     """Scenario 1: Successful upload returns the expected image key."""
@@ -136,7 +145,12 @@ def test_save_image_to_seaweedfs_success(mock_boto3):
     image_key = save_image_to_seaweedfs(target, image_file, uuid)
 
     assert image_key == f"ddm/{target}/{uuid}.png"
-    mock_boto3.client.assert_called_once() #checking that the object store was accessed
+    mock_boto3.client.assert_called_once_with(
+        "s3",
+        endpoint_url="seaweedfs.fake.com",
+        aws_access_key_id="fake_access_key",
+        aws_secret_access_key="fake_key",
+    ) #checking that an S3 client was created
     mock_instance.put_object.assert_called_once() #checking that the object store had new data input into it
 
 # ==============================================================================
