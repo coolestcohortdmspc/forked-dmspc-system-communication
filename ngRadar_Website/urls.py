@@ -20,5 +20,7 @@ urlpatterns = [
 
     
     # logout path 
-    path('logout/', LogoutView.as_view(), name='logout')
+    path('logout/', views.logout_view, name='logout'),
+    path('logout/message_screen', views.logging_out_message, name='logout_message')
+
 ]

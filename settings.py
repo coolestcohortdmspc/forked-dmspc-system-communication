@@ -133,7 +133,7 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 LOGIN_URL = 'login'            # name of the login route in urls.py
 LOGIN_REDIRECT_URL = 'home'    # after login -> /ngRadar_Website/home.html
-LOGOUT_REDIRECT_URL = 'login'  # after logout -> back to the login page
+LOGOUT_REDIRECT_URL = 'logout_message'  # after logout -> display logout message -> back to the login page
 
 # Let everyone see the login page; LoginRequiredMiddleware guards every other page.
 LOGIN_REQUIRED_IGNORE_PATHS = [
