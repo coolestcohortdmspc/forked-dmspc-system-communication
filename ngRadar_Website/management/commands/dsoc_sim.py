@@ -16,6 +16,8 @@ from ngRadar_Website.enums import Stations
 import time
 from botocore.exceptions import EndpointConnectionError
 from ngRadar_Website.utils import latency_calc, bootstrap
+import boto3
+from botocore.exceptions import NoCredentialsError
 
 
 """
@@ -97,8 +99,6 @@ def create_img(tx_waveform):
 
 def save_image_to_seaweedfs(target, image_file, dsoc_uuid):
     # Save the image to SeaweedFS using S3 API
-    import boto3
-    from botocore.exceptions import NoCredentialsError
 
     s3 = boto3.client(
         's3',

@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import io
 from unittest.mock import patch, MagicMock
 
 
@@ -12,7 +13,7 @@ from unittest.mock import patch, MagicMock
 # Because we read "ngrok_endpoint.env" on import, we need to patch the Path globally
 # before importing all the functions we want to test.
 # ==============================================================================
-mock_env_data = "BOOTSTRAP_SERVER=localhost:9092\nSOME_OTHER_VAR=value" # idk what this var is called
+mock_env_data = "BOOTSTRAP_SERVER=localhost:9092\nSOME_OTHER_VAR=value\nWEED_S3_DOMAIN=seaweedfs.fake.com\nWEED_S3_ACCESS_KEY=fake_access_key\nWEED_S3_SECRET_KEY=fake_key\nWEED_S3_BUCKET=fake_bucket" 
 with patch("pathlib.Path.read_text", return_value=mock_env_data):
     from ngRadar_Website.management.commands.dsoc_sim import (
         Command,
@@ -105,13 +106,38 @@ def test_publish_db_exception(mock_dsoc_event):
 # 4. create_img Test
 # ==============================================================================
 
+def test_create_img_output():
+    """Ensure the function returns a BytesIO object with non-zero content."""
+    tx_waveform = "SineWave"
+    img_file, num_bytes = create_img(tx_waveform)
+    
+    assert isinstance(img_file, bytes)
+    assert num_bytes > 0
+    assert num_bytes == len(img_file)
+
 
 
 # ==============================================================================
 # 5. save_image_to_seaweedfs Test
 # ==============================================================================
 
+@patch("ngRadar_Website.management.commands.dsoc_sim.boto3") #fake the boto3 module which interacts with seaweedfs
+def test_save_image_to_seaweedfs_success(mock_boto3):
+    """Scenario 1: Successful upload returns the expected image key."""
+    #function inputs:
+    target = "Venus"
+    image_file = b"fake png bytes"
+    uuid = "12345"
 
+    #creating the fake boto3.client:
+    mock_instance = MagicMock()
+    mock_boto3.client.return_value = mock_instance
+
+    image_key = save_image_to_seaweedfs(target, image_file, uuid)
+
+    assert image_key == f"ddm/{target}/{uuid}.png"
+    mock_boto3.client.assert_called_once() #checking that the object store was accessed
+    mock_instance.put_object.assert_called_once() #checking that the object store had new data input into it
 
 # ==============================================================================
 # 6. consume Test
