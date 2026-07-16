@@ -12,7 +12,6 @@
         }
     </style>
     <script>
-        const maxNumberOfMessages = 20; // Maximum number of messages to keep in the chart
         const ctx = document.getElementById('LatencyChart').getContext('2d');
         const Latency_Chart = new Chart(ctx, {
             type: 'line',
@@ -73,36 +72,31 @@
             let numberMessagesDisplayed = Latency_Chart.data.labels.length;
 
             if (numberMessagesDisplayed == 0) {
-                for(let index=0; index < numberReceivedMessages; index++)
+                for(let index=numberReceivedMessages; index > 0 ; index--)
                 {
-                    Latency_Chart.data.labels.push(messageDateTime_Array[index]);//push formatted time to the chart (X Axis)
-                    Latency_Chart.data.datasets[0].data.push(messageLatency_Array[index]);//push latency (Y Axis)
+                    Latency_Chart.data.labels.push(messageDateTime_Array[index-1]);//push formatted time to the chart (X Axis)
+                    Latency_Chart.data.datasets[0].data.push(messageLatency_Array[index-1]);//push latency (Y Axis)
                 }
             }
             else if (numberMessagesDisplayed != 0) {
-                // if((messageDateTime_Array[numberReceivedMessages]!="")&&(messageLatency_Array[numberReceivedMessages]!=""))
-                // {
-                //     Latency_Chart.data.labels.shift();// Removes oldest data point
-                //     Latency_Chart.data.datasets[0].data.shift();
-                    
-                //     Latency_Chart.data.labels.push(messageDateTime_Array[numberReceivedMessages]);//push formatted time to the chart (X Axis)
-                //     Latency_Chart.data.datasets[0].data.push(messageLatency_Array[numberReceivedMessages]);//push latency (Y Axis)
-                // }
 
+                    //ensure empty messages can't be added
+                    if((messageDateTime_Array[0]!=null)&&(messageLatency_Array[0]!=null)){
+                        lastDateTime = Latency_Chart.data.labels[numberMessagesDisplayed-1];//get the last time
+                        lastDateTime_String = lastDateTime.join(" ");//combine array into a string for comparison
+                        newDateTime = messageDateTime_Array[0].join(" ");//get new data from the array
 
-            //     if (Latency_Chart.data.labels.length > maxNumberOfMessages) {
-            //         Latency_Chart.data.labels.shift();// Removes oldest data points
-            //         Latency_Chart.data.datasets[0].data.shift();
-            //     }
-            //     else {
-            //         lastDateTime = Latency_Chart.data.labels[numberOfMessages - 1];//get the second to last time
-            //         lastDateTime_String = lastDateTime.join(" ");//combine array into a string for comparison
-            //         if (lastDateTime_String != messageDateTime)//only add the data if it is new
-            //         {
-            //             Latency_Chart.data.labels.push(formattedDateTime);//push formatted time to the chart
-            //             Latency_Chart.data.datasets[0].data.push(messageLatency);
-            //         }
-            //     }
+                        if (lastDateTime_String != newDateTime)//only add the data if it is new
+                        {
+                            // Removes oldest data point
+                            Latency_Chart.data.labels.shift();
+                            Latency_Chart.data.datasets[0].data.shift();
+
+                            //push formatted time to the chart
+                            Latency_Chart.data.labels.push(messageDateTime_Array[0]);
+                            Latency_Chart.data.datasets[0].data.push(messageLatency_Array[0]);
+                        }
+                    }
             }
              Latency_Chart.update();
         };

@@ -40,17 +40,26 @@ def get_obs_events():
     """Helper function to keep data uniform across view updates"""
 
     latest_events = ObservatoryEvent.objects.order_by("-event_time")
+    latest_20 = latest_events[:RECORDS_TO_DISPLAY]
 
     ui_event = uiEvent.objects.order_by("-event_time")
+    latest_20_UI = ui_event[:RECORDS_TO_DISPLAY]
+
     # Calculate the average latency of the last 20 records
-    latest_20 = latest_events[:RECORDS_TO_DISPLAY]
     avg_latency = latest_20.aggregate(Avg('latency_ms'))['latency_ms__avg'] or 0
     current_waveform = ui_event.first().selected_waveform if ui_event.exists() else None
 
     return {
-        'latest_events': latest_events,
-        'latest_event': latest_events.first() if latest_events else None,
-        'ui_event': ui_event.first() if ui_event else None,
+        # 'latest_events': latest_events,
+        # 'latest_event': latest_events.first() if latest_events else None,
+        # 'ui_event': ui_event.first() if ui_event else None,
+        # 'gbt_event': latest_events.filter(station=Stations.GBT).order_by('-event_time').first(), # only care about the latest event for home gbt partial
+        # 'dsoc_event': latest_events.filter(station=Stations.DSOC).order_by('-event_time').first(), # only care about the latest event for home dsoc partial
+
+        #display only 20 messages on the dashboard
+        'latest_events': latest_20,
+        'latest_event': latest_20.first() if latest_20 else None,
+        'ui_event': latest_20_UI.first() if latest_20_UI else None,
         'gbt_event': latest_events.filter(station=Stations.GBT).order_by('-event_time').first(), # only care about the latest event for home gbt partial
         'dsoc_event': latest_events.filter(station=Stations.DSOC).order_by('-event_time').first(), # only care about the latest event for home dsoc partial
         'avg_latency': round(avg_latency, 2),
@@ -75,15 +84,10 @@ def get_Message_Latency():
         unformatted_date_time = str(object.event_time)
         formatted_date_time = unformatted_date_time[0:10], unformatted_date_time[11:19]#format the time in the views rather than in the front end
         
-        message_latency_arr.append(str(round(object.latency_ms,3)))#round the latency to 3 decimal places
-        message_time_arr.append(formatted_date_time)
-
-    print(message_time_arr)
-    print(message_latency_arr)
-    # Old Logic for getting last message in database
-    # last_message_latency_str = str(ObservatoryEvent.objects.order_by("event_time").last().latency_ms)
-    # last_message_time_str = str(ObservatoryEvent.objects.order_by("event_time").last().event_time)
-    # last_message_time_str = last_message_time_str[:DATE_TIME_STRING]  # Truncate to first 20 characters
+        # Prevent the tx off messages from being displayed since they do not have latency
+        if(str(object.tx_waveform)!= "Tx_OFF"):
+            message_latency_arr.append(str(round(object.latency_ms,3)))#round the latency to 3 decimal places
+            message_time_arr.append(formatted_date_time)
     
     data_to_send = {
         "latency_array": message_latency_arr,
