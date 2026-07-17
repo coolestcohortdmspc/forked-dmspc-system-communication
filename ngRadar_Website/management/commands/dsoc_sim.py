@@ -132,6 +132,39 @@ def save_image_to_seaweedfs(target, image_file, dsoc_uuid):
     return image_key
 
 
+def process_msg(msg):
+    #decode the GBT payload that is a single string of just the uuid:
+    gbt_uuid = msg.key().decode("utf-8")
+
+    #use the uuid from the payload to import the correct line of data from the GBT table:
+    gbt_data = DB_import(gbt_uuid)
+
+    #calculate latency with event_time from the GBT import, before we update the event_time value in DB_columns
+    dsoc_latency = latency_calc(gbt_data[3])
+
+    #create the rest of the column values specific to DSOC/images:
+    data = DB_columns(gbt_data)
+    data['latency_ms'] = dsoc_latency
+
+    # 1. Gather data and create the image file and dsoc_uuid first:
+    object_id, target, tx_waveform, event_time = gbt_data
+    image_file, num_bytes = create_img(tx_waveform)
+    dsoc_uuid = str(uuid.uuid4())
+
+        # 2. Upload the image to SeaweedFS using your pre-generated uuid
+    image_key = save_image_to_seaweedfs(target, image_file, dsoc_uuid)
+
+    # 3. Inject the UUID and image_key directly into the payload data
+    data['uuid'] = dsoc_uuid
+
+    # 4. Save everything at once
+    # To trigger the signal events to obsevent table
+    publish_DB(image_key=image_key, num_bytes=num_bytes, data=data)
+
+    print(f"Received message from {Stations.GBT.label} for object {object_id}; DDM is ready in SeaweedFS (Image Path: {image_key}.")
+
+
+
 def consume(topic, config):
     #creates a new consumer instance
     consumer = Consumer(config)
@@ -150,43 +183,11 @@ def consume(topic, config):
                 print("Consumer error:", msg.error())
                 continue
 
-            #decode the GBT payload that is a single string of just the uuid:
-            gbt_uuid = msg.key().decode("utf-8")
-
-            #use the uuid from the payload to import the correct line of data from the GBT table:
-            gbt_data = DB_import(gbt_uuid)
-
-            #calculate latency with event_time from the GBT import, before we update the event_time value in DB_columns
-            dsoc_latency = latency_calc(gbt_data[3])
-
-            #create the rest of the column values specific to DSOC/images:
-            data = DB_columns(gbt_data)
-            data['latency_ms'] = dsoc_latency
-
-            # 1. Gather data and create the image file and dsoc_uuid first:
-            object_id, target, tx_waveform, event_time = gbt_data
-            image_file, num_bytes = create_img(tx_waveform)
-            dsoc_uuid = str(uuid.uuid4())
-
-             # 2. Upload the image to SeaweedFS using your pre-generated uuid
-            image_key = save_image_to_seaweedfs(target, image_file, dsoc_uuid)
-
-            # 3. Inject the UUID and image_key directly into the payload data
-            data['uuid'] = dsoc_uuid
-
-            # 4. Save everything at once
-            # To trigger the signal events to obsevent table
-            publish_DB(image_key=image_key, num_bytes=num_bytes, data=data)
-
-            print(f"Received message from {Stations.GBT.label} for object {object_id}; DDM is ready in SeaweedFS (Image Path: {image_key}.")
-    
+            process_msg(msg)
     except Exception as e:
         import traceback
         print("An unhandled exception occurred in the consumer loop:")
         traceback.print_exc()
-
-
-
 
 
 #   except KeyboardInterrupt: 
@@ -194,7 +195,6 @@ def consume(topic, config):
 #   finally:
 #     print("reached the end")
   
-
 
 class Command(BaseCommand):
     help = "Runs the DSOC simulator"

@@ -22,6 +22,7 @@ with patch("pathlib.Path.read_text", return_value=mock_env_data):
         publish_DB,
         create_img,
         save_image_to_seaweedfs,
+        process_msg,
         consume,
     )
 
@@ -154,13 +155,79 @@ def test_save_image_to_seaweedfs_success(mock_boto3):
     mock_instance.put_object.assert_called_once() #checking that the object store had new data input into it
 
 # ==============================================================================
-# 6. consume Test
+# 6. process_msg Test
 # ==============================================================================
 
+#We don't want to actually call all of these functions
+#Make a mock of each function to define the fake output we can use:
+@patch("ngRadar_Website.management.commands.dsoc_sim.uuid.uuid4")
+@patch("ngRadar_Website.management.commands.dsoc_sim.DB_import")
+@patch("ngRadar_Website.management.commands.dsoc_sim.latency_calc")
+@patch("ngRadar_Website.management.commands.dsoc_sim.DB_columns")
+@patch("ngRadar_Website.management.commands.dsoc_sim.create_img")
+@patch("ngRadar_Website.management.commands.dsoc_sim.save_image_to_seaweedfs")
+@patch("ngRadar_Website.management.commands.dsoc_sim.publish_DB") #the arguments for each patch are then listed in reverse order:
+def test_process_msg(mock_publish_DB,
+                    mock_save_image,
+                    mock_create_img,
+                    mock_DB_columns,
+                    mock_latency_calc,
+                    mock_DB_import,
+                    mock_uuid,
+                ):
+    """Ensure the process_msg function processes the Kafka message and calls each nested function correctly"""
+    
+    #fake uuid payload from kafka
+    mock_uuid.return_value = "12345"
+
+    mock_msg = MagicMock()
+    mock_msg.key.return_value = b"12345"
+    mock_msg.error.return_value = None
+
+    #pretend that, given the fake uuid, this data is extracted from the DB:
+    gbt_data = (
+        "obj001",
+        "Venus",
+        "SineWave",
+        datetime(2026, 7, 15, 12, 0, 0, tzinfo=timezone.utc)
+    )
+    
+    #Each of these mock return values is pretending that we ran the function, and defining what the fake output is
+    mock_DB_import.return_value = gbt_data
+
+    mock_latency_calc.return_value = 1000
+    
+    data = {
+        "event_time": datetime(2026, 7, 16, 12, 0, 0, tzinfo=timezone.utc),
+        "object_id": mock_DB_import[0],
+        "target": mock_DB_import[1],
+    }
+    mock_DB_columns.return_value = data
+
+    img_file = b"bytes"
+    num_bytes = 500
+    mock_create_img.return_value = img_file, num_bytes
+
+    image_key = f"ddm/'Venus'/{mock_uuid}.png"
+    mock_save_image.return_value = image_key
+
+    mock_publish_DB.return_value = None
+
+    #Now we can call the real function, which will use the defined mock values:
+    process_msg(mock_msg)
+
+    #This checks whether each function was called with the expected input (meaning that the code works):
+    mock_DB_import.assert_called_once_with("12345")
+    mock_latency_calc.assert_called_once_with(gbt_data[3])
+    mock_DB_columns.assert_called_once_with(gbt_data)
+    mock_create_img.assert_called_once_with(gbt_data[2])
+    mock_save_image.assert_called_once_with(gbt_data[1], img_file, "12345")
+    mock_publish_DB.assert_called_once_with(image_key=image_key, num_bytes=num_bytes, data=data)
 
 
-
-
+# ==============================================================================
+# 7. consume Test
+# ==============================================================================
 
 
 
