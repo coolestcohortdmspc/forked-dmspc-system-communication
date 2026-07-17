@@ -8,12 +8,10 @@ import pytest
 # ===============================================
 
 #can add as many different latency test values here as you want:
-testcases = [
-    (datetime.now(timezone.utc) - timedelta(seconds=1), 1000),
-    (datetime.now(timezone.utc) - timedelta(seconds=2), 2000),
-]
-
-@pytest.mark.parametrize("event_time,expected", testcases)
+@pytest.mark.parametrize("event_time, expected", [
+        (datetime.now(timezone.utc) - timedelta(seconds=1), 1000),
+        (datetime.now(timezone.utc) - timedelta(seconds=2), 2000)
+    ])
 def test_latency_calc(event_time, expected):
     latency = latency_calc(event_time)
 
