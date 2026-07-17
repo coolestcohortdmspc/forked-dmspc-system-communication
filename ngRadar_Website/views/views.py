@@ -200,6 +200,10 @@ def submit_waveform(request):
 @cache_control(no_cache=True, must_revalidate=True, no_store=True) #Desmond's Auth token fix - comment if we decide not to use
 def login_view(request):
     #logout_view(request)
+    
+    if(request.user.is_authenticated == False):#will log the user out if they come to the login page and are still logged in
+        return render(request, 'ngRadar_Website/partials/log_out_partial.html')
+
 
     if request.method == 'POST':
         username_input = request.POST['username']
@@ -226,10 +230,12 @@ def logout_view(request):
     response = redirect(login_view)
     return response
 
+#@cache_control(no_cache=True, no_store=True)
 def logging_out_message(request):
     return render(request, 'ngRadar_Website/partials/log_out_partial.html')
 
 @login_required
+#@cache_control(no_cache=True, must_revalidate=True, no_store=True) #Desmond's Auth token fix - comment if we decide not to use
 def home_view(request):
 
     response = render(request, "ngRadar_Website/home.html", get_obs_events())
@@ -238,6 +244,7 @@ def home_view(request):
 
 
 @login_required
+#@cache_control(no_cache=True, must_revalidate=True, no_store=True) #Desmond's Auth token fix - comment if we decide not to use
 def dashboard_view(request):
 
     response = render(request, "ngRadar_Website/dashboard.html", get_obs_events())

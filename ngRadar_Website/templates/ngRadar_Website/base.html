@@ -36,14 +36,6 @@
       <form action="{% url 'logout_message' %}" method="POST" style="margin-left:auto">
         {% csrf_token %}
         <button id = "theLogOut_Button" type="submit" class="btn btn-secondary btn-sm">Logout</button>
-
-        <script>
-          const logoutButton = document.getElementById('theLogOut_Button');
-          console.log("logout button clicked");
-          logoutButton.addEventListener('click', function() {
-          logoutButton.style.visibility = 'hidden';
-          });
-        </script>
       </form>
       {% endif %}
     </header>
