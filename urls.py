@@ -7,7 +7,7 @@ from ngRadar_Website.views import views
 
 
 urlpatterns = [
-    path('', views.login_view, name='login_root'), 
+    path('', views.login_view), 
     path('login/', views.login_view, name='login'),
     path('admin/', admin.site.urls),
     path('', include('ngRadar_Website.urls')),

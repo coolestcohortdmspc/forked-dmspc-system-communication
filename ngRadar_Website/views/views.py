@@ -18,7 +18,7 @@ from django.core.cache import cache
 from ngRadar_Website.enums import Stations
 from ngRadar_Website.models.models import ObservatoryEvent, uiEvent, gbtEvent, dsocEvent, ngrok_endpoint
 from django.contrib import messages
-from django.contrib.auth import authenticate, login
+from django.contrib.auth import authenticate, login, logout
 from django.db.models import Avg
 from confluent_kafka import Producer
 import os 
@@ -177,6 +177,8 @@ def submit_waveform(request):
 
 @cache_control(no_cache=True, must_revalidate=True, no_store=True) #Desmond's Auth token fix - comment if we decide not to use
 def login_view(request):
+    if request.user.is_authenticated:
+        logout(request)
     if request.method == 'POST':
         username_input = request.POST['username']
         password_input = request.POST['password']
@@ -197,7 +199,7 @@ def login_view(request):
 
     return render(request, 'registration/login.html')
 
-
+@cache_control(no_cache=True, must_revalidate=True, no_store=True)
 @login_required
 def home_view(request):
     return render(
@@ -206,7 +208,7 @@ def home_view(request):
         get_obs_events(),
     )
 
-
+@cache_control(no_cache=True, must_revalidate=True, no_store=True)
 @login_required
 def dashboard_view(request):
     return render(
