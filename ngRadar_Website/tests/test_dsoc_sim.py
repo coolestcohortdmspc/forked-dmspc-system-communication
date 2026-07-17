@@ -17,7 +17,6 @@ import pytest
 mock_env_data = "BOOTSTRAP_SERVER=localhost:9092\nSOME_OTHER_VAR=value" 
 with patch("pathlib.Path.read_text", return_value=mock_env_data):
     from ngRadar_Website.management.commands.dsoc_sim import (
-        Command,
         DB_import,
         DB_columns,
         publish_DB,

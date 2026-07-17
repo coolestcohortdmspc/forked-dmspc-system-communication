@@ -3,6 +3,7 @@ from confluent_kafka.admin import AdminClient, NewTopic
 from dotenv import load_dotenv
 from matplotlib.path import Path
 from pathlib import Path
+from ngRadar_Website.enums import Stations
 
 
 def latency_calc(event_time):
@@ -18,7 +19,7 @@ def latency_calc(event_time):
 def config_func(sim, bootstrap):
     # Generates config file and Kafka topic info, based on the sim (either 'GBT' or 'DSOC').
     # Designed to be called in conjunction with bootstrap function
-    if sim == "GBT":
+    if sim == Stations.GBT:
         
         #bootstrap = os.environ["BOOTSTRAP_SERVER"] 
         admin = AdminClient({"bootstrap.servers": bootstrap})
@@ -35,7 +36,7 @@ def config_func(sim, bootstrap):
         producer_topic = "GBT_data"  # NOTE The topic to which the messages will be sent, rename accordingly to whatever topic you want to send to
         producer_config = {
             "bootstrap.servers": bootstrap,
-            "message.max.bytes": 8388608,
+            "message.max.bytes": 8388608,# NOTE can make this constant
             "client.id": "GBT-producer"
         }
 
@@ -43,7 +44,7 @@ def config_func(sim, bootstrap):
         consumer_config = {
             "bootstrap.servers": bootstrap,
             "fetch.max.bytes": 8388608,
-            "session.timeout.ms": 45000,
+            "session.timeout.ms": 45000, #NOTE this one too
             "client.id": "GBT-consumer",
             "group.id": "GBT-consumer-group",
             "auto.offset.reset": "earliest",
@@ -80,7 +81,7 @@ def bootstrap(sim):
     if not bootstrap:
         raise RuntimeError("BOOTSTRAP_SERVER not found in /out/ngrok_endpoint.env")
     
-    if sim == "GBT":
+    if sim == Stations.GBT:
         producer_topic, producer_config, consumer_topic, consumer_config = config_func(sim, bootstrap)
         return producer_topic, producer_config, consumer_topic, consumer_config
     else:

@@ -21,7 +21,7 @@ payload = {
     "latency_ms": None,
 }
 
-producer_topic, producer_config, consumer_topic, consumer_config = bootstrap("GBT")
+producer_topic, producer_config, consumer_topic, consumer_config = bootstrap(Stations.GBT)
 
 def set_payload_dict(waveform, event_time):
     payload["object_id"] = '30104'

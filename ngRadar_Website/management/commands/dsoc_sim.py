@@ -10,7 +10,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import io
-from ngRadar_Website.models import gbtEvent, dsocEvent
+from ngRadar_Website.models.models import gbtEvent, dsocEvent
 from pathlib import Path
 from ngRadar_Website.enums import Stations
 import time
