@@ -85,11 +85,14 @@ def serve_image(request, uuid):
     # Configure boto3 to use the internal domain for API calls,
     # but generate presigned URLs using the public domain.
     s3 = boto3.client(
-        "s3",
-        endpoint_url=os.environ["WEED_S3_INTERNAL_DOMAIN"], 
-        aws_access_key_id=os.environ["WEED_S3_ACCESS_KEY"],
-        aws_secret_access_key=os.environ["WEED_S3_SECRET_KEY"],
-        config=Config(s3={'addressing_style': 'path'}) # Keeps bucket in the path layout
+    "s3",
+    endpoint_url=os.environ["WEED_S3_INTERNAL_DOMAIN"], 
+    aws_access_key_id=os.environ["WEED_S3_ACCESS_KEY"],
+    aws_secret_access_key=os.environ["WEED_S3_SECRET_KEY"],
+    config=Config(
+        signature_version='s3v4', # Force modern AWS V4 signing protocol
+        s3={'addressing_style': 'path'}
+        )
     )
 
     # Ask seaweedfs to generate a direct, temporary link to the file
