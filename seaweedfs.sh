@@ -1,18 +1,12 @@
 #!/bin/sh
 
-# This is the entrypoint script for the SeaweedFS container. It detects the environment (Render vs Local) and configures the S3 domain and ports accordingly.
+# This is the entrypoint script for the SeaweedFS container.
 
-# 1. Detect if running on Render vs Local
-if [ -n "$RENDER" ] || [ "$APP_ENV" = "demo" ]; then
-    echo "--- Demo Cloud Environment Detected ---"
-    # Fallback syntax uses :- instead of ://
-    S3_DOMAIN="${WEED_S3_DOMAIN}" 
-else
-    echo "--- Local Development Environment Detected ---"
-    S3_DOMAIN="${WEED_S3_DOMAIN}" 
-fi
+S3_DOMAIN="${WEED_S3_DOMAIN}" 
 
 # Bind to 0.0.0.0 so other containers in the docker network can connect
+# TODO: Will this still work if hosted on Render?
+# Or should I let an env var handle assigning this?
 BIND_IP="0.0.0.0" 
 
 # 2. Extract or fallback to configured ports
@@ -25,10 +19,11 @@ echo "S3 Port     : $S3_PORT"
 echo "Filer Port  : $FILER_PORT"
 
 # 3. Boot SeaweedFS 
+# TODO: Will I need to remove the bind_ip command below for render?
 exec weed server \
   -ip="$BIND_IP" \
   -dir="/data" \
-  -s3 \
+  -s3=true \
   -s3.domainName="$S3_DOMAIN" \
   -s3.port="$S3_PORT" \
   -filer=true \
