@@ -19,7 +19,7 @@ from django.core.cache import cache
 from ngRadar_Website.enums import Stations
 from ngRadar_Website.models.models import ObservatoryEvent, uiEvent, gbtEvent, dsocEvent, ngrok_endpoint
 from django.contrib import messages
-from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth import authenticate, login, logout, logout
 from django.db.models import Avg
 from confluent_kafka import Producer
 import os 
@@ -201,8 +201,8 @@ def submit_waveform(request):
 def login_view(request):
     #logout_view(request)
     
-    if(request.user.is_authenticated == False):#will log the user out if they come to the login page and are still logged in
-        return render(request, 'ngRadar_Website/partials/log_out_partial.html')
+    if(request.user.is_authenticated):#will log the user out if they come to the login page and are still logged in
+        return render(request, 'ngRadar_Website/partials/log_out_partial.html')#goes to logout message
 
 
     if request.method == 'POST':
@@ -230,12 +230,13 @@ def logout_view(request):
     response = redirect(login_view)
     return response
 
-#@cache_control(no_cache=True, no_store=True)
+@cache_control(no_cache=True, must_revalidate=True, no_store=True)
 def logging_out_message(request):
     return render(request, 'ngRadar_Website/partials/log_out_partial.html')
 
+
+@cache_control(no_cache=True, must_revalidate=True, no_store=True)
 @login_required
-#@cache_control(no_cache=True, must_revalidate=True, no_store=True) #Desmond's Auth token fix - comment if we decide not to use
 def home_view(request):
 
     response = render(request, "ngRadar_Website/home.html", get_obs_events())
@@ -243,8 +244,8 @@ def home_view(request):
     return response
 
 
+@cache_control(no_cache=True, must_revalidate=True, no_store=True)
 @login_required
-#@cache_control(no_cache=True, must_revalidate=True, no_store=True) #Desmond's Auth token fix - comment if we decide not to use
 def dashboard_view(request):
 
     response = render(request, "ngRadar_Website/dashboard.html", get_obs_events())
