@@ -21,6 +21,12 @@
   </div>
 </body>
 <script>
-  setTimeout(function () {window.location.href = "{% url 'logout' %}";}, 1500); //return to login page after _ seconds
+    window.addEventListener('DOMContentLoaded', function () {
+        const logoutButton = document.getElementById('theLogOut_Button');//make the logout button invisible when on this page.
+        if (logoutButton) {
+        logoutButton.style.visibility = 'hidden';
+        }
+    });
+    setTimeout(function () {window.location.href = "{% url 'logout' %}";}, 1500); //return to login page after _ seconds
 </script>
 {% endblock %}

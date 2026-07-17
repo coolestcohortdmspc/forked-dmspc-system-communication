@@ -27,8 +27,6 @@ import uuid
 from datetime import datetime, timezone 
 from dotenv import load_dotenv
 
-import time
-
 
 load_dotenv(override=True)
 
@@ -201,7 +199,8 @@ def submit_waveform(request):
 
 @cache_control(no_cache=True, must_revalidate=True, no_store=True) #Desmond's Auth token fix - comment if we decide not to use
 def login_view(request):
-    
+    #logout_view(request)
+
     if request.method == 'POST':
         username_input = request.POST['username']
         password_input = request.POST['password']
@@ -232,20 +231,18 @@ def logging_out_message(request):
 
 @login_required
 def home_view(request):
-    return render(
-        request,
-        "ngRadar_Website/home.html",
-        get_obs_events(),
-    )
+
+    response = render(request, "ngRadar_Website/home.html", get_obs_events())
+    #Need to add cache control modifiers here
+    return response
 
 
 @login_required
 def dashboard_view(request):
-    return render(
-        request,
-        "ngRadar_Website/dashboard.html",
-        get_obs_events(),
-    )
+
+    response = render(request, "ngRadar_Website/dashboard.html", get_obs_events())
+    #Need to add cache control modifiers here
+    return response
 
 
 def event_table_partial(request):
@@ -255,6 +252,7 @@ def event_table_partial(request):
         "ngRadar_Website/partials/dashboard_updates.html",
         get_obs_events(),
     )
+
 
 def status_partial(request):
     # this is the partial template view for the status box on the home page
