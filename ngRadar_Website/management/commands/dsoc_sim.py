@@ -176,18 +176,20 @@ def consume(topic, config):
         while True:
             #consumer polls the topic and prints any incoming messages
             msg = consumer.poll(1.0) #polls for messages for 1 second
-            #if msg is not None and msg.error() is None:
+            
             if msg is None:
                 continue
             if msg.error() is not None:
                 print("Consumer error:", msg.error())
                 continue
 
+            #if msg is not None and msg.error() is None:
             process_msg(msg)
     except Exception as e:
         import traceback
         print("An unhandled exception occurred in the consumer loop:")
         traceback.print_exc()
+        raise
 
 
 #   except KeyboardInterrupt: 

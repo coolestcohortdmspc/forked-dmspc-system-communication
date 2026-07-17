@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 import io
 from unittest.mock import patch, MagicMock
+import pytest
 
 
 # =============================================
@@ -229,7 +230,28 @@ def test_process_msg(mock_publish_DB,
 # 7. consume Test
 # ==============================================================================
 
+@patch("ngRadar_Website.management.commands.dsoc_sim.Consumer")
+@patch("ngRadar_Website.management.commands.dsoc_sim.process_msg")
+def test_consume(mock_process_msg, mock_Consumer):
+    """Scenario 1: msg is Not None and error is None"""
 
+    # mock the results of the Consumer and subscribe calls:
+    mock_consumer = mock_Consumer.return_value
+    mock_consumer.subscribe.return_value = None
 
+    # make a fake message returned from polling:
+    mock_msg = MagicMock()
+    mock_msg.error.return_value = None
+    # to deal with the While loop, stop after one message is polled:
+    mock_consumer.poll.side_effect = [
+        mock_msg,
+        RuntimeError("Stop Test"),
+    ]
 
+    #call the function to use our fake values:
+    with pytest.raises(RuntimeError):
+        consume("topic", "config")
 
+    mock_Consumer.assert_called_once_with("config")
+    mock_consumer.subscribe.assert_called_once_with("topic")
+    mock_process_msg.assert_called_once_with(mock_msg)
