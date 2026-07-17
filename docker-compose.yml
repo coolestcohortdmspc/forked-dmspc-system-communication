@@ -238,6 +238,8 @@ services:
       - "${FILER_PORT:-8888}:8888"
       - "${MASTER_PORT:-9333}:9333"
       - "${S3_PORT:-8333}:8333"
+    environment:
+      - PORT=8333 # Will also simulate Render's port injection locally
     volumes:
       - seaweed_data:/data
     networks:
@@ -245,6 +247,8 @@ services:
     env_file:
       - .env
     profiles: ["kafka"]
+
+
 
   storage-ui:
     image: mastertinner/s3manager:latest
