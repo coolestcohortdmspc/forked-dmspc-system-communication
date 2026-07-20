@@ -18,7 +18,15 @@ start)
 
 rebuild)
     echo "Rebuilding development environment..."
-    docker compose build --no-cache && docker compose up -d
+    # Take down kafka containers
+    docker compose stop $KAFKA_SERVICES
+    docker compose rm -f $KAFKA_SERVICES
+    # Take down the rest of the containers
+    docker compose down
+    # --no-cache ensures code changes are baked in cleanly
+    docker compose build --no-cache
+    # --force-recreate guarantees .env variable updates  and config updates are pushed into the container upon rebuild
+    docker compose up -d --force-recreate
     ;;
 
 stop)
