@@ -53,6 +53,11 @@ EOF
   S3_CONFIG_ARG="-s3.config=/etc/seaweedfs/s3.json"
 fi
 
+# Keeping these args below in case I need them later:
+# -filer=true \
+# -filer.port="$FILER_PORT"
+# -s3 \
+
 # Boot SeaweedFS
 exec weed server \
   -ip="$BIND_IP" \
