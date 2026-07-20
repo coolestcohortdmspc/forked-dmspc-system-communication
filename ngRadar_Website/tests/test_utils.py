@@ -138,7 +138,6 @@ def test_bootstrap(mock_config_func, mock_path):
 # ==============================================================================
 
 @patch("ngRadar_Website.utils.Consumer")
-#@patch("ngRadar_Website.management.commands.dsoc_sim.process_msg")
 def test_consume(mock_Consumer):
     """Scenario 1: msg is Not None and error is None"""
 

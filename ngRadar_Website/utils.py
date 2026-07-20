@@ -8,18 +8,25 @@ from confluent_kafka import Consumer
 
 
 def latency_calc(event_time):
-  #calculates the latency of the message from the time it was sent to the time it was received
-  #returns latency in milliseconds
-
-  current_time = datetime.now(timezone.utc)
-  latency = current_time - event_time
-  latency_ms = latency.total_seconds() * 1000
-  return latency_ms
+    """
+    Description: Calculates the latency of the message from the time it was sent to the time it was received
+    Inputs: event_time = Time in the past. This is the time when the 'stopwatch' starts on our latency calculation
+    Returns: latency_ms = Latency in milliseconds
+    """
+    current_time = datetime.now(timezone.utc)
+    latency = current_time - event_time
+    latency_ms = latency.total_seconds() * 1000
+    return latency_ms
 
 
 def config_func(sim, bootstrap):
-    # Generates config file and Kafka topic info, based on the sim (either 'GBT' or 'DSOC').
-    # Designed to be called in conjunction with bootstrap function
+    """
+    Description: Generates config file and Kafka topic info, based on the sim.
+                Designed to be called in conjunction with bootstrap function.
+    Inputs: sim = the sim file in use (GBT or DSOC)
+            bootstrap = bootstrap info derived from .env
+    Returns: topic(s) and config(s) variables
+    """
     if sim == Stations.GBT:
         
         #bootstrap = os.environ["BOOTSTRAP_SERVER"] 
@@ -67,7 +74,11 @@ def config_func(sim, bootstrap):
 
 
 def bootstrap(sim):
-    
+    """
+    Description: Extracts bootstrap info from .env and ngrok, then uses config_func to generate outputs
+    Inputs: sim = the sim file in use (GBT or DSOC)
+    Returns: topic(s) and config(s) variables
+    """
     load_dotenv()  # Load environment variables from .env file
 
     p = Path("../../../../out/ngrok_endpoint.env")
@@ -91,7 +102,13 @@ def bootstrap(sim):
     
 
 def consume(topic, config, process_msg):
-    #creates a new consumer instance
+    """
+    Description: Creates a new consumer instance; subscribes to a Kafka topic and receives messages.
+    Inputs: topic = The Kafka topic to receieve messages from.
+            config = Server configuration defining the bootstrap, byte and timeout limits, and IDs.
+            process_msg = A function which accepts the Kafka message as an input.
+    Returns: N/A
+    """
     consumer = Consumer(config)
 
     #subscribes to the specified topic
