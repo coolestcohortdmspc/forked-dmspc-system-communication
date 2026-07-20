@@ -28,7 +28,7 @@ This code will:
 - load the image key + the uuid into the DB
 """
 
-topic, config = bootstrap("DSOC")
+topic, config = bootstrap(Stations.DSOC)
 
 def DB_import(uuid):
     

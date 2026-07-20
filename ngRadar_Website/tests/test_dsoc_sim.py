@@ -80,7 +80,7 @@ def test_db_columns_mapping(mock_datetime):
 # ==============================================================================
 
 @patch("ngRadar_Website.management.commands.dsoc_sim.dsocEvent") # fake a dsocEvent record, let's you bypass having to connect to postres to test logic
-@patch("ngRadar_Website.management.commands.dsoc_sim.time.sleep")
+@patch("ngRadar_Website.management.commands.dsoc_sim.time.sleep") #NOTE we can remove the fake time.sleep when we move the delay from DSOC into the UI code
 def test_publish_db_success(mock_sleep, mock_dsoc_event):
     """Scenario 1: Valid payload correctly creates and outputs the model instance."""
     input_data = {"event_time": "time", "object_id": "obj_1", "target": "Venus"}
@@ -97,7 +97,7 @@ def test_publish_db_success(mock_sleep, mock_dsoc_event):
 
 
 @patch("ngRadar_Website.management.commands.dsoc_sim.dsocEvent")
-@patch("ngRadar_Website.management.commands.dsoc_sim.time.sleep")
+@patch("ngRadar_Website.management.commands.dsoc_sim.time.sleep") #NOTE we can remove this one too
 def test_publish_db_exception(mock_sleep, mock_dsoc_event):
     """Scenario 2: Handled database crash returns None instead of crashing runtime."""
     mock_dsoc_event.objects.create.side_effect = Exception("DB Connection Timeout")
