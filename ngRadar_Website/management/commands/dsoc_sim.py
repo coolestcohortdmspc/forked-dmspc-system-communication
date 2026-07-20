@@ -57,7 +57,6 @@ def publish_DB(image_key, num_bytes, data):
 
     try:
         # Create and capture the instantiated record model
-        time.sleep(3)
         record = dsocEvent.objects.create(**payload_data)
         print("Payload saved to database successfully.")
         return record  # <-- Return the actual object record
@@ -125,7 +124,7 @@ def save_image_to_seaweedfs(target, image_file, dsoc_uuid):
         except EndpointConnectionError:
             if attempt == 4:
                 raise
-            time.sleep(2)
+            time.sleep(1)
             print(f"Success: Image saved to SeaweedFS at {image_key}")
 
     return image_key
