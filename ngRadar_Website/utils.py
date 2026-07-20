@@ -101,7 +101,7 @@ def bootstrap(sim):
         return topic, config
     
 
-def consume(topic, config, process_msg):
+def consume(topic, config, process_msg, producer_topic=None, producer_config=None):
     """
     Description: Creates a new consumer instance; subscribes to a Kafka topic and receives messages.
     Inputs: topic = The Kafka topic to receieve messages from.
@@ -126,7 +126,7 @@ def consume(topic, config, process_msg):
                 continue
 
             #if msg is not None and msg.error() is None:
-            process_msg(msg)
+            process_msg(msg, producer_topic, producer_config)
     except Exception as e:
         import traceback
         print("An unhandled exception occurred in the consumer loop:")

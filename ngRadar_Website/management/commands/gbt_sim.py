@@ -21,8 +21,6 @@ payload = {
     "latency_ms": None,
 }
 
-producer_topic, producer_config, consumer_topic, consumer_config = bootstrap(Stations.GBT)
-
 def set_payload_dict(waveform, event_time):
     payload["object_id"] = '30104'
     payload["target"] = 'Moretus'
@@ -81,7 +79,7 @@ def produce(topic, config, key, value):
     producer.flush()
 
 
-def process_msg(msg):
+def process_msg(msg, producer_topic, producer_config):
     ui_uuid = msg.key().decode("utf-8")  # this is the uuid of the ui_event
     notif = msg.value().decode("utf-8")
 
@@ -106,9 +104,11 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         print("Starting GBT simulator")
 
+        producer_topic, producer_config, consumer_topic, consumer_config = bootstrap(Stations.GBT)
+
         # generate a dummy data payload, publish this data to the db, produce a message with this payload, then start consuming
         set_payload_dict('W48', -1)
         gbt_uuid = publish_to_db()
         key, value = f"{gbt_uuid}", "GBT transmitting"
         produce(producer_topic, producer_config, key, value)
-        consume(consumer_topic, consumer_config, process_msg)
+        consume(consumer_topic, consumer_config, process_msg, producer_topic=producer_topic, producer_config=producer_config)

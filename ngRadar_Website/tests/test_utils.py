@@ -162,4 +162,4 @@ def test_consume(mock_Consumer):
 
     mock_Consumer.assert_called_once_with("config")
     mock_consumer.subscribe.assert_called_once_with("topic")
-    mock_process_msg.assert_called_once_with(mock_msg)
+    mock_process_msg.assert_called_once_with(mock_msg, None, None)

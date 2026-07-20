@@ -6,7 +6,6 @@ from unittest.mock import patch, MagicMock
 # TEST THE STANDALONE FUNCTIONS FROM DSOC_SIM
 # =============================================
 
-
 # ==============================================================================
 # IMPORTANT:
 # Because we read "ngrok_endpoint.env" on import, we need to patch the Path globally
