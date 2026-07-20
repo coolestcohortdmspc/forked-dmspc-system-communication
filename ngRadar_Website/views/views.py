@@ -2,7 +2,7 @@ from django.shortcuts import redirect, render
 from django.contrib.auth.decorators import login_required
 
 from django.views.decorators.cache import cache_control
-#from django.views.decorators.http import require_POST, require_GET
+from django.views.decorators.http import require_POST #, require_GET
 
 #libraries to get files from the outside directory
 #import sys
@@ -33,37 +33,27 @@ load_dotenv(override=True)
 #program constants
 DATE_TIME_STRING=19
 RECORDS_TO_DISPLAY=20
+LAST_RECORDS = 5
 
 def get_obs_events():
     """Helper function to keep data uniform across view updates"""
 
-    latest_events = ObservatoryEvent.objects.order_by("-event_time")
-    latest_20 = latest_events[:RECORDS_TO_DISPLAY]
-
-    ui_event = uiEvent.objects.order_by("-event_time")
-    latest_20_UI = ui_event[:RECORDS_TO_DISPLAY]
-
-    # Calculate the average latency of the last 20 records
-    avg_latency = latest_20.aggregate(Avg('latency_ms'))['latency_ms__avg'] or 0
-    current_waveform = ui_event.first().selected_waveform if ui_event.exists() else None
+    latest_events = ObservatoryEvent.objects.order_by("-event_time")[:RECORDS_TO_DISPLAY]
+    ui_events = uiEvent.objects.order_by("-event_time")[:LAST_RECORDS]
+    gbt_events = gbtEvent.objects.order_by("-event_time")[:LAST_RECORDS]
+    dsoc_events = dsocEvent.objects.order_by("-event_time")[:LAST_RECORDS]
+    avg_latency = latest_events.aggregate(Avg('latency_ms'))['latency_ms__avg'] or 0
+    current_waveform = ui_events.first().selected_waveform if ui_events.exists() else None
 
     return {
-        # 'latest_events': latest_events,
-        # 'latest_event': latest_events.first() if latest_events else None,
-        # 'ui_event': ui_event.first() if ui_event else None,
-        # 'gbt_event': latest_events.filter(station=Stations.GBT).order_by('-event_time').first(), # only care about the latest event for home gbt partial
-        # 'dsoc_event': latest_events.filter(station=Stations.DSOC).order_by('-event_time').first(), # only care about the latest event for home dsoc partial
-
-        #display only 20 messages on the dashboard
-        'latest_events': latest_20,
-        'latest_event': latest_20.first() if latest_20 else None,
-        'ui_event': latest_20_UI.first() if latest_20_UI else None,
-        'gbt_event': latest_events.filter(station=Stations.GBT).order_by('-event_time').first(), # only care about the latest event for home gbt partial
-        'dsoc_event': latest_events.filter(station=Stations.DSOC).order_by('-event_time').first(), # only care about the latest event for home dsoc partial
+        'latest_events': latest_events,
+        'latest_event': latest_events.first() if latest_events else None,
+        'ui_event': ui_events.first() if ui_events else None,
+        'gbt_event': gbt_events.first() if gbt_events else None,
+        'dsoc_event': dsoc_events.first() if dsoc_events else None,
         'avg_latency': round(avg_latency, 2),
         'current_waveform': current_waveform
     }
-
 
 
 # Keep as a placeholder when we develop this feature.
@@ -197,7 +187,7 @@ def submit_waveform(request):
 #====================================================
 
 
-@cache_control(no_cache=True, must_revalidate=True, no_store=True) #Desmond's Auth token fix - comment if we decide not to use
+@cache_control(no_cache=True, must_revalidate=True, no_store=True, max_age=0) #Desmond's Auth token fix - comment if we decide not to use
 def login_view(request):
     #logout_view(request)
     
@@ -225,17 +215,19 @@ def login_view(request):
 
     return render(request, 'registration/login.html')
 
+@cache_control(no_cache=True, must_revalidate=True, no_store=True, max_age=0)
 def logout_view(request):
     logout(request)
     response = redirect(login_view)
     return response
 
-@cache_control(no_cache=True, must_revalidate=True, no_store=True)
+
+@cache_control(no_cache=True, must_revalidate=True, no_store=True, max_age=0)
 def logging_out_message(request):
     return render(request, 'ngRadar_Website/partials/log_out_partial.html')
 
 
-@cache_control(no_cache=True, must_revalidate=True, no_store=True)
+@cache_control(no_cache=True, must_revalidate=True, no_store=True, max_age=0)
 @login_required
 def home_view(request):
 
@@ -244,7 +236,7 @@ def home_view(request):
     return response
 
 
-@cache_control(no_cache=True, must_revalidate=True, no_store=True)
+@cache_control(no_cache=True, must_revalidate=True, no_store=True, max_age=0)
 @login_required
 def dashboard_view(request):
 

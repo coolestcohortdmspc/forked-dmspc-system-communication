@@ -2,9 +2,18 @@
 
 {% block content %}
 <head>
+  <title>Logging You Out</title>
+  <!-- The following Script prevents display of a webpage from browser cache. This needs to be in the html head to work correctly -->
+   <!-- This was added specifically to fix the issue with Safari -->
+    <script>
+    window.addEventListener('pageshow', function (event) {
+      if (event.persisted) {
+        window.location.reload();
+      }
+    });
+  </script>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Logging You Out</title>
   <style>
     html, body { height: 100%; margin: 0; font-family: Arial, Helvetica, sans-serif; }
     .center { height: 100%; display: flex; align-items: center; justify-content: center; text-align: center; }
