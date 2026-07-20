@@ -135,7 +135,7 @@ def save_image_to_seaweedfs(target, image_file, dsoc_uuid):
 
     s3 = boto3.client(
         's3',
-        endpoint_url=os.environ.get('WEED_S3_DOMAIN'),
+        endpoint_url=os.environ.get('WEED_S3_INTERNAL_DOMAIN'),
         aws_access_key_id=os.environ.get('WEED_S3_ACCESS_KEY'),
         aws_secret_access_key=os.environ.get('WEED_S3_SECRET_KEY')
     )
