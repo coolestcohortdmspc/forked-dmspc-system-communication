@@ -1,5 +1,4 @@
 from datetime import datetime, timedelta, timezone
-from ngRadar_Website.utils import latency_calc, config_func, bootstrap
 import pytest
 from unittest.mock import patch, MagicMock
 from ngRadar_Website.enums import Stations
@@ -9,6 +8,19 @@ from ngRadar_Website.enums import Stations
 # Here we can test all of our utility functions
 # ===============================================
 
+# ==============================================================================
+# IMPORTANT:
+# Because we read "ngrok_endpoint.env" on import, we need to patch the Path globally
+# before importing all the functions we want to test.
+# ==============================================================================
+mock_env_data = "BOOTSTRAP_SERVER=localhost:9092\nSOME_OTHER_VAR=value" 
+with patch("pathlib.Path.read_text", return_value=mock_env_data):
+    from ngRadar_Website.utils import (
+        latency_calc,
+        config_func,
+        bootstrap,
+        consume,
+    )
 
 # ==============================================================================
 # 1. latency_calc
@@ -59,7 +71,7 @@ def test_config_func_GBT(mock_AdminClient):
             "message.max.bytes": 8388608,
             "client.id": "GBT-producer"
         }
-    assert consumer_topic == "user_input"
+    assert consumer_topic == ["user_input"]
     assert consumer_config == {
             "bootstrap.servers": bootstrap,
             "fetch.max.bytes": 8388608,
@@ -90,3 +102,65 @@ def test_config_func_DSOC():
             "group.id": "consumer-group",
             "auto.offset.reset": "earliest",
         }
+
+# ==============================================================================
+# 3. bootstrap Test
+# ==============================================================================
+
+@patch("ngRadar_Website.utils.Path.read_text")
+@patch("ngRadar_Website.utils.config_func")
+def test_bootstrap(mock_config_func, mock_path):
+    """Scenario 1: sim = GBT"""
+
+    sim = Stations.GBT
+
+    mock_env_data = "BOOTSTRAP_SERVER=localhost:9092\nSOME_OTHER_VAR=value"
+    mock_path.return_value = mock_env_data
+    
+    mock_config_func.return_value = (
+        "GBT_data",
+        {"bootstrap.servers": "localhost:9092"},
+        ["user_input"],
+        {"bootstrap.servers": "localhost:9092"},
+    )
+
+    producer_topic, producer_config, consumer_topic, consumer_config = bootstrap(sim)
+
+    mock_config_func.assert_called_once_with(sim, "localhost:9092")
+    assert producer_topic == "GBT_data"
+    assert producer_config == {"bootstrap.servers": "localhost:9092"}
+    assert consumer_topic == ["user_input"]
+    assert consumer_config == {"bootstrap.servers": "localhost:9092"}
+
+
+# ==============================================================================
+# 4. consume Test
+# ==============================================================================
+
+@patch("ngRadar_Website.utils.Consumer")
+#@patch("ngRadar_Website.management.commands.dsoc_sim.process_msg")
+def test_consume(mock_Consumer):
+    """Scenario 1: msg is Not None and error is None"""
+
+    # mock the results of the Consumer and subscribe calls:
+    mock_consumer = mock_Consumer.return_value
+    mock_consumer.subscribe.return_value = None
+
+    mock_process_msg = MagicMock()
+
+    # make a fake message returned from polling:
+    mock_msg = MagicMock()
+    mock_msg.error.return_value = None
+    # to deal with the While loop, stop after one message is polled:
+    mock_consumer.poll.side_effect = [
+        mock_msg,
+        RuntimeError("Stop Test"),
+    ]
+
+    #call the function to use our fake values:
+    with pytest.raises(RuntimeError):
+        consume("topic", "config", mock_process_msg)
+
+    mock_Consumer.assert_called_once_with("config")
+    mock_consumer.subscribe.assert_called_once_with("topic")
+    mock_process_msg.assert_called_once_with(mock_msg)

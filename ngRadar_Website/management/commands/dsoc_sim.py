@@ -3,7 +3,6 @@ from datetime import datetime, timedelta, timezone
 from PIL import Image
 import uuid
 from django.core.management.base import BaseCommand
-from confluent_kafka import Consumer
 from dotenv import load_dotenv
 import random
 import matplotlib
@@ -15,7 +14,7 @@ from pathlib import Path
 from ngRadar_Website.enums import Stations
 import time
 from botocore.exceptions import EndpointConnectionError
-from ngRadar_Website.utils import latency_calc, bootstrap
+from ngRadar_Website.utils import latency_calc, bootstrap, consume
 import boto3
 from botocore.exceptions import NoCredentialsError
 
@@ -164,44 +163,10 @@ def process_msg(msg):
     print(f"Received message from {Stations.GBT.label} for object {object_id}; DDM is ready in SeaweedFS (Image Path: {image_key}.")
 
 
-
-def consume(topic, config):
-    #creates a new consumer instance
-    consumer = Consumer(config)
-
-    #subscribes to the specified topic
-    consumer.subscribe(topic)
-    
-    try:
-        while True:
-            #consumer polls the topic and prints any incoming messages
-            msg = consumer.poll(1.0) #polls for messages for 1 second
-            
-            if msg is None:
-                continue
-            if msg.error() is not None:
-                print("Consumer error:", msg.error())
-                continue
-
-            #if msg is not None and msg.error() is None:
-            process_msg(msg)
-    except Exception as e:
-        import traceback
-        print("An unhandled exception occurred in the consumer loop:")
-        traceback.print_exc()
-        raise
-
-
-#   except KeyboardInterrupt: 
-#     pass
-#   finally:
-#     print("reached the end")
-  
-
 class Command(BaseCommand):
     help = "Runs the DSOC simulator"
 
     def handle(self, *args, **options):
         print("Starting DSOC simulator")
 
-        consume(topic, config)
+        consume(topic, config, process_msg)

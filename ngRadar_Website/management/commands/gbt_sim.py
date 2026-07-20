@@ -8,7 +8,7 @@ from ngRadar_Website.models.models import uiEvent
 from ngRadar_Website.models.models import gbtEvent
 # from dotenv import find_dotenv
 from pathlib import Path
-from ngRadar_Website.utils import latency_calc, bootstrap
+from ngRadar_Website.utils import latency_calc, bootstrap, consume
 
 
 # payload that will be inserted in the gbtEvent db table
@@ -81,46 +81,23 @@ def produce(topic, config, key, value):
     producer.flush()
 
 
-def consume(topic, config):
-    # creates a new consumer instance
-    consumer = Consumer(config)
+def process_msg(msg):
+    ui_uuid = msg.key().decode("utf-8")  # this is the uuid of the ui_event
+    notif = msg.value().decode("utf-8")
 
-    #subscribes to the specified topic
-    consumer.subscribe([topic])
+    # turn off the transmitter for 5 seconds
+    turn_off_transmitter()
 
-    try:
-        while True:
-            # consumer polls the topic and prints any incoming messages
-            msg = consumer.poll(1.0) # polls for messages for 1 second
-            # if msg is not None and msg.error() is None:
-            if msg is None:
-                continue
-            if msg.error() is not None:
-                print("Consumer error:", msg.error())
-                continue
+    # fill in the values to be published to the db
+    generate_payload(ui_uuid)
 
-            ui_uuid = msg.key().decode("utf-8")  # this is the uuid of the ui_event
-            notif = msg.value().decode("utf-8")
+    # publish new transmission to the db
+    gbt_uuid = publish_to_db()
 
-            # turn off the transmitter for 5 seconds
-            turn_off_transmitter()
+    key, value = f"{gbt_uuid}", "GBT transmitting"
 
-            # fill in the values to be published to the db
-            generate_payload(ui_uuid)
-
-            # publish new transmission to the db
-            gbt_uuid = publish_to_db()
-
-            key, value = f"{gbt_uuid}", "GBT transmitting"
-
-            # produce this new message, lets DSOC know to produce image(s)
-            produce(producer_topic, producer_config, key, value)
-
-    except KeyboardInterrupt: 
-        pass
-    finally:
-        # closes the consumer connection
-        consumer.close()
+    # produce this new message, lets DSOC know to produce image(s)
+    produce(producer_topic, producer_config, key, value)
 
 
 class Command(BaseCommand):
@@ -134,4 +111,4 @@ class Command(BaseCommand):
         gbt_uuid = publish_to_db()
         key, value = f"{gbt_uuid}", "GBT transmitting"
         produce(producer_topic, producer_config, key, value)
-        consume(consumer_topic, consumer_config)
+        consume(consumer_topic, consumer_config, process_msg)

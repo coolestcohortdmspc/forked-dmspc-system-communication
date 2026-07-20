@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 from matplotlib.path import Path
 from pathlib import Path
 from ngRadar_Website.enums import Stations
+from confluent_kafka import Consumer
 
 
 def latency_calc(event_time):
@@ -40,7 +41,7 @@ def config_func(sim, bootstrap):
             "client.id": "GBT-producer"
         }
 
-        consumer_topic = "user_input"
+        consumer_topic = ["user_input"]
         consumer_config = {
             "bootstrap.servers": bootstrap,
             "fetch.max.bytes": 8388608,
@@ -87,3 +88,30 @@ def bootstrap(sim):
     else:
         topic, config = config_func(sim, bootstrap)
         return topic, config
+    
+
+def consume(topic, config, process_msg):
+    #creates a new consumer instance
+    consumer = Consumer(config)
+
+    #subscribes to the specified topic
+    consumer.subscribe(topic)
+    
+    try:
+        while True:
+            #consumer polls the topic and prints any incoming messages
+            msg = consumer.poll(1.0) #polls for messages for 1 second
+            
+            if msg is None:
+                continue
+            if msg.error() is not None:
+                print("Consumer error:", msg.error())
+                continue
+
+            #if msg is not None and msg.error() is None:
+            process_msg(msg)
+    except Exception as e:
+        import traceback
+        print("An unhandled exception occurred in the consumer loop:")
+        traceback.print_exc()
+        raise
