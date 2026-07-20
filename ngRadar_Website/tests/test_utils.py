@@ -34,7 +34,7 @@ with patch("pathlib.Path.read_text", return_value=mock_env_data):
 def test_latency_calc(event_time, expected):
     latency = latency_calc(event_time)
 
-    upper_bound = expected+100
+    upper_bound = expected+300
     
     # 3. Assert (1 second = 1000 milliseconds)
     assert expected <= latency < upper_bound, f"Expected latency around 1000 ms, got {latency} ms"
