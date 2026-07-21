@@ -192,7 +192,7 @@ def login_view(request):
     #logout_view(request)
     
     if(request.user.is_authenticated):#will log the user out if they come to the login page and are still logged in
-        return render(request, 'ngRadar_Website/partials/log_out_partial.html')#goes to logout message
+        return logout_view(request)#goes to logout message
 
 
     if request.method == 'POST':
@@ -215,14 +215,14 @@ def login_view(request):
 
     return render(request, 'registration/login.html')
 
-@cache_control(no_cache=True, must_revalidate=True, no_store=True, max_age=0)
+#@cache_control(no_cache=True, must_revalidate=True, no_store=True, max_age=0)
 def logout_view(request):
     logout(request)
-    response = redirect(login_view)
+    response = logging_out_message(request)
     return response
 
 
-@cache_control(no_cache=True, must_revalidate=True, no_store=True, max_age=0)
+#@cache_control(no_cache=True, must_revalidate=True, no_store=True, max_age=0)
 def logging_out_message(request):
     return render(request, 'ngRadar_Website/partials/log_out_partial.html')
 

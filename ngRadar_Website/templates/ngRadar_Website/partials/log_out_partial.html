@@ -8,10 +8,14 @@
     <script>
     window.addEventListener('pageshow', function (event) {
       if (event.persisted) {
-        window.location.reload();
+        window.location.replace("{% url 'login' %}");      
       }
     });
   </script>
+  
+  <!-- <meta http-equiv="Cache-Control" content="no-cache"> -->
+  <meta http-equiv="refresh" content="1.2">
+
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
@@ -30,12 +34,14 @@
   </div>
 </body>
 <script>
+    const MS_TO_REDIRECT = 1200;
+    setTimeout(function () {window.location.href = "{% url 'login' %}";}, MS_TO_REDIRECT); //return to login page after _ seconds
+
     window.addEventListener('DOMContentLoaded', function () {
         const logoutButton = document.getElementById('theLogOut_Button');//make the logout button invisible when on this page.
         if (logoutButton) {
         logoutButton.style.visibility = 'hidden';
         }
     });
-    setTimeout(function () {window.location.href = "{% url 'logout' %}";}, 1500); //return to login page after _ seconds
 </script>
 {% endblock %}
