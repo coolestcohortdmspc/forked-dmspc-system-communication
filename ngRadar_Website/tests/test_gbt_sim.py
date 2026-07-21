@@ -1,5 +1,6 @@
 from unittest.mock import patch, MagicMock
 from datetime import datetime, timezone
+from unittest.mock import ANY
 
 
 # =============================================
@@ -57,3 +58,54 @@ def test_set_payload_dict(mock_latency):
     assert payload["rec_waveform"] == waveform
     assert before <= payload["event_time"] <= after
     mock_latency.assert_called_once_with(payload["event_time"], event_time)
+
+
+# ==============================================================================
+# 2. generate_payload Test
+# ==============================================================================
+
+# patch the database referenced, and the function called:
+@patch("ngRadar_Website.management.commands.gbt_sim.uiEvent")
+@patch("ngRadar_Website.management.commands.gbt_sim.set_payload_dict")
+def test_generate_payload(mock_payload, mock_ui_event):
+    # create fake values for the two variables referenced:
+    mock_record = MagicMock()
+    mock_record.selected_waveform = "SineWave"
+    mock_record.event_time = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    mock_ui_event.objects.get.return_value = mock_record
+    
+    # create a fake output to the set_payload_dict function:
+    mock_payload.return_value = "payload"
+
+    payload = generate_payload("uuid")
+
+    mock_ui_event.objects.get.assert_called_once_with(uuid="uuid")
+    mock_payload.assert_called_once_with("SineWave", datetime(2026, 1, 1, tzinfo=timezone.utc))
+    assert payload == "payload"
+
+
+# ==============================================================================
+# 3. turn_off_transmitter Test
+# ==============================================================================
+
+# patch the database referenced, and time.sleep:
+@patch("ngRadar_Website.management.commands.gbt_sim.gbtEvent")
+@patch("ngRadar_Website.management.commands.gbt_sim.time.sleep")
+def test_turn_off_transmitter(mock_sleep, mock_gbt_event):
+    # the patch has created the fake gbtEvent table, so we can call the function:
+    turn_off_transmitter()
+
+    mock_gbt_event.objects.create.assert_called_once_with(
+        object_id="30104",
+        target="Moretus",
+        tx_waveform="Tx_OFF",
+        rec_waveform="Tx_OFF",
+        event_time=ANY,
+        latency_ms=0,
+    )
+    mock_sleep.assert_called_once_with(5)
+
+
+# ==============================================================================
+# 4. publish_to_db Test
+# ==============================================================================
