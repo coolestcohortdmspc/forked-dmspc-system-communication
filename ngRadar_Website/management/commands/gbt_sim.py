@@ -75,7 +75,6 @@ def produce(topic, config, key, value):
 
 def process_msg(msg, producer_topic, producer_config):
     ui_uuid = msg.key().decode("utf-8")  # this is the uuid of the ui_event
-    notif = msg.value().decode("utf-8")
 
     # turn off the transmitter for 5 seconds
     turn_off_transmitter()

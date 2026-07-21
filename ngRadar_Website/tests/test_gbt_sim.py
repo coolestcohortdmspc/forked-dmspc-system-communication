@@ -2,6 +2,7 @@ from unittest.mock import patch, MagicMock
 from datetime import datetime, timezone
 from unittest.mock import ANY
 from ngRadar_Website.enums import Stations
+from uuid import uuid4
 
 
 # =============================================
@@ -111,3 +112,82 @@ def test_turn_off_transmitter(mock_sleep, mock_gbt_event):
 # ==============================================================================
 # 4. publish_to_db Test
 # ==============================================================================
+
+@patch("ngRadar_Website.management.commands.gbt_sim.gbtEvent")
+def test_publish_to_db(mock_gbt_event):
+    input_data = {
+            "object_id": 'fake_obj', 
+            "target": 'fake_target', 
+            "tx_waveform": 'Off', 
+            "rec_waveform": 'Off', 
+            "event_time": datetime(2026, 1, 1, tzinfo=timezone.utc), 
+            "latency_ms": 0,
+        }
+    mock_instance = MagicMock()
+    mock_instance.uuid = uuid4()
+    mock_gbt_event.objects.create.return_value = mock_instance
+
+    uuid = publish_to_db(input_data)
+
+    assert uuid == mock_instance.uuid
+    mock_gbt_event.objects.create.assert_called_once_with(**input_data)
+
+# ==============================================================================
+# 5. produce Test
+# ==============================================================================
+
+@patch("ngRadar_Website.management.commands.gbt_sim.Producer")
+def test_produce(mock_Producer):
+    topic = "topic"
+    config = "config"
+    key = "key"
+    value = "value"
+    
+    mock_producer = mock_Producer.return_value
+
+    produce(topic, config, key, value)
+
+    mock_Producer.assert_called_once_with(config)
+    mock_producer.produce.assert_called_once_with(topic, key=key, value=value)
+    mock_producer.flush.assert_called_once_with()
+
+
+# ==============================================================================
+# 6. process_msg Test
+# ==============================================================================
+
+# @patch("ngRadar_Website.management.commands.gbt_sim.uuid.uuid4")
+# @patch("ngRadar_Website.management.commands.gbt_sim.mock_transmitter")
+# @patch("ngRadar_Website.management.commands.gbt_sim.mock_gen_payload")
+# @patch("ngRadar_Website.management.commands.gbt_sim.mock_publish_DB")
+# @patch("ngRadar_Website.management.commands.gbt_sim.mock_produce")
+# def test_process_msg(mock_produce, mock_publish_DB, mock_gen_payload, mock_transmitter, mock_uuid):
+#     #fake uuid payload from kafka
+#     mock_uuid.return_value = "12345"
+
+#     mock_msg = MagicMock()
+#     mock_msg.key.return_value = b"12345"
+#     mock_msg.error.return_value = None
+
+#     producer_topic = "topic"
+#     producer_config = "config"
+
+#     mock_transmitter.return_value = None
+
+#     mock_payload = {
+#         "object_id": "fake_obj", 
+#         "target": "fake_target", 
+#         "tx_waveform": "Sinewave", 
+#         "rec_waveform": "Sinewave", 
+#         "event_time": datetime(2026, 1, 1, tzinfo=timezone.utc), 
+#         "latency_ms": 100,
+#     }
+#     mock_gen_payload.return_value = mock_payload
+
+#     mock_publish_DB.return_value = "gbt_uuid"
+
+#     mock_produce.return_value = None
+
+#     process_msg(mock_msg, producer_topic, producer_config)
+
+#     mock_transmitter.assert_called_once()
