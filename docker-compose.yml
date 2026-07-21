@@ -234,17 +234,26 @@ services:
     build: 
       context: .
       dockerfile: seaweed.Dockerfile
+    env_file:
+      - .env
     ports:
       - "${FILER_PORT:-8888}:8888"
       - "${MASTER_PORT:-9333}:9333"
       - "${S3_PORT:-8333}:8333"
+    environment:
+      - PORT=8333 # Will also simulate Render's port injection locally
+      - WEED_S3_ACCESS_KEY=${WEED_S3_ACCESS_KEY}
+      - WEED_S3_SECRET_KEY=${WEED_S3_SECRET_KEY}
+      - DATABASE_URL=${DATABASE_URL}
     volumes:
       - seaweed_data:/data
     networks:
       - ngradar_website_network
-    env_file:
-      - .env
+    depends_on:
+      - postgres
     profiles: ["kafka"]
+
+
 
   storage-ui:
     image: mastertinner/s3manager:latest

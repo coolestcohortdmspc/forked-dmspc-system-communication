@@ -11,10 +11,12 @@ psycopg==3.3.4
 psycopg-binary==3.3.4
 pycparser==3.0
 python-dotenv==1.2.2
-confluent-kafka==2.8.0
+confluent-kafka
 gunicorn
 whitenoise
 matplotlib
 boto3
 botocore
 numpy
+pytest
+pytest-django
