@@ -27,19 +27,9 @@ def set_payload_dict(waveform, event_time):
     payload["tx_waveform"] = waveform
     payload["rec_waveform"] = waveform
     payload["event_time"] = datetime.now(timezone.utc)
-    payload["latency_ms"] = latency_calc(payload["event_time"], event_time)
+    payload["latency_ms"] = latency_calc(event_time, Stations.GBT)
 
     return payload
-
-
-def latency_calc(gbt_event_time, ui_event_time):
-    # calculates the latency of the message from the time it was sent to the time it was received
-    # returns latency in milliseconds
-    if ui_event_time == -1:
-        return 0
-    latency = gbt_event_time - ui_event_time
-    latency_ms = latency.total_seconds() * 1000 - 5000
-    return latency_ms
 
 
 def generate_payload(ui_event_uuid):

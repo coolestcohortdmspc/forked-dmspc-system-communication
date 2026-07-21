@@ -31,13 +31,45 @@ with patch("pathlib.Path.read_text", return_value=mock_env_data):
         (datetime.now(timezone.utc) - timedelta(seconds=1), 1000),
         (datetime.now(timezone.utc) - timedelta(seconds=2), 2000)
     ])
-def test_latency_calc(event_time, expected):
+def test_latency_calc_dsoc(event_time, expected):
+    """Scenario 1: sim is DSOC"""
+    sim = Stations.DSOC
+    latency = latency_calc(event_time, sim)
+
+    upper_bound = expected+300
+    
+    # 3. Assert (1 second = 1000 milliseconds)
+    assert expected <= latency < upper_bound, f"Expected latency around 1000 ms, got {latency} ms"
+
+
+@pytest.mark.parametrize("event_time, expected", [
+        (datetime.now(timezone.utc) - timedelta(seconds=1), 1000),
+        (datetime.now(timezone.utc) - timedelta(seconds=2), 2000)
+    ])
+def test_latency_calc_none(event_time, expected):
+    """Scenario 2: sim is not provided"""
     latency = latency_calc(event_time)
 
     upper_bound = expected+300
     
     # 3. Assert (1 second = 1000 milliseconds)
     assert expected <= latency < upper_bound, f"Expected latency around 1000 ms, got {latency} ms"
+
+
+@pytest.mark.parametrize("event_time, expected", [
+        (datetime.now(timezone.utc) - timedelta(seconds=1), -4000),
+        (datetime.now(timezone.utc) - timedelta(seconds=2), -3000),
+        (-1, 0)
+    ])
+def test_latency_calc_gbt(event_time, expected):
+    """Scenario 3: sim is gbt"""
+    sim = Stations.GBT
+    latency = latency_calc(event_time, sim)
+
+    upper_bound = expected+300
+    
+    # 3. Assert (1 second = 1000 milliseconds)
+    assert expected <= latency < upper_bound, f"Expected latency around {expected} ms, got {latency} ms"
 
 
 # ==============================================================================

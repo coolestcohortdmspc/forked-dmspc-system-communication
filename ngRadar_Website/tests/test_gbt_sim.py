@@ -1,6 +1,7 @@
 from unittest.mock import patch, MagicMock
 from datetime import datetime, timezone
 from unittest.mock import ANY
+from ngRadar_Website.enums import Stations
 
 
 # =============================================
@@ -57,7 +58,8 @@ def test_set_payload_dict(mock_latency):
     assert payload["tx_waveform"] == waveform
     assert payload["rec_waveform"] == waveform
     assert before <= payload["event_time"] <= after
-    mock_latency.assert_called_once_with(payload["event_time"], event_time)
+    mock_latency.assert_called_once_with(event_time, Stations.GBT)
+    assert payload["latency_ms"] == 100
 
 
 # ==============================================================================
