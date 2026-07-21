@@ -156,38 +156,33 @@ def test_produce(mock_Producer):
 # 6. process_msg Test
 # ==============================================================================
 
-# @patch("ngRadar_Website.management.commands.gbt_sim.uuid.uuid4")
-# @patch("ngRadar_Website.management.commands.gbt_sim.mock_transmitter")
-# @patch("ngRadar_Website.management.commands.gbt_sim.mock_gen_payload")
-# @patch("ngRadar_Website.management.commands.gbt_sim.mock_publish_DB")
-# @patch("ngRadar_Website.management.commands.gbt_sim.mock_produce")
-# def test_process_msg(mock_produce, mock_publish_DB, mock_gen_payload, mock_transmitter, mock_uuid):
-#     #fake uuid payload from kafka
-#     mock_uuid.return_value = "12345"
 
-#     mock_msg = MagicMock()
-#     mock_msg.key.return_value = b"12345"
-#     mock_msg.error.return_value = None
+@patch("ngRadar_Website.management.commands.gbt_sim.turn_off_transmitter")
+@patch("ngRadar_Website.management.commands.gbt_sim.generate_payload")
+@patch("ngRadar_Website.management.commands.gbt_sim.publish_to_db")
+@patch("ngRadar_Website.management.commands.gbt_sim.produce")
+def test_process_msg(mock_produce, mock_publish_DB, mock_gen_payload, mock_transmitter):
+    mock_msg = MagicMock()
+    mock_msg.key.return_value = b"12345"
 
-#     producer_topic = "topic"
-#     producer_config = "config"
+    producer_topic = "topic"
+    producer_config = "config"
 
-#     mock_transmitter.return_value = None
+    payload = {
+        "object_id": "fake_obj", 
+        "target": "fake_target", 
+        "tx_waveform": "Sinewave", 
+        "rec_waveform": "Sinewave", 
+        "event_time": datetime(2026, 1, 1, tzinfo=timezone.utc), 
+        "latency_ms": 100,
+    }
+    mock_gen_payload.return_value = payload
 
-#     mock_payload = {
-#         "object_id": "fake_obj", 
-#         "target": "fake_target", 
-#         "tx_waveform": "Sinewave", 
-#         "rec_waveform": "Sinewave", 
-#         "event_time": datetime(2026, 1, 1, tzinfo=timezone.utc), 
-#         "latency_ms": 100,
-#     }
-#     mock_gen_payload.return_value = mock_payload
+    mock_publish_DB.return_value = "gbt_uuid"
 
-#     mock_publish_DB.return_value = "gbt_uuid"
+    process_msg(mock_msg, producer_topic, producer_config)
 
-#     mock_produce.return_value = None
-
-#     process_msg(mock_msg, producer_topic, producer_config)
-
-#     mock_transmitter.assert_called_once()
+    mock_transmitter.assert_called_once()
+    mock_gen_payload.assert_called_once_with("12345")
+    mock_publish_DB.assert_called_once_with(payload)
+    mock_produce.assert_called_once_with("topic", "config", "gbt_uuid", "GBT transmitting")
