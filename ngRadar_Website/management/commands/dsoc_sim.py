@@ -107,11 +107,7 @@ def save_image_to_seaweedfs(target, image_file, dsoc_uuid):
 
     for attempt in range(5):
         try:
-            if hasattr(image_file, 'read'):
-                image_file.seek(0) # Reset stream pointer to the beginning of the file
-                file_data = image_file.read()
-            else:
-                file_data = image_file
+            file_data = image_file
             s3.put_object(
                 Bucket=os.environ.get('WEED_S3_BUCKET'),
                 Key=image_key,
