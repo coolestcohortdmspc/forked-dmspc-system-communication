@@ -19,7 +19,7 @@ from botocore.config import Config
 from django.core.cache import cache
 
 from ngRadar_Website.enums import Stations
-from ngRadar_Website.models.models import ObservatoryEvent, uiEvent, ngrok_endpoint
+from ngRadar_Website.models.models import ObservatoryEvent, uiEvent, ngrok_endpoint, gbtEvent, dsocEvent
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout, logout
 from django.db.models import Avg
