@@ -18,7 +18,7 @@ from botocore.config import Config
 #libraries used for lock status
 from django.core.cache import cache
 
-from ngRadar_Website.enums import Stations
+#from ngRadar_Website.enums import Stations
 from ngRadar_Website.models.models import ObservatoryEvent, uiEvent, ngrok_endpoint, gbtEvent, dsocEvent
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout, logout
@@ -33,9 +33,10 @@ from dotenv import load_dotenv
 load_dotenv(override=True)
 
 #program constants
-DATE_TIME_STRING=19
+
 RECORDS_TO_DISPLAY=20
 LAST_RECORDS = 5
+EXPIRE_TIME_SECONDS = 3600
 
 def get_obs_events():
     """Helper function to keep data uniform across view updates"""
@@ -119,7 +120,7 @@ def serve_image(request, uuid):
             'Bucket': os.environ["WEED_S3_BUCKET"], 
             'Key': event.image_key
         },
-        ExpiresIn=3600 # The link is valid for 1 hour (3600 seconds)
+        ExpiresIn=EXPIRE_TIME_SECONDS # The link is valid for 1 hour (3600 seconds)
     )
     
       # Swap out the internal network name for the public domain before redirecting
