@@ -1,14 +1,11 @@
-from pathlib import Path
-
-from dotenv import load_dotenv
+import pytest
 from unittest.mock import patch, MagicMock
 
 from ngRadar_Website.views.views import get_obs_events
 from ngRadar_Website.enums import Stations
 from datetime import datetime, timezone
 
-
-import random,string
+import random,string, MockQuery
 
 #constants
 RECORDS_TO_DISPLAY=20
@@ -53,19 +50,19 @@ def test_get_obs_events(Mock_uiEvent, Mock_dsoc_Event, Mock_gbtEvent, Mock_Obser
         gbt_event_arr.append(gbt_event)
         dsoc_event_arr.append(dsoc_event)
         ui_event_arr.append(ui_event)
-    
-    Mock_ObservatoryEvent.objects.filter.return_value = obs_event_arr
-    Mock_gbtEvent.objects.filter.return_value = gbt_event_arr
-    Mock_dsoc_Event.objects.filter.return_value = dsoc_event_arr
-    Mock_uiEvent.objects.filter.return_value = ui_event_arr
+
+    Mock_ObservatoryEvent.objects.order_by.return_value = MockQuery.MockQuery(obs_event_arr)
+    Mock_gbtEvent.objects.order_by.return_value = MockQuery.MockQuery(gbt_event_arr)
+    Mock_dsoc_Event.objects.order_by.return_value = MockQuery.MockQuery(dsoc_event_arr)
+    Mock_uiEvent.objects.order_by.return_value = MockQuery.MockQuery(ui_event_arr)
 
     theObservatoryEvents = get_obs_events()
 
-    latest_obs_events = theObservatoryEvents["latest_events"]
-    print("obs event length")
-    print(len(obs_event_arr))
-    length = RECORDS_TO_DISPLAY
-    #assert len(latest_obs_events) == length
+    latest_obs_event = theObservatoryEvents["latest_events"]
+    print((latest_obs_event.items()))
+    # print(latest_obs_events.list)
+    # length = RECORDS_TO_DISPLAY
+    # assert len(latest_obs_events) == length
 
 
 def getMockObsEvent(mockID, mockTarget, mockWaveform, currentDate, mock_latency):
