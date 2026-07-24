@@ -120,7 +120,7 @@ def test_create_img_output():
 @patch.dict(
     "os.environ",
     {
-        "WEED_S3_DOMAIN": "seaweedfs.fake.com",
+        "WEED_S3_INTERNAL_DOMAIN": "seaweedfs.fake.com",
         "WEED_S3_ACCESS_KEY": "fake_access_key",
         "WEED_S3_SECRET_KEY": "fake_key",
         "WEED_S3_BUCKET": "fake_bucket",

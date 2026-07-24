@@ -5,67 +5,83 @@ from unittest.mock import patch, MagicMock
 
 from ngRadar_Website.views.views import get_obs_events
 from ngRadar_Website.enums import Stations
-from datetime import datetime, timezone
-
+from datetime import datetime, timezone, timedelta
+import pytest
+from ngRadar_Website.enums import Stations
+from ngRadar_Website.models.models import gbtEvent, dsocEvent, ObservatoryEvent, uiEvent
+from ngRadar_Website.views.views import get_obs_events
 
 import random,string
 
-#constants
-RECORDS_TO_DISPLAY=20
-LAST_RECORDS = 5
+# # ==============================================================================
+# # IMPORTANT:
+# # Because we read "ngrok_endpoint.env" on import, we need to patch the Path globally
+# # before importing all the functions we want to test.
+# # ==============================================================================
+# mock_env_data = "BOOTSTRAP_SERVER=localhost:9092\nSOME_OTHER_VAR=value" 
+# with patch("pathlib.Path.read_text", return_value=mock_env_data):
+#     from ngRadar_Website.views.views import (
+#         get_obs_events,
+#         get_Message_Latency,
+#         latency_graphing,
+#         serve_image,
+#         lock_status,
+#         submit_waveform,
+#     )
 
 #Test the Functions from views.py
-@patch("ngRadar_Website.views.views.ObservatoryEvent")
-@patch("ngRadar_Website.views.views.gbtEvent")
-@patch("ngRadar_Website.views.views.dsocEvent")
-@patch("ngRadar_Website.views.views.uiEvent")
-def test_get_obs_events(Mock_uiEvent, Mock_dsoc_Event, Mock_gbtEvent, Mock_ObservatoryEvent):
+@pytest.mark.django_db
+def test_get_obs_events():
 
-    obs_event_arr = []
-    gbt_event_arr = []
-    dsoc_event_arr = []
-    ui_event_arr = []
+    now = datetime.now(timezone.utc)
 
-    number_in_database = random.randint(RECORDS_TO_DISPLAY, 30) #put random number of items in database
-    for i in range(number_in_database+1):
-        #generate mock data for use in this test
-        mockID_arr=["1","2","3","4","5"]
-        mockTarget_arr=["alpha", "bravo", "charlie", "delta", "echo"]
-        arrayIndex = random.randint(0,len(mockID_arr)-1)
-        #gets mock ID and target from the array
-        mockID = mockID_arr[arrayIndex]
-        mockTarget = mockTarget_arr[arrayIndex]
-        mockWaveform = random.randint(45,55)
-        currentDate = datetime.now(timezone.utc)
-        mock_latency = random.randint(100, 1000)
-        mockUUID = gen_pattern_uuid_like()
-        mockBytes = random.randint(100000, 500000)
-        mockID = gen_8char_ID()
-
-        #call functions which will produce the objects
-        obs_event = getMockObsEvent(mockID, mockTarget, mockWaveform,currentDate,mock_latency)
-        gbt_event = getMockGBTEvent(mockID, mockTarget, mockWaveform,currentDate,mock_latency,mockUUID)
-        dsoc_event = getMockDSOCEvent(mockID, mockTarget,currentDate,mock_latency,mockUUID, mockBytes)
-        ui_event = getMockUIEvent(mockUUID,mockWaveform,currentDate)
-
-        #add the objects to the lists
-        obs_event_arr.append(obs_event)
-        gbt_event_arr.append(gbt_event)
-        dsoc_event_arr.append(dsoc_event)
-        ui_event_arr.append(ui_event)
-    
-    Mock_ObservatoryEvent.objects.filter.return_value = obs_event_arr
-    Mock_gbtEvent.objects.filter.return_value = gbt_event_arr
-    Mock_dsoc_Event.objects.filter.return_value = dsoc_event_arr
-    Mock_uiEvent.objects.filter.return_value = ui_event_arr
+    for i in range(25):
+        ObservatoryEvent.objects.create(
+            uuid = f"{i}",
+            object_id = f"OBJ{i}",
+            target = "target",
+            tx_waveform = "Sinewave",
+            rec_waveform = "Sinewave",
+            product_type = "DDM",
+            product_id = f"00{i}",
+            station = Stations.GBT,
+            event_time = now - timedelta(seconds=i),
+            created_at = now - timedelta(seconds=i+5),
+            xmit_station = Stations.GBT,
+            rcvr_station = Stations.DSOC,
+            image_key = f"ddm/target/uuid.png",
+            num_bytes = 2048,
+            latency_ms = 100,
+        )
+        gbtEvent.objects.create(
+            uuid = f"{i}",
+            object_id = f"OBJ{i}",
+            target = "target",
+            tx_waveform = "Sinewave",
+            rec_waveform = "Sinewave",
+            event_time = now - timedelta(seconds=i),
+            latency_ms = 100
+        )
+        dsocEvent.objects.create(
+            uuid = f"{i}",
+            object_id = f"OBJ{i}",
+            target = "target",
+            image_key = f"ddm/target/uuid.png",
+            num_bytes = 2048,
+            event_time = now - timedelta(seconds=i),
+            latency_ms = 100
+        )
+        uiEvent.objects.create(
+            uuid = f"{i}",
+            selected_waveform = "Sinewave",
+            event_time = now - timedelta(seconds=i)
+        )
 
     theObservatoryEvents = get_obs_events()
 
     latest_obs_events = theObservatoryEvents["latest_events"]
-    print("obs event length")
-    print(len(obs_event_arr))
-    length = RECORDS_TO_DISPLAY
-    #assert len(latest_obs_events) == length
+    length = len(latest_obs_events)
+    assert length == 20
 
 
 def getMockObsEvent(mockID, mockTarget, mockWaveform, currentDate, mock_latency):

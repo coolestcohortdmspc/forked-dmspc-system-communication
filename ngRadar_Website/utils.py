@@ -109,6 +109,11 @@ def bootstrap(sim):
         return topic, config
     
 
+def views_bootstrap():
+    from dotenv import load_dotenv
+    load_dotenv(override=True)
+
+
 def consume(topic, config, process_msg, producer_topic=None, producer_config=None):
     """
     Description: Creates a new consumer instance; subscribes to a Kafka topic and receives messages.
