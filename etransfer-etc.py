@@ -17,27 +17,70 @@ CLIENT_DIR = Path("/Users/tmatson/Documents/GitHub/etransfer/data/pickle5.jpeg")
 #DAEMON_DIR = "/Users/ndepergola/Projects/etransfer-test/"
 DAEMON_DIR = "/Users/tmatson/Documents/GitHub/etransfer/data-retrieved/"
 
-if len(sys.argv) == 1:  # default command
-    cmd = ["./etc", f"{CLIENT_DIR}", f"{os.environ.get('TY_IP_ADDRESS')}:{DAEMON_DIR}"]
-elif len(sys.argv) >= 3:  # check if command line arguments were provided
-    cmd = ["./etc", f"{Path(sys.argv[1])}", f"{sys.argv[2]}"] + sys.argv[3:]
-else:  # invalid command
-    print("Error: Invalid arguments")
-    print("Usage: python etransfer-etc.py source_path destination_ip_address#port:/destination_path [optional_modes]")
-    print("Note: #port is optional, depends on your use case")
-    sys.exit(1)
+
+while True:
+    # displays the current working source directory and asks for a path from there to source data
+    current_source_folder = f"*/{os.environ.get('SOURCE_DIR').strip().split("/")[-2]}/"
+    source_path = os.environ.get('SOURCE_DIR') + input(f"({current_source_folder})$ Enter your source file path: ")
+
+    # displays the current working destination directory and asks for a path from there to transfer data to
+    current_destination_folder = f"*/{os.environ.get('DESTINATION_DIR').strip().split("/")[-2]}/"
+    destination_path = os.environ.get('DESTINATION_DIR') + input(f"({current_destination_folder})$ Enter your destination file path: ")
+
+    print()
+    print("Select a transfer mode, options are: ")
+    print("--overwrite")
+    print(" this restarts the file transfer. The remote file is truncated to zero size after which the whole source file is transferred.")
+    print("--resume")
+    print(" this resumes an operation. If the source file is longer than the destination file, the remaning bytes are transferred. If the source file's size is shorter or equal to the destination no bytes are transferred and no error is generated.")
+    print()
+    # asks for any optional modes, like --overwrite or --resume
+    optional_mode = input("Enter a transfer mode or leave blank: ")
+
+    if source_path[-1] == "/" or len(optional_mode.strip().split()) > 1:
+        print()
+        print("=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=")
+        print("| Invalid input, please try again |")
+        print("=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=")
+        print()
+        continue
+    else:
+        if destination_path[-1] != "/":
+            destination_path = destination_path + "/"
+        
+        break
+
+if optional_mode.strip() == "":
+    cmd = [
+        "./etc", 
+        Path(f"{os.environ.get('SOURCE_IP')}:{source_path}"), 
+        f"{os.environ.get('DESTINATION_IP')}:{destination_path}"
+    ]
+else:
+    option = optional_mode.strip().split()  # creates an array without whitespace from the input
+    cmd = [
+        "./etc", 
+        Path(f"{os.environ.get('SOURCE_IP')}:{source_path}"), 
+        f"{os.environ.get('DESTINATION_IP')}:{destination_path}"
+    ] + option
+
+# if len(sys.argv) == 1:  # default command
+#     cmd = ["./etc", f"{os.environ.get('SOURCE_IP')}:{source_path}", f"{os.environ.get('DESTINATION_IP')}:{destination_path}"]
+# elif len(sys.argv) >= 3:  # check if command line arguments were provided
+#     cmd = ["./etc", f"{Path(sys.argv[1])}", f"{sys.argv[2]}"] + sys.argv[3:]
+# else:  # invalid command
+#     print("Error: Invalid arguments")
+#     print("Usage: python etransfer-etc.py source_path destination_ip_address#port:/destination_path [optional_modes]")
+#     print("Note: #port is optional, depends on your use case")
+#     sys.exit(1)
 
 result = subprocess.run(
     cmd,
     cwd=COMMAND_DIR,
-    capture_output=True,
     text=True,
     check=False,  # set True if you want exceptions on non-zero exit
 )
 
-print("Exit code:", result.returncode)
-print("STDOUT:\n", result.stdout)
-print("STDERR:\n", result.stderr)
-
 if result.returncode != 0:
+    print("Exit code:", result.returncode)
     raise RuntimeError("etransfer command failed")
