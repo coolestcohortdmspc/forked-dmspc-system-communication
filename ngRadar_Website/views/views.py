@@ -5,10 +5,10 @@ from django.views.decorators.cache import cache_control
 
 #libraries used for data streaming
 import json
-from django.http import StreamingHttpResponse, JsonResponse
+from django.http import StreamingHttpResponse, JsonResponse, HttpResponse
 
 # serve_image imports
-from ngRadar_Website.utils import create_s3_client, get_presigned_url
+from ngRadar_Website.utils import create_s3_client # , get_presigned_url
 
 #libraries used for lock status
 from django.core.cache import cache
@@ -19,6 +19,7 @@ from django.contrib.auth import authenticate, login, logout, logout
 from django.db.models import Avg
 from confluent_kafka import Producer
 import uuid
+import os
 from datetime import datetime, timezone 
 from dotenv import load_dotenv
 
@@ -91,11 +92,22 @@ def latency_graphing(request):
 def serve_image(request, uuid):
     event = get_object_or_404(ObservatoryEvent, uuid=uuid)
 
+    bucket = bucket = os.environ["WEED_S3_BUCKET"]
+
     s3 = create_s3_client()
 
-    presigned_url = get_presigned_url(s3, event)
+    # presigned_url = get_presigned_url(s3, event)
+    # return redirect(presigned_url)
 
-    return redirect(presigned_url)
+    obj = s3.get_object(
+    Bucket=bucket,
+    Key=event.image_key,
+    )
+
+    return HttpResponse(
+        obj["Body"].read(),
+        content_type=obj["ContentType"],
+    )
 
 
 

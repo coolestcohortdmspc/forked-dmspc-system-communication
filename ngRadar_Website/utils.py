@@ -143,11 +143,13 @@ def consume(topic, config, process_msg):
         raise
 
 
+
 def create_s3_client():
     """
     Creates the boto3 S3 client and waits for the S3 gateway
     to become available.
     """
+    print("Connecting to:", os.environ["WEED_S3_ENDPOINT"])
 
     s3 = boto3.client(
         "s3",
@@ -182,32 +184,33 @@ def create_s3_client():
     return s3
 
 
-def get_presigned_url(s3, event):
-    """
-    Gets a presigned url, specifically for the serve_image in the views,
-    But could be used elsewhere if we grow our website to rendering more 
-    pages with images.
-    """
 
-    presigned_url = s3.generate_presigned_url(
-            'get_object',
-            Params={
-                'Bucket': os.environ["WEED_S3_BUCKET"], 
-                'Key': event.image_key
-            },
-            ExpiresIn=3600 # The link is valid for 1 hour (3600 seconds)
-        )
-    print("Generated:", presigned_url)
+# def get_presigned_url(s3, event):
+#     """
+#     Gets a presigned url, specifically for the serve_image in the views,
+#     But could be used elsewhere if we grow our website to rendering more 
+#     pages with images.
+#     """
 
-    endpoint = os.environ["WEED_S3_ENDPOINT"]
-    public = os.environ["WEED_S3_PUBLIC_URL"]
+#     presigned_url = s3.generate_presigned_url(
+#             'get_object',
+#             Params={
+#                 'Bucket': os.environ["WEED_S3_BUCKET"], 
+#                 'Key': event.image_key
+#             },
+#             ExpiresIn=3600 # The link is valid for 1 hour (3600 seconds)
+#         )
+#     print("Generated:", presigned_url)
 
-    if endpoint != public:      # will replace for local dev only, in a demo these will be identical (ngrok)
-        presigned_url = presigned_url.replace(endpoint, public)
-        print("After replace:", presigned_url)
-        
-    return presigned_url
-    
+#     endpoint = os.environ["WEED_S3_ENDPOINT"]
+#     public = os.environ["WEED_S3_PUBLIC_URL"]
+
+#     if endpoint != public:      # will replace for local dev only, in a demo these will be identical (ngrok)
+#         presigned_url = presigned_url.replace(endpoint, public)
+#         print("After replace:", presigned_url)
+
+#     return presigned_url
+
 
 
 def ensure_bucket_exists(s3):
