@@ -2,68 +2,34 @@
 
 # This is the entrypoint script for the SeaweedFS container.
 
-# This binding will work both for Render and local Docker
-BIND_IP="0.0.0.0" 
+# below tells the script to use .env vars
+set -e
 
-# Render automatically injects $PORT. Fall back to local variables if missing, so local Docker will still work.
-S3_PORT=${PORT:-${WEED_S3_PORT:-8333}}
-FILER_PORT=${WEED_FILER_PORT:-8888}
-S3_DOMAIN="${WEED_S3_INTERNAL_DOMAIN:-localhost}"
+: "${WEED_DB_HOST:?WEED_DB_HOST is required}"
+: "${WEED_DB_USER:?WEED_DB_USER is required}"
+: "${WEED_DB_PASSWORD:?WEED_DB_PASSWORD is required}"
+: "${WEED_DB_NAME:?WEED_DB_NAME is required}"
 
-echo "Binding IP  : $BIND_IP"
-echo "S3 Domain   : $S3_DOMAIN"
-echo "S3 Port     : $S3_PORT"
-echo "Filer Port  : $FILER_PORT"
+: "${WEED_S3_ACCESS_KEY:?WEED_S3_ACCESS_KEY is required}"
+: "${WEED_S3_SECRET_KEY:?WEED_S3_SECRET_KEY is required}"
 
-# Initialize default arguments for filer
-FILER_ARGS="-filer=true -filer.port=$FILER_PORT"
-S3_CONFIG_ARG=""
+mkdir -p /etc/seaweedfs
 
-# Creates this filer.toml to store filer metadata (no postgres changes required)
-if [ -n "$DATABASE_URL" ]; then
-  mkdir -p /etc/seaweedfs
-  cat <<EOF > /etc/seaweedfs/filer.toml
-[postgres]
-enabled=true
-url="$DATABASE_URL"
-EOF
-  FILER_ARGS="$FILER_ARGS -filer.options=/etc/seaweedfs/filer.toml"
-fi
+envsubst < /filer.toml.template > /etc/seaweedfs/filer.toml
+echo "Generated filer.toml"
+cat /etc/seaweedfs/filer.toml
 
-# Handle S3 Credentials (will work locally & on render)
-if [ -n "$WEED_S3_ACCESS_KEY" ] && [ -n "$WEED_S3_SECRET_KEY" ]; then
-  mkdir -p /etc/seaweedfs
-  cat <<EOF > /etc/seaweedfs/s3.json
-{
-  "identities": [
-    {
-      "name": "django_app",
-      "credentials": [
-        {
-          "accessKey": "$WEED_S3_ACCESS_KEY",
-          "secretKey": "$WEED_S3_SECRET_KEY"
-        }
-      ],
-      "actions": ["Read", "Write", "List", "Tagging", "Admin"]
-    }
-  ]
-}
-EOF
-  # Store the flag to pass s3 credentials into the final command
-  S3_CONFIG_ARG="-s3.config=/etc/seaweedfs/s3.json"
-fi
+envsubst < /s3.json.template > /etc/seaweedfs/s3.json
+echo "Generated s3.json"
 
-# Keeping these args below in case I need them later:
-# -filer=true \
-# -filer.port="$FILER_PORT"
-# -s3 \
 
-# Boot SeaweedFS
 exec weed server \
-  -ip="$BIND_IP" \
-  -dir="/data" \
+  -ip=0.0.0.0 \
+  -dir=/data \
+  -filer=true \
+  -filer.port=8888 \
   -s3=true \
-  -s3.domainName="$S3_DOMAIN" \
-  -s3.port="$S3_PORT" \
-  $S3_CONFIG_ARG \
-  $FILER_ARGS
+  -s3.port=8333 \
+  -s3.config=/etc/seaweedfs/s3.json # \
+  # -s3.externalUrl="$WEED_S3_PUBLIC_URL"
+

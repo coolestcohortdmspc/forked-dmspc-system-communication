@@ -5,6 +5,15 @@ from matplotlib.path import Path
 from pathlib import Path
 from ngRadar_Website.enums import Stations
 from confluent_kafka import Consumer
+import boto3
+import os
+import time
+from botocore.config import Config
+from botocore.exceptions import (
+    EndpointConnectionError,
+    ConnectionError,
+    ClientError,
+)
 
 
 def latency_calc(event_time):
@@ -132,3 +141,104 @@ def consume(topic, config, process_msg):
         print("An unhandled exception occurred in the consumer loop:")
         traceback.print_exc()
         raise
+
+
+def create_s3_client():
+    """
+    Creates the boto3 S3 client and waits for the S3 gateway
+    to become available.
+    """
+
+    s3 = boto3.client(
+        "s3",
+        endpoint_url=os.environ["WEED_S3_ENDPOINT"],
+        aws_access_key_id=os.environ["WEED_S3_ACCESS_KEY"],
+        aws_secret_access_key=os.environ["WEED_S3_SECRET_KEY"],
+        region_name="us-east-1",
+        config=Config(
+            signature_version="s3v4",
+            s3={"addressing_style": "path"},
+        ),
+    )
+
+    for attempt in range(30):
+        try:
+            s3.list_buckets()
+            print("SeaweedFS S3 is ready.")
+            break
+
+        except (EndpointConnectionError, ConnectionError):
+            print(f"Waiting for SeaweedFS... ({attempt + 1}/30)")
+            time.sleep(2)
+
+        except ClientError as e:
+            # The S3 API is responding, so we're ready.
+            print(f"SeaweedFS responded: {e.response['Error']['Code']}")
+            break
+    else:
+        raise RuntimeError("SeaweedFS S3 never became ready")
+
+    ensure_bucket_exists(s3)
+    return s3
+
+
+def get_presigned_url(s3, event):
+    """
+    Gets a presigned url, specifically for the serve_image in the views,
+    But could be used elsewhere if we grow our website to rendering more 
+    pages with images.
+    """
+
+    presigned_url = s3.generate_presigned_url(
+            'get_object',
+            Params={
+                'Bucket': os.environ["WEED_S3_BUCKET"], 
+                'Key': event.image_key
+            },
+            ExpiresIn=3600 # The link is valid for 1 hour (3600 seconds)
+        )
+    print("Generated:", presigned_url)
+
+    endpoint = os.environ["WEED_S3_ENDPOINT"]
+    public = os.environ["WEED_S3_PUBLIC_URL"]
+
+    if endpoint != public:      # will replace for local dev only, in a demo these will be identical (ngrok)
+        presigned_url = presigned_url.replace(endpoint, public)
+        print("After replace:", presigned_url)
+        
+    return presigned_url
+    
+
+
+def ensure_bucket_exists(s3):
+    bucket = os.environ["WEED_S3_BUCKET"]
+
+    try:
+        s3.head_bucket(Bucket=bucket)
+        print(f"Bucket '{bucket}' exists.")
+        return
+
+    except ClientError as e:
+        code = e.response["ResponseMetadata"]["HTTPStatusCode"]
+        print(e.response)
+
+        if code != 404:
+            raise
+
+    print(f"Creating bucket '{bucket}'...")
+    s3.create_bucket(Bucket=bucket)
+    print("Bucket created.")
+
+
+def upload_seaweedfs(s3, image_key, file_data):
+    bucket = os.environ["WEED_S3_BUCKET"]
+
+    s3.put_object(
+        Bucket=bucket,
+        Key=image_key,
+        Body=file_data,
+        ContentType="image/png",
+    )
+
+    print(f"Success: {image_key}")
+    return image_key

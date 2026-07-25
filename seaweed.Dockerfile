@@ -1,6 +1,10 @@
-FROM chrislusf/seaweedfs:latest
+FROM chrislusf/seaweedfs:4.40
 
-# Copy entrypoint script
+RUN apk add --no-cache gettext
+
+COPY s3.json.template /s3.json.template
+COPY filer.toml.template /filer.toml.template
+
 COPY seaweedfs.sh /seaweedfs.sh
 RUN chmod +x /seaweedfs.sh
 
@@ -8,3 +12,4 @@ RUN chmod +x /seaweedfs.sh
 EXPOSE 9333 8888 8333
 
 ENTRYPOINT ["/seaweedfs.sh"]
+

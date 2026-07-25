@@ -1,22 +1,16 @@
-import os
-from datetime import datetime, timedelta, timezone
-from PIL import Image
+from datetime import datetime, timezone
 import uuid
 from django.core.management.base import BaseCommand
-from dotenv import load_dotenv
-import random
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import io
 from ngRadar_Website.models.models import gbtEvent, dsocEvent
-from pathlib import Path
 from ngRadar_Website.enums import Stations
+from ngRadar_Website.utils import latency_calc, bootstrap, consume, create_s3_client, upload_seaweedfs
+from botocore.exceptions import EndpointConnectionError, ClientError
+import os
 import time
-from botocore.exceptions import EndpointConnectionError
-from ngRadar_Website.utils import latency_calc, bootstrap, consume
-import boto3
-from botocore.exceptions import NoCredentialsError
 
 
 """
@@ -96,38 +90,24 @@ def create_img(tx_waveform):
     return image_file, num_bytes
 
 def save_image_to_seaweedfs(target, image_file, dsoc_uuid):
-    # Save the image to SeaweedFS using S3 API
-
-    s3 = boto3.client(
-        's3',
-        endpoint_url=os.environ.get('WEED_S3_INTERNAL_DOMAIN'),
-        aws_access_key_id=os.environ.get('WEED_S3_ACCESS_KEY'),
-        aws_secret_access_key=os.environ.get('WEED_S3_SECRET_KEY')
-    )
+    # Saves the image to SeaweedFS using S3 API
 
     image_key = f"ddm/{target}/{dsoc_uuid}.png"
 
-    for attempt in range(5):
-        try:
-            if hasattr(image_file, 'read'):
-                image_file.seek(0) # Reset stream pointer to the beginning of the file
-                file_data = image_file.read()
-            else:
-                file_data = image_file
-            s3.put_object(
-                Bucket=os.environ.get('WEED_S3_BUCKET'),
-                Key=image_key,
-                Body=file_data,
-                ContentType='image/png'
-            )
-            break
-        except EndpointConnectionError:
-            if attempt == 4:
-                raise
-            time.sleep(1)
-            print(f"Success: Image saved to SeaweedFS at {image_key}")
+    s3 = create_s3_client()
+    
+    if hasattr(image_file, 'read'):
+        image_file.seek(0) # Reset stream pointer to the beginning of the file
+        file_data = image_file.read()
+    else:
+        file_data = image_file
+
+    image_key = upload_seaweedfs(s3, image_key, file_data)
+
+    print(f"Success: Image saved to SeaweedFS at {image_key}")
 
     return image_key
+        
 
 
 def process_msg(msg):

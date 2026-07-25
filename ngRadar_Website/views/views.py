@@ -1,30 +1,23 @@
 from django.shortcuts import redirect, render, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.cache import cache_control
-from django.views.decorators.http import require_POST #, require_GET
 
-#libraries to get files from the outside directory
-#import sys
-from pathlib import Path
 
 #libraries used for data streaming
 import json
 from django.http import StreamingHttpResponse, JsonResponse
 
-# s3 imports
-import boto3
-from botocore.config import Config
+# serve_image imports
+from ngRadar_Website.utils import create_s3_client, get_presigned_url
 
 #libraries used for lock status
 from django.core.cache import cache
 
-from ngRadar_Website.enums import Stations
 from ngRadar_Website.models.models import ObservatoryEvent, uiEvent, ngrok_endpoint, gbtEvent, dsocEvent
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout, logout
 from django.db.models import Avg
 from confluent_kafka import Producer
-import os 
 import uuid
 from datetime import datetime, timezone 
 from dotenv import load_dotenv
@@ -98,40 +91,11 @@ def latency_graphing(request):
 def serve_image(request, uuid):
     event = get_object_or_404(ObservatoryEvent, uuid=uuid)
 
-    # Configure boto3 to use the internal domain for API calls,
-    # but generate presigned URLs using the public domain.
-    s3 = boto3.client(
-    "s3",
-    endpoint_url=os.environ["WEED_S3_INTERNAL_DOMAIN"], 
-    aws_access_key_id=os.environ["WEED_S3_ACCESS_KEY"],
-    aws_secret_access_key=os.environ["WEED_S3_SECRET_KEY"],
-    config=Config(
-        signature_version='s3v4', # Force modern AWS V4 signing protocol
-        s3={'addressing_style': 'path'}
-        )
-    )
+    s3 = create_s3_client()
 
-    # Ask seaweedfs to generate a direct, temporary link to the file
-    # This happens instantly without loading any image bytes into Django memory
-    presigned_url = s3.generate_presigned_url(
-        'get_object',
-        Params={
-            'Bucket': os.environ["WEED_S3_BUCKET"], 
-            'Key': event.image_key
-        },
-        ExpiresIn=3600 # The link is valid for 1 hour (3600 seconds)
-    )
-    
-      # Swap out the internal network name for the public domain before redirecting
-      # Will make the user's browser go fetch the image directly from seaweedfs using this URL
-      # Each time this view is called (i.e. on page load, refresh, etc.) a new 1 hour url is created.
-      # Better security this way
-    public_url = presigned_url.replace(
-        os.environ["WEED_S3_INTERNAL_DOMAIN"], 
-        os.environ["WEED_S3_PUBLIC_DOMAIN"]
-    )
-    
-    return redirect(public_url)
+    presigned_url = get_presigned_url(s3, event)
+
+    return redirect(presigned_url)
 
 
 
