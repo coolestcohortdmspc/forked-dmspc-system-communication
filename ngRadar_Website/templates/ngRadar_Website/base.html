@@ -32,49 +32,34 @@
            style="height: 60px; width: auto; object-fit: contain;" />
       <h1 class="text-wrapper-5 mb-0 fs-2">ngRadar System Communication Demo</h1>
 
-      {% if user.is_authenticated and request.resolver_match.url_name != 'login' %}
+      <!-- {% if user.is_authenticated and request.resolver_match.url_name != 'login' %}
       <form method="POST" action="{% url 'logout' %}" method="POST" style="margin-left:auto">
         {% csrf_token %}
         <button id = "theLogOut_Button" type="submit" class="btn btn-secondary btn-sm">Logout</button>
       </form>
-      {% endif %}
+      {% endif %} -->
     </header>
 
 
-    {% block everywhere %}
-     <!-- main row: left nav + right content -->
-    <div class="d-flex flex-grow-1">
-      <!-- LEFT NAV -->
-        <nav class="p-3 border-end" style="min-width: 220px;" aria-label="Primary">
-        <div class="d-grid gap-2">
-            <button onclick="window.location.href='/home/'" class="btn btn-dark" type="button">
-            Home
-            </button>
-            <button onclick="window.location.href='/dashboard/'" class="btn btn-dark" type="button">
-            History Events Table
-            </button>
-            <button class="btn btn-dark" type="button">
-            PRDX Files
-            </button>
-            <button class="btn btn-dark" type="button">
-            TLEs
-            </button>
-            <button class="btn btn-dark" type="button">
-            <!-- Uncomment the link below and delete the one above when we're ready to use -->
-            <!-- <button onclick="window.location.href='/new_observation'" class="btn btn-dark" type="button"> -->
-            Plan Observation
-            </button>
-        </div>
-        </nav>
+     {% block everywhere %}
+      <!-- main row: left nav + right content -->
+      <div class="d-flex flex-grow-1">
+        <!-- NAV -->
+          <nav class="p-3 border-end" style="min-width: 220px;" aria-label="Primary">
+            <div class="d-grid gap-2">
+                {% include 'ngRadar_Website/partials/nav.html' %}
+            </div>
+          </nav>
+      
 
 
       <!-- RIGHT CONTENT -->
-      <main class="flex-grow-1">
-        <div class="container mt-5">
-          {% block content %}{% endblock %}
-        </div>
-      </main>
-    </div>
+        <main class="flex-grow-1">
+          <div class="container mt-5">
+            {% block content %}{% endblock %}
+          </div>
+        </main>
+      </div>
     {% endblock %}
 
     
