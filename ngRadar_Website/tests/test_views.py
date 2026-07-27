@@ -10,7 +10,8 @@ import pytest
 from ngRadar_Website.enums import Stations
 from ngRadar_Website.models.models import gbtEvent, dsocEvent, ObservatoryEvent, uiEvent
 #from ngRadar_Website.views.views import get_obs_events
-from django.shortcuts import redirect, get_object_or_404
+from django.test import RequestFactory
+from django.http import HttpResponse
 
 import random,string
 
@@ -25,6 +26,8 @@ with patch("pathlib.Path.read_text", return_value=mock_env_data):
         serve_image,
         lock_status,
         submit_waveform,
+        login_view,
+        logout_view,
     )
 
 
@@ -85,6 +88,17 @@ with patch("pathlib.Path.read_text", return_value=mock_env_data):
 #     assert length == 20
 
 
+# ==============================================================================
+# 1. get_message_latency Test
+# ==============================================================================
+
+"""Desmond's code here:"""
+
+
+# ==============================================================================
+# 2. serve_image Test
+# ==============================================================================
+
 
 @patch.dict(
     "os.environ",
@@ -130,3 +144,31 @@ def test_serve_image(mock_Config, mock_boto3, mock_get_obj):
             aws_secret_access_key="fake_key",
             config = mock_config
         ) #checking that an S3 client was created
+
+
+# ==============================================================================
+# 3. login_view Test
+# ==============================================================================
+
+
+@patch("ngRadar_Website.views.views.logout_view")
+def test_login_view(mock_logout):
+    """Scenario 1: user is authenticated"""
+
+    #We need this django function to generate a fake http request for us:
+    factory = RequestFactory()
+    request = factory.get("/login/")
+
+    #the following authentication is True to satisfy the if statement:
+    request.user = MagicMock()
+    request.user.is_authenticated = True
+
+    #We need the formatting to be in HttpResponse to satisfy the cache_control decorator:
+    mock_response = HttpResponse("logged out")
+    mock_logout.return_value = mock_response
+
+    #Call the function:
+    output = login_view(request)
+
+    assert output == mock_response
+    mock_logout.assert_called_once_with(request)
