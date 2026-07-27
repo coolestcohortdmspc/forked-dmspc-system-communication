@@ -11,7 +11,7 @@ from ngRadar_Website.enums import Stations
 from ngRadar_Website.models.models import gbtEvent, dsocEvent, ObservatoryEvent, uiEvent
 #from ngRadar_Website.views.views import get_obs_events
 from django.test import RequestFactory
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseRedirect
 
 import random,string
 
@@ -152,7 +152,7 @@ def test_serve_image(mock_Config, mock_boto3, mock_get_obj):
 
 
 @patch("ngRadar_Website.views.views.logout_view")
-def test_login_view(mock_logout):
+def test_login_view_auth(mock_logout):
     """Scenario 1: user is authenticated"""
 
     #We need this django function to generate a fake http request for us:
@@ -172,3 +172,33 @@ def test_login_view(mock_logout):
 
     assert output == mock_response
     mock_logout.assert_called_once_with(request)
+
+
+@patch("ngRadar_Website.views.views.authenticate")
+@patch("ngRadar_Website.views.views.login")
+@patch("ngRadar_Website.views.views.redirect")
+@patch("ngRadar_Website.views.views.logout_view")
+def test_login_view_post_valid(mock_logout, mock_redirect, mock_login, mock_auth):
+    """Scenario 2: method = POST with valid credentials"""
+
+    factory = RequestFactory()
+    request = factory.post("/login/", {
+        "username": "name",
+        "password": "secret"
+    })
+
+    request.user = MagicMock()
+    request.user.is_authenticated = False
+
+    mock_user = MagicMock()
+    mock_auth.return_value = mock_user
+
+    mock_response = HttpResponseRedirect("/home/")
+    mock_redirect.return_value = mock_response
+
+    output = login_view(request)
+
+    mock_login.assert_called_once_with(request, mock_user)
+    assert output == mock_response
+    mock_auth.assert_called_once_with(request, username="name", password="secret")
+    mock_logout.assert_not_called()
