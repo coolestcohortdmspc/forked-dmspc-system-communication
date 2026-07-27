@@ -141,7 +141,7 @@ def test_config_func_DSOC():
 
 @patch("ngRadar_Website.utils.Path.read_text")
 @patch("ngRadar_Website.utils.config_func")
-def test_bootstrap(mock_config_func, mock_path):
+def test_bootstrap_GBT(mock_config_func, mock_path):
     """Scenario 1: sim = GBT"""
 
     sim = Stations.GBT
@@ -163,6 +163,47 @@ def test_bootstrap(mock_config_func, mock_path):
     assert producer_config == {"bootstrap.servers": "localhost:9092"}
     assert consumer_topic == ["user_input"]
     assert consumer_config == {"bootstrap.servers": "localhost:9092"}
+
+
+@patch("ngRadar_Website.utils.Path.read_text")
+@patch("ngRadar_Website.utils.config_func")
+def test_bootstrap_DSOC(mock_config_func, mock_path):
+    """Scenario 2: sim = DSOC"""
+
+    sim = Stations.DSOC
+
+    mock_env_data = "BOOTSTRAP_SERVER=localhost:9092\nSOME_OTHER_VAR=value"
+    mock_path.return_value = mock_env_data
+    
+    mock_config_func.return_value = (
+        "GBT_data",
+        {"bootstrap.servers": "localhost:9092"},
+    )
+
+    topic, config = bootstrap(sim)
+
+    mock_config_func.assert_called_once_with(sim, "localhost:9092")
+    assert topic == "GBT_data"
+    assert config == {"bootstrap.servers": "localhost:9092"}
+
+
+@pytest.mark.parametrize("sim", [
+        (Stations.GBT),
+        (Stations.DSOC)
+    ])
+@patch("ngRadar_Website.utils.Path.read_text")
+def test_bootstrap_none(mock_path, sim):
+    """Scenario 3: bootstrap not found"""
+
+    mock_env_data = "BOOTSTRAP_SERVER=\nSOME_OTHER_VAR=value"
+    mock_path.return_value = mock_env_data
+
+    with pytest.raises(
+        RuntimeError,
+        match="BOOTSTRAP_SERVER not found in /out/ngrok_endpoint.env",
+    ):
+        bootstrap(sim)
+
 
 
 # ==============================================================================
