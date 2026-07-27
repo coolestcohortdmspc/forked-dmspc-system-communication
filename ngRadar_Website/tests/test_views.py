@@ -187,6 +187,7 @@ def test_login_view_post_valid(mock_logout, mock_redirect, mock_login, mock_auth
         "password": "secret"
     })
 
+    #set auth to False to avoid first if statement:
     request.user = MagicMock()
     request.user.is_authenticated = False
 
@@ -201,4 +202,35 @@ def test_login_view_post_valid(mock_logout, mock_redirect, mock_login, mock_auth
     mock_login.assert_called_once_with(request, mock_user)
     assert output == mock_response
     mock_auth.assert_called_once_with(request, username="name", password="secret")
+    mock_logout.assert_not_called()
+
+@patch("ngRadar_Website.views.views.authenticate")
+@patch("ngRadar_Website.views.views.render")
+@patch("ngRadar_Website.views.views.messages.error")
+@patch("ngRadar_Website.views.views.logout_view")
+def test_login_view_post_invalid(mock_logout, mock_msg_error, mock_render, mock_auth):
+    """Scenario 3: method = POST with IN-valid credentials"""
+
+    factory = RequestFactory()
+    request = factory.post("/login/", {
+        "username": "name",
+        "password": "secret"
+    })
+
+    #set auth to False to avoid first if statement:
+    request.user = MagicMock()
+    request.user.is_authenticated = False
+
+    mock_user = None
+    mock_auth.return_value = mock_user
+
+    mock_response = HttpResponse("login page")
+    mock_render.return_value = mock_response
+
+    output = login_view(request)
+
+    assert output == mock_response
+    mock_auth.assert_called_once_with(request, username="name", password="secret")
+    mock_msg_error.assert_called_once_with(request, "Invalid username or password.")
+    mock_render.assert_called_once_with(request, 'registration/login.html')
     mock_logout.assert_not_called()
