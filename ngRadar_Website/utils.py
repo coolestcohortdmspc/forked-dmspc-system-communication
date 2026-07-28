@@ -6,6 +6,9 @@ from pathlib import Path
 from ngRadar_Website.enums import Stations
 from confluent_kafka import Consumer
 
+#Program constants
+SESSION_TIMEOUT_MS = 45000
+MAX_BYTES = 8388608
 
 def latency_calc(event_time, sim=None):
     """
@@ -52,15 +55,15 @@ def config_func(sim, bootstrap):
         producer_topic = "GBT_data"  # NOTE The topic to which the messages will be sent, rename accordingly to whatever topic you want to send to
         producer_config = {
             "bootstrap.servers": bootstrap,
-            "message.max.bytes": 8388608,# NOTE can make this constant
+            "message.max.bytes": MAX_BYTES,# NOTE can make this constant
             "client.id": "GBT-producer"
         }
 
         consumer_topic = ["user_input"]
         consumer_config = {
             "bootstrap.servers": bootstrap,
-            "fetch.max.bytes": 8388608,
-            "session.timeout.ms": 45000, #NOTE this one too
+            "fetch.max.bytes": MAX_BYTES,
+            "session.timeout.ms": SESSION_TIMEOUT_MS,
             "client.id": "GBT-consumer",
             "group.id": "GBT-consumer-group",
             "auto.offset.reset": "earliest",
@@ -71,8 +74,8 @@ def config_func(sim, bootstrap):
         topic = ["GBT_data"]  #consumes from the GBT's topic
         config = {
             "bootstrap.servers": bootstrap,
-            "fetch.max.bytes": 8388608,
-            "session.timeout.ms": 45000,
+            "fetch.max.bytes": MAX_BYTES,
+            "session.timeout.ms": SESSION_TIMEOUT_MS,
             "client.id": "dsoc-consumer",
             "group.id": "consumer-group",
             "auto.offset.reset": "earliest",
