@@ -2,7 +2,6 @@ from unittest.mock import patch, MagicMock
 from datetime import datetime, timezone
 
 from ngRadar_Website.views.views import get_Message_Latency
-from datetime import datetime, timezone
 
 import json
 
