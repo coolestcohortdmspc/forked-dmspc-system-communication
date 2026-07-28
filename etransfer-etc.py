@@ -17,8 +17,9 @@ CLIENT_DIR = Path("/Users/tmatson/Documents/GitHub/etransfer/data/pickle5.jpeg")
 #DAEMON_DIR = "/Users/ndepergola/Projects/etransfer-test/"
 DAEMON_DIR = "/Users/tmatson/Documents/GitHub/etransfer/data-retrieved/"
 
+is_valid_input = False
 
-while True:
+while not is_valid_input:
     # displays the current working source directory and asks for a path from there to source data
     current_source_folder = f"*/{os.environ.get('SOURCE_DIR').strip().split("/")[-2]}/"
     source_path = os.environ.get('SOURCE_DIR') + input(f"({current_source_folder})$ Enter your source file path: ")
@@ -43,12 +44,11 @@ while True:
         print("| Invalid input, please try again |")
         print("=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=")
         print()
-        continue
     else:
         if destination_path[-1] != "/":
             destination_path = destination_path + "/"
-        
-        break
+
+        is_valid_input = True
 
 if optional_mode.strip() == "":
     cmd = [
@@ -63,16 +63,6 @@ else:
         Path(f"{os.environ.get('SOURCE_IP')}:{source_path}"), 
         f"{os.environ.get('DESTINATION_IP')}:{destination_path}"
     ] + option
-
-# if len(sys.argv) == 1:  # default command
-#     cmd = ["./etc", f"{os.environ.get('SOURCE_IP')}:{source_path}", f"{os.environ.get('DESTINATION_IP')}:{destination_path}"]
-# elif len(sys.argv) >= 3:  # check if command line arguments were provided
-#     cmd = ["./etc", f"{Path(sys.argv[1])}", f"{sys.argv[2]}"] + sys.argv[3:]
-# else:  # invalid command
-#     print("Error: Invalid arguments")
-#     print("Usage: python etransfer-etc.py source_path destination_ip_address#port:/destination_path [optional_modes]")
-#     print("Note: #port is optional, depends on your use case")
-#     sys.exit(1)
 
 result = subprocess.run(
     cmd,
