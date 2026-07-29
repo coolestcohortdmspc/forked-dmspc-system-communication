@@ -21,15 +21,15 @@ from confluent_kafka import Producer
 import uuid
 import os
 from datetime import datetime, timezone 
-from dotenv import load_dotenv
+from ngRadar_Website.utils import views_bootstrap
 
-
-load_dotenv(override=True)
+views_bootstrap()
 
 #program constants
-DATE_TIME_STRING=19
+
 RECORDS_TO_DISPLAY=20
 LAST_RECORDS = 5
+EXPIRE_TIME_SECONDS = 3600
 
 def get_obs_events():
     """Helper function to keep data uniform across view updates"""

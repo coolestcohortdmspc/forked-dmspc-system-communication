@@ -62,6 +62,11 @@ kafka-down)
     docker compose rm -f $KAFKA_SERVICES
     ;;
 
+testcov)
+    echo "Calculating unit test coverage..."
+    pytest --cov=ngRadar_Website --cov-report=term-missing
+    ;;
+
 hard-reset)
 
     read -p "This will DELETE your local database and containers. Continue? (y/N): " ANSWER

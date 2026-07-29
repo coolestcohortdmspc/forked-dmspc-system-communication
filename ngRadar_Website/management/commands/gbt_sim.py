@@ -21,31 +21,23 @@ payload = {
     "latency_ms": None,
 }
 
-producer_topic, producer_config, consumer_topic, consumer_config = bootstrap(Stations.GBT)
-
 def set_payload_dict(waveform, event_time):
     payload["object_id"] = '30104'
     payload["target"] = 'Moretus'
     payload["tx_waveform"] = waveform
     payload["rec_waveform"] = waveform
     payload["event_time"] = datetime.now(timezone.utc)
-    payload["latency_ms"] = latency_calc(payload["event_time"], event_time)
+    payload["latency_ms"] = latency_calc(event_time, Stations.GBT)
 
-
-def latency_calc(gbt_event_time, ui_event_time):
-    # calculates the latency of the message from the time it was sent to the time it was received
-    # returns latency in milliseconds
-    if ui_event_time == -1:
-        return 0
-    latency = gbt_event_time - ui_event_time
-    latency_ms = latency.total_seconds() * 1000 - 5000
-    return latency_ms
+    return payload
 
 
 def generate_payload(ui_event_uuid):
     ui_event = uiEvent.objects.get(uuid=ui_event_uuid)
 
-    set_payload_dict(ui_event.selected_waveform, ui_event.event_time)
+    payload = set_payload_dict(ui_event.selected_waveform, ui_event.event_time)
+
+    return payload
 
 
 def turn_off_transmitter():
@@ -63,7 +55,7 @@ def turn_off_transmitter():
     time.sleep(5)
 
 
-def publish_to_db():
+def publish_to_db(payload):
     gbt_event = gbtEvent.objects.create(**payload)
 
     return gbt_event.uuid
@@ -81,18 +73,17 @@ def produce(topic, config, key, value):
     producer.flush()
 
 
-def process_msg(msg):
+def process_msg(msg, producer_topic, producer_config):
     ui_uuid = msg.key().decode("utf-8")  # this is the uuid of the ui_event
-    notif = msg.value().decode("utf-8")
 
     # turn off the transmitter for 5 seconds
     turn_off_transmitter()
 
     # fill in the values to be published to the db
-    generate_payload(ui_uuid)
+    payload = generate_payload(ui_uuid)
 
     # publish new transmission to the db
-    gbt_uuid = publish_to_db()
+    gbt_uuid = publish_to_db(payload)
 
     key, value = f"{gbt_uuid}", "GBT transmitting"
 
@@ -106,9 +97,11 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         print("Starting GBT simulator")
 
+        producer_topic, producer_config, consumer_topic, consumer_config = bootstrap(Stations.GBT)
+
         # generate a dummy data payload, publish this data to the db, produce a message with this payload, then start consuming
-        set_payload_dict('W48', -1)
-        gbt_uuid = publish_to_db()
+        payload = set_payload_dict('W48', -1)
+        gbt_uuid = publish_to_db(payload)
         key, value = f"{gbt_uuid}", "GBT transmitting"
         produce(producer_topic, producer_config, key, value)
-        consume(consumer_topic, consumer_config, process_msg)
+        consume(consumer_topic, consumer_config, process_msg, producer_topic=producer_topic, producer_config=producer_config)

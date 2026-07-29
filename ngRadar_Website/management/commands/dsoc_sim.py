@@ -21,8 +21,6 @@ This code will:
 - load the image key + the uuid into the DB
 """
 
-topic, config = bootstrap(Stations.DSOC)
-
 def DB_import(uuid):
     
   gbt_data = gbtEvent.objects.filter(uuid=uuid).values_list('object_id', 'target', 'tx_waveform', 'event_time').first()
@@ -96,11 +94,7 @@ def save_image_to_seaweedfs(target, image_file, dsoc_uuid):
 
     s3 = create_s3_client()
     
-    if hasattr(image_file, 'read'):
-        image_file.seek(0) # Reset stream pointer to the beginning of the file
-        file_data = image_file.read()
-    else:
-        file_data = image_file
+    file_data = image_file
 
     image_key = upload_seaweedfs(s3, image_key, file_data)
 
@@ -109,8 +103,7 @@ def save_image_to_seaweedfs(target, image_file, dsoc_uuid):
     return image_key
         
 
-
-def process_msg(msg):
+def process_msg(msg, producer_topic=None, producer_config=None):
     #decode the GBT payload that is a single string of just the uuid:
     gbt_uuid = msg.key().decode("utf-8")
 
@@ -147,5 +140,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         print("Starting DSOC simulator")
+
+        topic, config = bootstrap(Stations.DSOC)
 
         consume(topic, config, process_msg)

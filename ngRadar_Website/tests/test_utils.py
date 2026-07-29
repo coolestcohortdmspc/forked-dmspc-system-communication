@@ -31,13 +31,45 @@ with patch("pathlib.Path.read_text", return_value=mock_env_data):
         (datetime.now(timezone.utc) - timedelta(seconds=1), 1000),
         (datetime.now(timezone.utc) - timedelta(seconds=2), 2000)
     ])
-def test_latency_calc(event_time, expected):
+def test_latency_calc_dsoc(event_time, expected):
+    """Scenario 1: sim is DSOC"""
+    sim = Stations.DSOC
+    latency = latency_calc(event_time, sim)
+
+    upper_bound = expected+300
+    
+    # 3. Assert (1 second = 1000 milliseconds)
+    assert expected <= latency < upper_bound, f"Expected latency around 1000 ms, got {latency} ms"
+
+
+@pytest.mark.parametrize("event_time, expected", [
+        (datetime.now(timezone.utc) - timedelta(seconds=1), 1000),
+        (datetime.now(timezone.utc) - timedelta(seconds=2), 2000)
+    ])
+def test_latency_calc_none(event_time, expected):
+    """Scenario 2: sim is not provided"""
     latency = latency_calc(event_time)
 
     upper_bound = expected+300
     
     # 3. Assert (1 second = 1000 milliseconds)
     assert expected <= latency < upper_bound, f"Expected latency around 1000 ms, got {latency} ms"
+
+
+@pytest.mark.parametrize("event_time, expected", [
+        (datetime.now(timezone.utc) - timedelta(seconds=1), -4000),
+        (datetime.now(timezone.utc) - timedelta(seconds=2), -3000),
+        (-1, 0)
+    ])
+def test_latency_calc_gbt(event_time, expected):
+    """Scenario 3: sim is gbt"""
+    sim = Stations.GBT
+    latency = latency_calc(event_time, sim)
+
+    upper_bound = expected+300
+    
+    # 3. Assert (1 second = 1000 milliseconds)
+    assert expected <= latency < upper_bound, f"Expected latency around {expected} ms, got {latency} ms"
 
 
 # ==============================================================================
@@ -109,7 +141,7 @@ def test_config_func_DSOC():
 
 @patch("ngRadar_Website.utils.Path.read_text")
 @patch("ngRadar_Website.utils.config_func")
-def test_bootstrap(mock_config_func, mock_path):
+def test_bootstrap_GBT(mock_config_func, mock_path):
     """Scenario 1: sim = GBT"""
 
     sim = Stations.GBT
@@ -131,6 +163,47 @@ def test_bootstrap(mock_config_func, mock_path):
     assert producer_config == {"bootstrap.servers": "localhost:9092"}
     assert consumer_topic == ["user_input"]
     assert consumer_config == {"bootstrap.servers": "localhost:9092"}
+
+
+@patch("ngRadar_Website.utils.Path.read_text")
+@patch("ngRadar_Website.utils.config_func")
+def test_bootstrap_DSOC(mock_config_func, mock_path):
+    """Scenario 2: sim = DSOC"""
+
+    sim = Stations.DSOC
+
+    mock_env_data = "BOOTSTRAP_SERVER=localhost:9092\nSOME_OTHER_VAR=value"
+    mock_path.return_value = mock_env_data
+    
+    mock_config_func.return_value = (
+        "GBT_data",
+        {"bootstrap.servers": "localhost:9092"},
+    )
+
+    topic, config = bootstrap(sim)
+
+    mock_config_func.assert_called_once_with(sim, "localhost:9092")
+    assert topic == "GBT_data"
+    assert config == {"bootstrap.servers": "localhost:9092"}
+
+
+@pytest.mark.parametrize("sim", [
+        (Stations.GBT),
+        (Stations.DSOC)
+    ])
+@patch("ngRadar_Website.utils.Path.read_text")
+def test_bootstrap_none(mock_path, sim):
+    """Scenario 3: bootstrap not found"""
+
+    mock_env_data = "BOOTSTRAP_SERVER=\nSOME_OTHER_VAR=value"
+    mock_path.return_value = mock_env_data
+
+    with pytest.raises(
+        RuntimeError,
+        match="BOOTSTRAP_SERVER not found in /out/ngrok_endpoint.env",
+    ):
+        bootstrap(sim)
+
 
 
 # ==============================================================================
@@ -162,4 +235,4 @@ def test_consume(mock_Consumer):
 
     mock_Consumer.assert_called_once_with("config")
     mock_consumer.subscribe.assert_called_once_with("topic")
-    mock_process_msg.assert_called_once_with(mock_msg)
+    mock_process_msg.assert_called_once_with(mock_msg, None, None)

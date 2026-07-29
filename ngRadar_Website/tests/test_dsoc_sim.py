@@ -6,7 +6,6 @@ from unittest.mock import patch, MagicMock
 # TEST THE STANDALONE FUNCTIONS FROM DSOC_SIM
 # =============================================
 
-
 # ==============================================================================
 # IMPORTANT:
 # Because we read "ngrok_endpoint.env" on import, we need to patch the Path globally
@@ -111,7 +110,7 @@ def test_create_img_output():
     assert isinstance(img_file, bytes)
     assert num_bytes > 0
     assert num_bytes == len(img_file)
-
+    assert img_file.startswith(b"\x89PNG\r\n\x1a\n") #ensures it is in PNG format
 
 
 # ==============================================================================
@@ -121,7 +120,7 @@ def test_create_img_output():
 @patch.dict(
     "os.environ",
     {
-        "WEED_S3_DOMAIN": "seaweedfs.fake.com",
+        "WEED_S3_INTERNAL_DOMAIN": "seaweedfs.fake.com",
         "WEED_S3_ACCESS_KEY": "fake_access_key",
         "WEED_S3_SECRET_KEY": "fake_key",
         "WEED_S3_BUCKET": "fake_bucket",
@@ -129,7 +128,6 @@ def test_create_img_output():
 )
 @patch("ngRadar_Website.management.commands.dsoc_sim.boto3") #fake the boto3 module which interacts with seaweedfs
 def test_save_image_to_seaweedfs_success(mock_boto3):
-    """Scenario 1: Successful upload returns the expected image key."""
     #function inputs:
     target = "Venus"
     image_file = b"fake png bytes"
