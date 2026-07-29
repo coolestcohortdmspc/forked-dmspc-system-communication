@@ -21,10 +21,20 @@ SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
 DEBUG = os.environ.get('DJANGO_DEBUG')
 
 # Allow local Docker containers AND Render's domain depending on environment
-# Have not tested this yet
+# This setting answers the question: "Is this Host header allowed?"
 ALLOWED_HOSTS = [
     host.strip() 
     for host in os.environ.get('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+]
+
+# This setting answers the question: "Is this HTTPS POST allowed to originate from this site?"
+# Without it, our render csrf authentication will fail
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip()
+    for origin in os.environ.get(
+        "DJANGO_CSRF_TRUSTED_ORIGINS",
+        "http://localhost:8000"
+    ).split(",")
 ]
 
 # Application definition
@@ -131,9 +141,9 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 # Authentication
 # https://docs.djangoproject.com/en/6.0/topics/auth/default/
 
-LOGIN_URL = 'login'            # name of the login route in urls.py
+LOGIN_URL = '/login/'            # name of the login route in urls.py
 LOGIN_REDIRECT_URL = 'home'    # after login -> /ngRadar_Website/home.html
-LOGOUT_REDIRECT_URL = 'login'  # after logout -> back to the login page
+LOGOUT_REDIRECT_URL = 'logout_message'  # after logout -> display logout message -> back to the login page
 
 # Let everyone see the login page; LoginRequiredMiddleware guards every other page.
 LOGIN_REQUIRED_IGNORE_PATHS = [

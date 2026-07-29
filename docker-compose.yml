@@ -27,6 +27,7 @@ services:
     image: postgres:18-alpine
     volumes:
       - postgres_data:/var/lib/postgresql
+      - ./postgres/init:/docker-entrypoint-initdb.d
     ports:
       - 5432:5432
     environment:
@@ -77,6 +78,7 @@ services:
       - "4040:4040"
     networks:
       - ngradar_website_network
+    
 
   broker:
     user: "0:0"
@@ -130,9 +132,7 @@ services:
         NGROK_BOOTSTRAP=$(curl -s  http://ngrok:4040/api/tunnels/command_line | grep -Po '"public_url":.*?[^\\]",' | cut -d':' -f2- | tr -d ',"' | sed 's/tcp:\/\///')
         echo "BOOTSTRAP_SERVER=$$NGROK_BOOTSTRAP" > /out/ngrok_endpoint.env
         /etc/confluent/docker/run
-    # networks:
-    #   - ngradar_website_network
-
+    
 
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
@@ -234,17 +234,25 @@ services:
     build: 
       context: .
       dockerfile: seaweed.Dockerfile
-    ports:
-      - "${FILER_PORT:-8888}:8888"
-      - "${MASTER_PORT:-9333}:9333"
-      - "${S3_PORT:-8333}:8333"
-    volumes:
-      - seaweed_data:/data
-    networks:
-      - ngradar_website_network
     env_file:
       - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      WEED_S3_ACCESS_KEY: ${WEED_S3_ACCESS_KEY}
+      WEED_S3_SECRET_KEY: ${WEED_S3_SECRET_KEY}
+    ports:
+      - "8333:8333"
+      - "8888:8888"
+      - "9333:9333"
+    volumes:
+      - seaweed_data:/data
+    depends_on:
+      - postgres
+    networks:
+      - ngradar_website_network
     profiles: ["kafka"]
+
+
 
   storage-ui:
     image: mastertinner/s3manager:latest

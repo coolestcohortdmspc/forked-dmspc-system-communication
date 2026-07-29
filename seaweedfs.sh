@@ -1,35 +1,35 @@
 #!/bin/sh
 
-# This is the entrypoint script for the SeaweedFS container. It detects the environment (Render vs Local) and configures the S3 domain and ports accordingly.
+# This is the entrypoint script for the SeaweedFS container.
 
-# 1. Detect if running on Render vs Local
-if [ -n "$RENDER" ] || [ "$APP_ENV" = "demo" ]; then
-    echo "--- Demo Cloud Environment Detected ---"
-    # Fallback syntax uses :- instead of ://
-    S3_DOMAIN="${WEED_S3_DOMAIN}" 
-else
-    echo "--- Local Development Environment Detected ---"
-    S3_DOMAIN="${WEED_S3_DOMAIN}" 
-fi
+# below tells the script to use .env vars
+set -e
 
-# Bind to 0.0.0.0 so other containers in the docker network can connect
-BIND_IP="0.0.0.0" 
+: "${WEED_DB_HOST:?WEED_DB_HOST is required}"
+: "${WEED_DB_USER:?WEED_DB_USER is required}"
+: "${WEED_DB_PASSWORD:?WEED_DB_PASSWORD is required}"
+: "${WEED_DB_NAME:?WEED_DB_NAME is required}"
 
-# 2. Extract or fallback to configured ports
-S3_PORT=${WEED_S3_PORT:-8333}
-FILER_PORT=${WEED_FILER_PORT:-8888}
+: "${WEED_S3_ACCESS_KEY:?WEED_S3_ACCESS_KEY is required}"
+: "${WEED_S3_SECRET_KEY:?WEED_S3_SECRET_KEY is required}"
 
-echo "Binding IP  : $BIND_IP"
-echo "S3 Domain   : $S3_DOMAIN"
-echo "S3 Port     : $S3_PORT"
-echo "Filer Port  : $FILER_PORT"
+mkdir -p /etc/seaweedfs
 
-# 3. Boot SeaweedFS 
+envsubst < /filer.toml.template > /etc/seaweedfs/filer.toml
+echo "Generated filer.toml"
+cat /etc/seaweedfs/filer.toml
+
+envsubst < /s3.json.template > /etc/seaweedfs/s3.json
+echo "Generated s3.json"
+
+
 exec weed server \
-  -ip="$BIND_IP" \
-  -dir="/data" \
-  -s3 \
-  -s3.domainName="$S3_DOMAIN" \
-  -s3.port="$S3_PORT" \
+  -ip=0.0.0.0 \
+  -dir=/data \
   -filer=true \
-  -filer.port="$FILER_PORT"
+  -filer.port=8888 \
+  -s3=true \
+  -s3.port=8333 \
+  -s3.config=/etc/seaweedfs/s3.json # \
+  # -s3.externalUrl="$WEED_S3_PUBLIC_URL"
+

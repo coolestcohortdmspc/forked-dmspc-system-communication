@@ -1,0 +1,8 @@
+[postgres]
+enabled = true
+hostname = "${WEED_DB_HOST}"
+port = ${WEED_DB_PORT}
+username = "${WEED_DB_USER}"
+password = "${WEED_DB_PASSWORD}"
+database = "${WEED_DB_NAME}"
+sslmode = "${WEED_DB_SSLMODE}"

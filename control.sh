@@ -1,10 +1,8 @@
 #!/usr/bin/env bash
 
 set -euo pipefail
-KAFKA_PROFILES="--profile kafka --profile ngrok"
-# "worker" is consumer.py, meaning kafka-up and kafka-down will automatically start and stop the consumer.py worker as well. 
-# If you want to run the consumer.py worker separately, you can ommit "worker" from the KAFKA_SERVICES variable and run it separately with "docker compose run --rm worker"
-# And bring it down with "docker compose stop worker" and "docker compose rm -f worker", but adding it here does both automatically.
+KAFKA_PROFILES="--profile kafka"
+
 KAFKA_SERVICES="zookeeper broker kafka-ui ngrok gbt seaweedfs dsoc ngrok-writer"
 
 COMMAND="$1"
@@ -18,7 +16,17 @@ start)
 
 rebuild)
     echo "Rebuilding development environment..."
-    docker compose build --no-cache && docker compose up -d
+    # Take down kafka containers
+    docker compose stop $KAFKA_SERVICES
+    docker compose rm -f $KAFKA_SERVICES
+    # Take down the rest of the containers
+    docker compose down
+    # --no-cache ensures code changes are baked in cleanly
+    docker compose build --no-cache
+    # --force-recreate guarantees .env variable updates  and config updates are pushed into the container upon rebuild
+    docker compose up -d --force-recreate
+    # same with kafka profiles:
+    docker compose $KAFKA_PROFILES up -d --force-recreate
     ;;
 
 stop)
@@ -47,10 +55,16 @@ kafka-up)
     docker compose $KAFKA_PROFILES up -d
     ;;
 
+
 kafka-down)
     echo "Stopping kafka broker, zookeeper, kafka-ui, ngrok, seaweedfs, workers..."
     docker compose stop $KAFKA_SERVICES
     docker compose rm -f $KAFKA_SERVICES
+    ;;
+
+testcov)
+    echo "Calculating unit test coverage..."
+    pytest --cov=ngRadar_Website --cov-report=term-missing
     ;;
 
 hard-reset)

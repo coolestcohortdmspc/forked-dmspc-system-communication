@@ -1,20 +1,16 @@
-import os
-from datetime import datetime, timedelta, timezone
-from PIL import Image
+from datetime import datetime, timezone
 import uuid
 from django.core.management.base import BaseCommand
-from confluent_kafka import Consumer
-from dotenv import load_dotenv
-import random
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import io
 from ngRadar_Website.models.models import gbtEvent, dsocEvent
-from pathlib import Path
 from ngRadar_Website.enums import Stations
+from ngRadar_Website.utils import latency_calc, bootstrap, consume, create_s3_client, upload_seaweedfs
+from botocore.exceptions import EndpointConnectionError, ClientError
+import os
 import time
-from botocore.exceptions import EndpointConnectionError
 
 
 """
@@ -24,42 +20,6 @@ This code will:
 - save image file to seaweedfs object store
 - load the image key + the uuid into the DB
 """
-
-load_dotenv()  # Load environment variables from .env file
-
-p = Path("../../../../out/ngrok_endpoint.env")
-text = p.read_text().strip()
-
-bootstrap = None
-for line in text.splitlines():
-    if line.startswith("BOOTSTRAP_SERVER="):
-        bootstrap = line.split("=", 1)[1].strip()
-        break
-
-if not bootstrap:
-    raise RuntimeError("BOOTSTRAP_SERVER not found in /out/ngrok_endpoint.env")
-
-config = {
-    "bootstrap.servers": bootstrap,
-    "fetch.max.bytes": 8388608,
-    "session.timeout.ms": 45000,
-    "client.id": "dsoc-consumer",
-    "group.id": "consumer-group",
-    "auto.offset.reset": "earliest",
-  }
-
-
-topic = ["GBT_data"]  #consumes from the GBT's topic
-
-def latency_calc(event_time):
-  #calculates the latency of the message from the time it was sent to the time it was received
-  #returns latency in milliseconds
-
-  current_time = datetime.now(timezone.utc)
-  latency = current_time - event_time
-  latency_ms = latency.total_seconds() * 1000
-  return latency_ms
-
 
 def DB_import(uuid):
     
@@ -89,7 +49,6 @@ def publish_DB(image_key, num_bytes, data):
 
     try:
         # Create and capture the instantiated record model
-        time.sleep(3)
         record = dsocEvent.objects.create(**payload_data)
         print("Payload saved to database successfully.")
         return record  # <-- Return the actual object record
@@ -129,104 +88,51 @@ def create_img(tx_waveform):
     return image_file, num_bytes
 
 def save_image_to_seaweedfs(target, image_file, dsoc_uuid):
-    # Save the image to SeaweedFS using S3 API
-    import boto3
-    from botocore.exceptions import NoCredentialsError
-
-    s3 = boto3.client(
-        's3',
-        endpoint_url=os.environ.get('WEED_S3_DOMAIN'),
-        aws_access_key_id=os.environ.get('WEED_S3_ACCESS_KEY'),
-        aws_secret_access_key=os.environ.get('WEED_S3_SECRET_KEY')
-    )
+    # Saves the image to SeaweedFS using S3 API
 
     image_key = f"ddm/{target}/{dsoc_uuid}.png"
 
-    for attempt in range(5):
-        try:
-            if hasattr(image_file, 'read'):
-                image_file.seek(0) # Reset stream pointer to the beginning of the file
-                file_data = image_file.read()
-            else:
-                file_data = image_file
-            s3.put_object(
-                Bucket=os.environ.get('WEED_S3_BUCKET'),
-                Key=image_key,
-                Body=file_data,
-                ContentType='image/png'
-            )
-            break
-        except EndpointConnectionError:
-            if attempt == 4:
-                raise
-            time.sleep(2)
-            print(f"Success: Image saved to SeaweedFS at {image_key}")
+    s3 = create_s3_client()
+    
+    file_data = image_file
+
+    image_key = upload_seaweedfs(s3, image_key, file_data)
+
+    print(f"Success: Image saved to SeaweedFS at {image_key}")
 
     return image_key
+        
 
+def process_msg(msg, producer_topic=None, producer_config=None):
+    #decode the GBT payload that is a single string of just the uuid:
+    gbt_uuid = msg.key().decode("utf-8")
 
-def consume(topic, config):
-    #creates a new consumer instance
-    consumer = Consumer(config)
+    #use the uuid from the payload to import the correct line of data from the GBT table:
+    gbt_data = DB_import(gbt_uuid)
 
-    #subscribes to the specified topic
-    consumer.subscribe(topic)
-    
-    try:
-        while True:
-            #consumer polls the topic and prints any incoming messages
-            msg = consumer.poll(1.0) #polls for messages for 1 second
-            #if msg is not None and msg.error() is None:
-            if msg is None:
-                continue
-            if msg.error() is not None:
-                print("Consumer error:", msg.error())
-                continue
+    #calculate latency with event_time from the GBT import, before we update the event_time value in DB_columns
+    dsoc_latency = latency_calc(gbt_data[3])
 
-            #decode the GBT payload that is a single string of just the uuid:
-            gbt_uuid = msg.key().decode("utf-8")
+    #create the rest of the column values specific to DSOC/images:
+    data = DB_columns(gbt_data)
+    data['latency_ms'] = dsoc_latency
 
-            #use the uuid from the payload to import the correct line of data from the GBT table:
-            gbt_data = DB_import(gbt_uuid)
+    # 1. Gather data and create the image file and dsoc_uuid first:
+    object_id, target, tx_waveform, event_time = gbt_data
+    image_file, num_bytes = create_img(tx_waveform)
+    dsoc_uuid = str(uuid.uuid4())
 
-            #calculate latency with event_time from the GBT import, before we update the event_time value in DB_columns
-            dsoc_latency = latency_calc(gbt_data[3])
+        # 2. Upload the image to SeaweedFS using your pre-generated uuid
+    image_key = save_image_to_seaweedfs(target, image_file, dsoc_uuid)
 
-            #create the rest of the column values specific to DSOC/images:
-            data = DB_columns(gbt_data)
-            data['latency_ms'] = dsoc_latency
+    # 3. Inject the UUID and image_key directly into the payload data
+    data['uuid'] = dsoc_uuid
 
-            # 1. Gather data and create the image file and dsoc_uuid first:
-            object_id, target, tx_waveform, event_time = gbt_data
-            image_file, num_bytes = create_img(tx_waveform)
-            dsoc_uuid = str(uuid.uuid4())
+    # 4. Save everything at once
+    # To trigger the signal events to obsevent table
+    publish_DB(image_key=image_key, num_bytes=num_bytes, data=data)
 
-             # 2. Upload the image to SeaweedFS using your pre-generated uuid
-            image_key = save_image_to_seaweedfs(target, image_file, dsoc_uuid)
-
-            # 3. Inject the UUID and image_key directly into the payload data
-            data['uuid'] = dsoc_uuid
-
-            # 4. Save everything at once
-            # To trigger the signal events to obsevent table
-            publish_DB(image_key=image_key, num_bytes=num_bytes, data=data)
-
-            print(f"Received message from {Stations.GBT.label} for object {object_id}; DDM is ready in SeaweedFS (Image Path: {image_key}.")
-    
-    except Exception as e:
-        import traceback
-        print("An unhandled exception occurred in the consumer loop:")
-        traceback.print_exc()
-
-
-
-
-
-#   except KeyboardInterrupt: 
-#     pass
-#   finally:
-#     print("reached the end")
-  
+    print(f"Received message from {Stations.GBT.label} for object {object_id}; DDM is ready in SeaweedFS (Image Path: {image_key}.")
 
 
 class Command(BaseCommand):
@@ -235,4 +141,6 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         print("Starting DSOC simulator")
 
-        consume(topic, config)
+        topic, config = bootstrap(Stations.DSOC)
+
+        consume(topic, config, process_msg)

@@ -39,12 +39,26 @@
     </div>
 
 </div>
-<!-- <script>
+
+<script>
+    function preventBack() {
+    window.history.forward();
+    }
+    setTimeout("preventBack()", 0);
+    window.onunload = function () {
+        null
+        //Push a the current page onto the browser history stack
+        //history.pushState(null, null, window.location.href);
+        }
+</script>
+
+<!-- Refresh the page if user attempts to go back into a protected function -->
+<script>
     window.addEventListener('pageshow', function(event){
         if(event.persisted){
             window.location.reload()
         }
     });
-</script> -->
+</script>
 {% endblock %}
 
