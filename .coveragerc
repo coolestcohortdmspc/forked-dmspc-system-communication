@@ -5,3 +5,4 @@ omit =
     ngRadar_Website/__init__.py
     ngRadar_Website/views/__init__.py
     ngRadar_Website/models/__init__.py
+    ngRadar_Website/robots.py
