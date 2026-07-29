@@ -20,3 +20,4 @@ botocore
 numpy
 pytest
 pytest-django
+pytest-cov
