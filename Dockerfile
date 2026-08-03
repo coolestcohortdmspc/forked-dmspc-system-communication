@@ -21,6 +21,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libsasl2-dev \
     && rm -rf /var/lib/apt/lists/*
 
+COPY --from=etransfer-builder:latest /build/etransfer/*-native-opt/etc /usr/local/bin/
+
+COPY --from=etransfer-builder:latest /build/etransfer/*-native-opt/etd /usr/local/bin/
+
 COPY requirements.txt .
 
 RUN pip install --upgrade pip \
