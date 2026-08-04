@@ -21,14 +21,24 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libsasl2-dev \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=etransfer-builder:latest /build/etransfer/*-native-opt/etc /usr/local/bin/
-
-COPY --from=etransfer-builder:latest /build/etransfer/*-native-opt/etd /usr/local/bin/
-
 COPY requirements.txt .
 
 RUN pip install --upgrade pip \
  && pip install --no-cache-dir -r requirements.txt
+
+
+#================
+# etransfer
+#================
+# Putting this here means that every additional simulator image will contain both executables.
+# Only the VLBA simulator ever calls etc.
+# Only the ETD container ever runs etd.
+COPY eTransfer /tmp/etransfer
+
+RUN cd /tmp/etransfer \
+ && make \
+ && find . -path "*/etc" -type f -executable -exec cp {} /usr/local/bin/etc \; \
+ && find . -path "*/etd" -type f -executable -exec cp {} /usr/local/bin/etd \;
 
 COPY . .
 
