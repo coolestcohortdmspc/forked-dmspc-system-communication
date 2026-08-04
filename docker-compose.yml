@@ -6,6 +6,17 @@
 # ===========================================================================
 
 services:
+  dsoc-volume-init:
+    image: alpine:3.20
+    profiles: ["kafka"]
+    user: "0:0"
+    volumes:
+      - ./etransfer_data/dsoc:/data
+    command:
+      - /bin/sh 
+      - -c 
+      - |
+        chmod 777 /data 
   ngradar_website:
     build: .
     env_file:
@@ -207,12 +218,18 @@ services:
     env_file:
       - .env
     depends_on:
-      - postgres
-      - broker
-      - seaweedfs
+      dsoc-volume-init:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_started
+      broker:
+        condition: service_started
+      seaweedfs:
+        condition: service_started
     volumes:
       - .:/service
       - ngrok_env:/out
+      - ./etransfer_data/dsoc:/data
     networks:
       - ngradar_website_network
     profiles: ["kafka"]
@@ -227,6 +244,7 @@ services:
         echo "----- Using ngrok endpoint: -----"
         cat /out/ngrok_endpoint.env
         echo "------------------------------------"
+        etd --run-as nobody --log-directory /data --command tcp://:4004 --data udt://:8008 
         python manage.py dsoc_sim
   
   
