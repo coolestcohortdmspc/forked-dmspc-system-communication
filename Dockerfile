@@ -1,3 +1,17 @@
+FROM debian:bookworm-slim AS etransfer-builder 
+
+RUN apt-get update && apt-get install -y gcc g++ make git 
+
+WORKDIR /build 
+
+RUN git clone --branch v2.0 https://github.com/jive-vlbi/etransfer.git
+
+RUN sed -i 's/MACHINE),arm64)/MACHINE),aarch64)/' /build/etransfer/libudt5ab/Makefile
+
+RUN sed -i 's/MACHINE),arm64)/MACHINE),aarch64)/' /build/etransfer/libsrt5ab/Makefile
+
+RUN cd etransfer && make 
+
 FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -33,12 +47,8 @@ RUN pip install --upgrade pip \
 # Putting this here means that every additional simulator image will contain both executables.
 # Only the VLBA simulator ever calls etc.
 # Only the ETD container ever runs etd.
-COPY eTransfer /tmp/etransfer
-
-RUN cd /tmp/etransfer \
- && make \
- && find . -path "*/etc" -type f -executable -exec cp {} /usr/local/bin/etc \; \
- && find . -path "*/etd" -type f -executable -exec cp {} /usr/local/bin/etd \;
+COPY --from=etransfer-builder /build/etransfer/*-native-opt/etc /usr/local/bin/
+COPY --from=etransfer-builder /build/etransfer/*-native-opt/etd /usr/local/bin/
 
 COPY . .
 
