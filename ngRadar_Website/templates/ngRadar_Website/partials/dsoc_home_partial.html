@@ -5,7 +5,11 @@
     </div>
 
     <div class="col-4 text-center">
-        <span class="fs-5">Status Here</span>
+        {% if latest_event.image_key %}
+        <span class="fs-5">Fake Status</span>
+        {% else %}
+        <span class="fs-5">Transferring...</span>
+        {% endif %}
     </div>
 
     <div class="col-4"></div>
