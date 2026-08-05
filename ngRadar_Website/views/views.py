@@ -14,7 +14,7 @@ from ngRadar_Website.enums import Stations
 #libraries used for lock status
 from django.core.cache import cache
 
-from ngRadar_Website.models.models import ObservatoryEvent, uiEvent, gbtEvent, dsocEvent  # , ngrok_endpoint
+from ngRadar_Website.models.models import ObservatoryEvent, uiEvent, gbtEvent, dsocEvent, ETransferEvent  # , ngrok_endpoint
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout, logout
 from django.db.models import Avg
@@ -41,6 +41,7 @@ def get_obs_events():
     dsoc_events = dsocEvent.objects.order_by("-event_time")[:LAST_RECORDS]
     avg_latency = latest_events.aggregate(Avg('latency_ms'))['latency_ms__avg'] or 0
     current_waveform = ui_events.first().selected_waveform if ui_events.exists() else None
+    latest_etr_event = ETransferEvent.objects.order_by("-event_time").first()
 
     return {
         'latest_events': latest_events,
@@ -49,7 +50,18 @@ def get_obs_events():
         'gbt_event': gbt_events.first() if gbt_events else None,
         'dsoc_event': dsoc_events.first() if dsoc_events else None,
         'avg_latency': round(avg_latency, 2),
-        'current_waveform': current_waveform
+        'current_waveform': current_waveform,
+        'latest_etr_event': latest_etr_event
+    }
+
+
+def get_dsoc_events():
+    """Helper function to keep data uniform across view updates"""
+
+    latest_event = dsocEvent.objects.order_by("-event_time").first()
+    
+    return {
+        'dsoc_latest_event': latest_event
     }
 
 
@@ -268,6 +280,7 @@ def dsoc_event_partial(request):
         request,
         "ngRadar_Website/partials/dsoc_home_partial.html",
         get_obs_events(),
+        get_dsoc_events(),
     )
 
 
