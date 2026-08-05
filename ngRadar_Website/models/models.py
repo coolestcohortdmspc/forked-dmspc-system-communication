@@ -20,7 +20,6 @@ class ObservatoryEvent(models.Model):
     )
     tx_waveform = models.CharField(max_length=100, blank=True, null=True)
     rec_waveform = models.CharField(max_length=100, blank=True, null=True)
-
     product_type = models.CharField(max_length=50, blank=True, null=True)
     product_id = models.CharField(max_length=100, blank=True, null=True)
     station = models.PositiveSmallIntegerField(
@@ -36,25 +35,24 @@ class ObservatoryEvent(models.Model):
     blank=True,
     null=True,
     )
-
     rcvr_station = models.IntegerField(
         choices=Stations.choices,
         blank=True,
         null=True,
     )
-    
     image_key = models.CharField(max_length=500, blank=True, null=True)
     num_bytes = models.IntegerField(blank=True, null=True)
     latency_ms = models.FloatField(default=0.0)
     transfer_uuid = models.UUIDField(
-            blank=True,
-            null=True,
-            db_index=True,
-        )
+        blank=True,
+        null=True,
+        db_index=True,
+    )
     status = models.PositiveSmallIntegerField(
-                choices=Status.choices,
-                default=Status.READY, blank=True, null=True
-            ) 
+        choices=Status.choices,
+        blank=True,
+        null=True,
+    )
 
 
     def __str__(self):
@@ -82,6 +80,26 @@ class dsocEvent(models.Model):
     num_bytes = models.IntegerField()
     event_time = models.DateTimeField()
     latency_ms = models.FloatField(default=0.0)
+    xmit_station = models.PositiveSmallIntegerField(
+        choices=Stations.choices,
+        blank=True,
+        null=True,
+    )
+    rcvr_station = models.PositiveSmallIntegerField(
+        choices=Stations.choices,
+        blank=True,
+        null=True,
+    )
+    transfer_uuid = models.UUIDField(
+        blank=True,
+        null=True,
+        db_index=True,
+    )
+    status = models.PositiveSmallIntegerField(
+        choices=Status.choices,
+        blank=True,
+        null=True,
+    )
 
     def __str__(self):
         return f"DSOC Event: {self.object_id} | {self.event_time}"
@@ -117,6 +135,21 @@ class ETransferEvent(models.Model):
     transfer_uuid = models.UUIDField(
         db_index=True,
         editable=False,
+    )
+    gbt_uuid = models.UUIDField(
+        blank=True,
+        null=True,
+        db_index=True,
+    )
+    object_id = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+    )
+    target = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
     )
     station = models.PositiveSmallIntegerField(
         choices=Stations.choices,

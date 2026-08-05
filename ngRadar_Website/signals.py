@@ -38,16 +38,17 @@ def create_obsevent_from_dsoc(sender, instance, created, **kwargs):
     ObservatoryEvent.objects.create(
         object_id=instance.object_id,
         target=instance.target,
-        tx_waveform=None,                   # DSOC records do not have waveforms
-        rec_waveform=None,                  # DSOC records do not have waveforms
-        image_key=instance.image_key,       # Included for DSOC
-        num_bytes=instance.num_bytes,       # Included for DSOC
+        tx_waveform=None,
+        rec_waveform=None,
+        image_key=instance.image_key,
+        num_bytes=instance.num_bytes,
         event_time=instance.event_time,
         latency_ms=instance.latency_ms,
-        station=Stations.DSOC,      
-        xmit_station=Stations.GBT, 
-        rcvr_station=Stations.DSOC,
-        status=None,
+        station=Stations.DSOC,
+        xmit_station=instance.xmit_station,
+        rcvr_station=instance.rcvr_station,
+        transfer_uuid=instance.transfer_uuid,
+        status=instance.status,
     )
 
 
@@ -58,26 +59,17 @@ def create_obsevent_from_etransfer(sender, instance, created, **kwargs):
         return
 
     ObservatoryEvent.objects.create(
-        object_id=None,
-        target=None,
+        object_id=instance.object_id,
+        target=instance.target,
         tx_waveform=None,
         rec_waveform=None,
         image_key=None,
         num_bytes=instance.num_bytes,
         event_time=instance.event_time,
-        created_at=timezone.now(),
         latency_ms=instance.latency_ms,
         station=instance.station,
-        xmit_station=(
-            Stations.HN
-            if instance.station == Stations.HN
-            else None
-        ),
-        rcvr_station=(
-            Stations.DSOC
-            if instance.station == Stations.DSOC
-            else None
-        ),
+        xmit_station=Stations.HN,
+        rcvr_station=Stations.DSOC,
         transfer_uuid=instance.transfer_uuid,
         status=instance.status,
     )
