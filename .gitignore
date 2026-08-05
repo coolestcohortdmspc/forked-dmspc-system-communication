@@ -8,3 +8,4 @@ venv/
 .venv/
 env/
 *.large
+mock_assets/progress.json
