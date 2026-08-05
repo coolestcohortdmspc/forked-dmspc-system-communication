@@ -1,8 +1,12 @@
 from django.core.management.base import BaseCommand
 from confluent_kafka import Producer
 from ngRadar_Website.utils import bootstrap, consume, etc_send
-from ngRadar_Website.enums import Stations
+from ngRadar_Website.enums import Stations, Status
 from pathlib import Path
+import json
+import subprocess
+import uuid
+from django.utils import timezone
 
 
 
@@ -14,13 +18,10 @@ This code will:
 - continue listening for Kafka messages
 
 Note: I am going to treat this sim as the Hancock VLBA site (Stations.HN) for hard-coded station data
-    I chose Hancock because I am from New Hampshire and I wanted to
+    I chose Hancock because I am from New Hampshire and I wanted to. 
+    Stations enum: HN  = 91, "Hancock (25-m, VLBA)"
 
 """
-
-COMMAND_DIR = Path("insert_path_to_etransfer/architecture/")  # TODO get path for etransfer
-CLIENT_SOURCE = Path("/data/new/*")  # TODO figure out what to put here
-DAEMON_DESTINATION = "localhost:/data/"  # TODO figure out what to put here
 
 
 def produce(topic, config, key, value):
@@ -35,29 +36,111 @@ def produce(topic, config, key, value):
     producer.flush()
 
 
+def publish_transfer_status(
+    *,
+    producer_topic,
+    producer_config,
+    transfer_uuid,
+    gbt_uuid,
+    status,
+    num_bytes,
+    filename=None,
+    message="",
+    stations=Stations.HN,
+):
+    payload = {
+        "transfer_uuid": str(transfer_uuid),
+        "gbt_uuid": str(gbt_uuid),
+        "status": int(status),
+        "status_label": status.label,
+        "num_bytes": num_bytes,
+        "filename": filename,
+        "event_time": timezone.now().isoformat(),
+        "message": message,
+        "stations": stations.label,
+    }
+
+    produce(
+        producer_topic,
+        producer_config,
+        str(transfer_uuid),
+        json.dumps(payload),
+    )
+
+
+
 def process_msg(msg, producer_topic, producer_config):
-    #decode the GBT payload that is a single string of just the uuid:
     gbt_uuid = msg.key().decode("utf-8")
-
-    key, value = f"{gbt_uuid}", "e-transfer started"
-    # produce this new message, lets DSOC know to produce image(s)
-    produce(producer_topic, producer_config, key, value)
-
-    # after sending a kafka message, begin e-transfer NOTE we need the etransfer repo in our repo to get this working
+    transfer_uuid = uuid.uuid4()
     frame_path = Path("/service/testdata/hello.txt")
-    # ^ this is the location of the data vlba client is going to grab and send to dsoc daemon
 
-    #NOTE: this is where we can add more logic to print status updates on data being generated at VLBA, and send once it's ready. For now, we are just sending a static file to DSOC daemon to test the e-transfer functionality.
-    if frame_path.exists():
-        print(f"Sending {frame_path} to DSOC daemon...")
+    if not frame_path.is_file():
+        publish_transfer_status(
+            producer_topic=producer_topic,
+            producer_config=producer_config,
+            transfer_uuid=transfer_uuid,
+            gbt_uuid=gbt_uuid,
+            status=Status.FAILED,
+            num_bytes=0,
+            filename=frame_path.name,
+            message="Source file does not exist",
+        )
+        return
+
+    num_bytes = frame_path.stat().st_size
+
+    publish_transfer_status(
+        producer_topic=producer_topic,
+        producer_config=producer_config,
+        transfer_uuid=transfer_uuid,
+        gbt_uuid=gbt_uuid,
+        status=Status.TRANSFERRING,
+        num_bytes=num_bytes,
+        filename=frame_path.name,
+        message="VLBA began the e-transfer",
+    )
+
+    try:
         etc_send(frame_path)
-    else:
-        print(f"Error: {frame_path} does not exist. Cannot send to DSOC daemon.")
+    except subprocess.CalledProcessError as exc:
+        publish_transfer_status(
+            producer_topic=producer_topic,
+            producer_config=producer_config,
+            transfer_uuid=transfer_uuid,
+            gbt_uuid=gbt_uuid,
+            status=Status.FAILED,
+            num_bytes=num_bytes,
+            filename=frame_path.name,
+            message=(
+                "E-transfer failed with return code: "
+                f"{exc.returncode}"
+            ),
+        )
+        return
+    except Exception as exc:
+        publish_transfer_status(
+            producer_topic=producer_topic,
+            producer_config=producer_config,
+            transfer_uuid=transfer_uuid,
+            gbt_uuid=gbt_uuid,
+            status=Status.FAILED,
+            num_bytes=num_bytes,
+            filename=frame_path.name,
+            message=f"Unexpected e-transfer failure: {exc}",
+        )
+        return
 
+    publish_transfer_status(
+        producer_topic=producer_topic,
+        producer_config=producer_config,
+        transfer_uuid=transfer_uuid,
+        gbt_uuid=gbt_uuid,
+        status=Status.TRANSFERRED,
+        num_bytes=num_bytes,
+        filename=frame_path.name,
+        message="VLBA e-transfer completed successfully",
+    )
 
-
-
-    
 
 
 class Command(BaseCommand):
@@ -66,6 +149,6 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         print("Starting VLBA simulator")
 
-        producer_topic, producer_config, consumer_topic, consumer_config = bootstrap(Stations.HN) # TODO: update according to Luara's bootstrap changes -THIS SHOULD BE GOOD NOW!
+        producer_topic, producer_config, consumer_topic, consumer_config = bootstrap(Stations.HN)
 
         consume(consumer_topic, consumer_config, process_msg, producer_topic=producer_topic, producer_config=producer_config)
