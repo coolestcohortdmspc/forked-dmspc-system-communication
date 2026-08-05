@@ -179,6 +179,7 @@ def process_msg(msg, producer_topic=None, producer_config=None):
     filename = payload.get("filename")
     expected_num_bytes = payload.get("num_bytes", 0)
     message = payload.get("message", "")
+    incoming_file = Path("/dsoc/incoming") / filename
 
     record_transfer_event(
         transfer_uuid=transfer_uuid,
@@ -189,13 +190,15 @@ def process_msg(msg, producer_topic=None, producer_config=None):
         message=message,
     )
 
-    filename = payload.get("filename")
-    incoming_file = Path("/dsoc/incoming") / filename
+    # filename = payload.get("filename")
+    # incoming_file = Path("/dsoc/incoming") / filename
     while incoming_file.stat().st_size <= expected_num_bytes:
         # print received bytes out of expected bytes and then write to a json file to be read by the progress bar on the front end
         print(f"Received {incoming_file.stat().st_size} out of {expected_num_bytes} bytes")
+        print(f"Received {incoming_file.stat().st_size} out of {expected_num_bytes} bytes")
         progress_data = {
             "received_bytes": incoming_file.stat().st_size,
+            "total_bytes": expected_num_bytes,
             "total_bytes": expected_num_bytes,
         }
         with open("/service/mock_assets/progress.json", "w") as f:
@@ -240,7 +243,6 @@ def process_msg(msg, producer_topic=None, producer_config=None):
         )
         return
 
-    incoming_file = Path("/dsoc/incoming") / filename
 
     record_transfer_event(
         transfer_uuid=transfer_uuid,

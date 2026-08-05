@@ -36,7 +36,7 @@ def produce(topic, config, key, value):
     producer.flush()
 
 
-def publish_transfer_status(
+def send_kafka_message(
     *,
     producer_topic,
     producer_config,
@@ -72,10 +72,11 @@ def publish_transfer_status(
 def process_msg(msg, producer_topic, producer_config):
     gbt_uuid = msg.key().decode("utf-8")
     transfer_uuid = uuid.uuid4()
-    frame_path = Path("/service/mock_assets/large_data/BT161A1_PT_No0008.large")
+    # frame_path = Path("/service/mock_assets/large_data/BT161A1_PT_No0008.large")
 
+    frame_path = Path("/service/testdata/hello.txt")
     if not frame_path.is_file():
-        publish_transfer_status(
+        send_kafka_message(
             producer_topic=producer_topic,
             producer_config=producer_config,
             transfer_uuid=transfer_uuid,
@@ -89,21 +90,21 @@ def process_msg(msg, producer_topic, producer_config):
 
     num_bytes = frame_path.stat().st_size
 
-    publish_transfer_status(
-        producer_topic=producer_topic,
-        producer_config=producer_config,
-        transfer_uuid=transfer_uuid,
-        gbt_uuid=gbt_uuid,
-        status=Status.TRANSFERRING,
-        num_bytes=num_bytes,
-        filename=frame_path.name,
-        message="VLBA began the e-transfer",
-    )
+    # send_kafka_message(
+    #     producer_topic=producer_topic,
+    #     producer_config=producer_config,
+    #     transfer_uuid=transfer_uuid,
+    #     gbt_uuid=gbt_uuid,
+    #     status=Status.TRANSFERRING,
+    #     num_bytes=num_bytes,
+    #     filename=frame_path.name,
+    #     message="VLBA began the e-transfer",
+    # )
 
     try:
         etc_send(frame_path)
     except subprocess.CalledProcessError as exc:
-        publish_transfer_status(
+        send_kafka_message(
             producer_topic=producer_topic,
             producer_config=producer_config,
             transfer_uuid=transfer_uuid,
@@ -118,7 +119,7 @@ def process_msg(msg, producer_topic, producer_config):
         )
         return
     except Exception as exc:
-        publish_transfer_status(
+        send_kafka_message(
             producer_topic=producer_topic,
             producer_config=producer_config,
             transfer_uuid=transfer_uuid,
@@ -130,7 +131,7 @@ def process_msg(msg, producer_topic, producer_config):
         )
         return
 
-    publish_transfer_status(
+    send_kafka_message(
         producer_topic=producer_topic,
         producer_config=producer_config,
         transfer_uuid=transfer_uuid,
