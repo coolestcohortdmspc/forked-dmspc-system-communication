@@ -279,3 +279,53 @@ def gbt_event_partial(request):
         get_obs_events(),
     )
 
+import json
+import os
+import time
+from django.http import StreamingHttpResponse, HttpResponseNotFound
+from django.views.decorators.http import require_GET
+
+PROGRESS_JSON_PATH = "/service/mock_assets/progress.json"  # <-- set this to your mounted path
+
+def sse(data: dict) -> str:
+    # SSE format: "data: <json>\n\n"
+    return f"data: {json.dumps(data)}\n\n"
+
+@require_GET
+def progress_sse(request):
+    if not os.path.exists(PROGRESS_JSON_PATH):
+        return HttpResponseNotFound("Progress file not found")
+
+    def gen():
+        last_received = None
+        last_total = None
+
+        while True:
+            if not os.path.exists(PROGRESS_JSON_PATH):
+                time.sleep(0.5)
+                continue
+
+            try:
+                with open(PROGRESS_JSON_PATH, "r", encoding="utf-8") as f:
+                    payload = json.load(f)
+
+                received = payload.get("received_bytes")
+                total = payload.get("total_bytes")
+
+                # Emit only if changed (avoid spamming)
+                if received != last_received or total != last_total:
+                    last_received, last_total = received, total
+                    yield sse({"received": received, "total": total})
+                    if total and received is not None and received >= total:
+                        break
+
+            except Exception as e:
+                # Emit error event
+                yield f"event: error\ndata: {json.dumps({'message': str(e)})}\n\n"
+
+            time.sleep(0.5)
+
+    resp = StreamingHttpResponse(gen(), content_type="text/event-stream")
+    resp["Cache-Control"] = "no-cache"
+    resp["X-Accel-Buffering"] = "no"  # helps with nginx buffering
+    return resp
