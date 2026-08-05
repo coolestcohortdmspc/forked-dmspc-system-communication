@@ -1,3 +1,6 @@
+#==========================
+# etransfer builder stage
+#==========================
 FROM debian:bookworm-slim AS etransfer-builder 
 
 RUN apt-get update && apt-get install -y gcc g++ make git 
@@ -12,6 +15,10 @@ RUN sed -i 's/MACHINE),arm64)/MACHINE),aarch64)/' /build/etransfer/libsrt5ab/Mak
 
 RUN cd etransfer && make 
 
+
+#==========================
+# main application image
+#==========================
 FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1
