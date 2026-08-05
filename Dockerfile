@@ -13,13 +13,13 @@ RUN sed -i 's/MACHINE),arm64)/MACHINE),aarch64)/' /build/etransfer/libudt5ab/Mak
 
 RUN sed -i 's/MACHINE),arm64)/MACHINE),aarch64)/' /build/etransfer/libsrt5ab/Makefile
 
-RUN cd etransfer && make 
+RUN cd etransfer && make
 
 
 #==========================
 # main application image
 #==========================
-FROM python:3.11-slim
+FROM python:3.11-slim AS base
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
@@ -49,16 +49,61 @@ RUN pip install --upgrade pip \
 
 
 #================
-# etransfer
+# app
 #================
-# Putting this here means that every additional simulator image will contain both executables.
-# Only the VLBA simulator ever calls etc.
-# Only the ETD container ever runs etd.
-COPY --from=etransfer-builder /build/etransfer/*-native-opt/etc /usr/local/bin/
-COPY --from=etransfer-builder /build/etransfer/*-native-opt/etd /usr/local/bin/
+FROM base AS app
 
 COPY . .
 
 RUN python manage.py collectstatic --noinput
 
 CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+
+
+#================
+# etransfer etd
+#================
+FROM base AS etd
+
+COPY --from=etransfer-builder /build/etransfer/*-native-opt/etd /usr/local/bin/
+
+
+#================
+# etransfer etc
+#================
+FROM base AS etc
+
+COPY --from=etransfer-builder /build/etransfer/*-native-opt/etc /usr/local/bin/
+
+
+#================
+# load-staging-data
+#================
+FROM postgres:18-alpine AS load-staging-data
+
+WORKDIR /scripts
+
+COPY load-staging-data.sh .
+
+RUN chmod +x load-staging-data.sh
+
+CMD ["./load-staging-data.sh"]
+
+
+#================
+# seaweedfs
+#================
+FROM chrislusf/seaweedfs:4.40 AS seaweedfs
+
+RUN apk add --no-cache gettext
+
+COPY s3.json.template /s3.json.template
+COPY filer.toml.template /filer.toml.template
+
+COPY seaweedfs.sh /seaweedfs.sh
+RUN chmod +x /seaweedfs.sh
+
+# Expose ports: 9333 (Master), 8888 (Filer), 8333 (S3)
+EXPOSE 9333 8888 8333
+
+ENTRYPOINT ["/seaweedfs.sh"]

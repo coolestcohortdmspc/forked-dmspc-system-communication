@@ -96,6 +96,20 @@ system-down)
     docker compose rm -f $SIM_SERVICES
     ;;
 
+soft-reset)
+    ./control.sh system-down
+    ./control.sh stop
+
+    docker volume ls -q \
+        | grep -v '^dmspc-system-communication_postgres_data$' \
+        | xargs -r docker volume rm
+
+    docker compose build
+    docker compose up -d --force-recreate
+
+    ./control.sh system-up
+    ;;
+
 testcov)
     echo "Calculating unit test coverage..."
     pytest --cov=ngRadar_Website --cov-report=term-missing
