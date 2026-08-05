@@ -48,7 +48,7 @@ def create_obsevent_from_dsoc(sender, instance, created, **kwargs):
         xmit_station=instance.xmit_station,
         rcvr_station=instance.rcvr_station,
         transfer_uuid=instance.transfer_uuid,
-        status=instance.status,
+        status=None,
     )
 
 
