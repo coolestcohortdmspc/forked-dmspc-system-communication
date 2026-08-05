@@ -40,24 +40,36 @@ def DB_columns(gbt_data):
     return data
 
 
-def publish_DB(image_key, num_bytes, data):
-    # Copy the dictionary so we don't accidentally mutate data out-of-scope
-    # since we are not using class based methods
+
+
+def publish_DB(
+    *,
+    image_key,
+    num_bytes,
+    data,
+    xmit_station,
+    rcvr_station,
+    transfer_uuid,
+):
     payload_data = data.copy()
+
     payload_data.update({
         "image_key": image_key,
-        "num_bytes": num_bytes
+        "num_bytes": num_bytes,
+        "xmit_station": xmit_station,
+        "rcvr_station": rcvr_station,
+        "transfer_uuid": transfer_uuid,
+        "status": Status.COMPLETED,
     })
-
     try:
-        # Create and capture the instantiated record model
-        record = dsocEvent.objects.create(**payload_data)
-        print("Payload saved to database successfully.")
-        return record  # <-- Return the actual object record
-
+          # Create and capture the instantiated record model
+          record = dsocEvent.objects.create(**payload_data)
+          print("Payload saved to database successfully.")
+          return record  # <-- Return the actual object record
+  
     except Exception as e:
-        print(f"Database error: {e}")
-        return None  # <-- Return None if something broke
+          print(f"Database error: {e}")
+          return None  # <-- Return None if something broke
 
 
 def create_img(tx_waveform):
@@ -134,14 +146,20 @@ def verify_incoming_transfer(
 def record_transfer_event(
     *,
     transfer_uuid,
+    gbt_uuid,
     station,
     status,
     num_bytes=0,
     latency_ms=0.0,
     message="",
 ):
+    gbt_event = gbtEvent.objects.get(uuid=gbt_uuid)
+
     return ETransferEvent.objects.create(
         transfer_uuid=transfer_uuid,
+        gbt_uuid=gbt_uuid,
+        object_id=gbt_event.object_id,
+        target=gbt_event.target,
         station=station,
         event_time=datetime.now(timezone.utc),
         latency_ms=latency_ms,
@@ -156,16 +174,18 @@ def process_msg(msg, producer_topic=None, producer_config=None):
     payload = json.loads(msg.value().decode("utf-8"))
 
     transfer_uuid = uuid.UUID(payload["transfer_uuid"])
-    gbt_uuid = payload["gbt_uuid"]
+    gbt_uuid = uuid.UUID(payload["gbt_uuid"])
     status = Status(payload["status"])
-    num_bytes = payload.get("num_bytes", 0)
+    filename = payload.get("filename")
+    expected_num_bytes = payload.get("num_bytes", 0)
     message = payload.get("message", "")
 
     record_transfer_event(
         transfer_uuid=transfer_uuid,
+        gbt_uuid=gbt_uuid,
         station=Stations.HN,
         status=status,
-        num_bytes=num_bytes,
+        num_bytes=expected_num_bytes,
         message=message,
     )
 
@@ -201,22 +221,21 @@ def process_msg(msg, producer_topic=None, producer_config=None):
         return
 
     already_processing = ETransferEvent.objects.filter(
-    transfer_uuid=transfer_uuid,
-    station=Stations.DSOC,
-    status__in=[Status.VERIFYING],
-    ).exists()
+        transfer_uuid=transfer_uuid,
+        station=Stations.DSOC,
+        status__in=[Status.VERIFYING],
+        ).exists()
 
     if already_processing:
         print(f"Transfer {transfer_uuid} is already being processed currently.")
         return
 
-    filename = payload.get("filename")
     if not filename:
         record_transfer_event(
             transfer_uuid=transfer_uuid,
             station=Stations.DSOC,
             status=Status.FAILED,
-            num_bytes=num_bytes,
+            num_bytes=expected_num_bytes,
             message="Kafka transfer message did not contain a filename",
         )
         return
@@ -225,20 +244,22 @@ def process_msg(msg, producer_topic=None, producer_config=None):
 
     record_transfer_event(
         transfer_uuid=transfer_uuid,
+        gbt_uuid=gbt_uuid,
         station=Stations.DSOC,
         status=Status.VERIFYING,
-        num_bytes=num_bytes,
+        num_bytes=expected_num_bytes,
         message=f"Verifying {filename}",
     )
 
     try:
         actual_num_bytes = verify_incoming_transfer(
             incoming_file=incoming_file,
-            expected_num_bytes=num_bytes,
+            expected_num_bytes=expected_num_bytes,
         )
     except Exception as exc:
         record_transfer_event(
             transfer_uuid=transfer_uuid,
+            gbt_uuid=gbt_uuid,
             station=Stations.DSOC,
             status=Status.FAILED,
             num_bytes=0,
@@ -270,25 +291,30 @@ def process_msg(msg, producer_topic=None, producer_config=None):
             image_key=image_key,
             num_bytes=image_num_bytes,
             data=data,
+            xmit_station=Stations.HN,
+            rcvr_station=Stations.DSOC,
+            transfer_uuid=transfer_uuid,
         )
 
     except Exception as exc:
         record_transfer_event(
             transfer_uuid=transfer_uuid,
+            gbt_uuid=gbt_uuid,
             station=Stations.DSOC,
             status=Status.FAILED,
-            num_bytes=actual_num_bytes,
+            num_bytes=expected_num_bytes,
             message=f"DSOC processing failed: {exc}",
         )
         return
 
     record_transfer_event(
         transfer_uuid=transfer_uuid,
+        gbt_uuid=gbt_uuid,
         station=Stations.DSOC,
         status=Status.COMPLETED,
         num_bytes=actual_num_bytes,
         latency_ms=dsoc_latency,
-        message="Transfer verified, image generated, and image stored. E-transfer complete.",
+        message="Transfer verified, transfer complete, image generated, and image stored.",
     )
 
 
