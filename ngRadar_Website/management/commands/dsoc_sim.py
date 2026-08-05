@@ -191,17 +191,17 @@ def process_msg(msg, producer_topic=None, producer_config=None):
 
     filename = payload.get("filename")
     incoming_file = Path("/dsoc/incoming") / filename
-    while incoming_file.stat().st_size <= num_bytes:
+    while incoming_file.stat().st_size <= expected_num_bytes:
         # print received bytes out of expected bytes and then write to a json file to be read by the progress bar on the front end
-        print(f"Received {incoming_file.stat().st_size} out of {num_bytes} bytes")
+        print(f"Received {incoming_file.stat().st_size} out of {expected_num_bytes} bytes")
         progress_data = {
             "received_bytes": incoming_file.stat().st_size,
-            "total_bytes": num_bytes,
+            "total_bytes": expected_num_bytes,
         }
         with open("/service/mock_assets/progress.json", "w") as f:
             json.dump(progress_data, f)
         time.sleep(0.5)  # Sleep for a short duration before checking again
-        if incoming_file.stat().st_size == num_bytes:
+        if incoming_file.stat().st_size == expected_num_bytes:
             break
 
     if status == Status.FAILED:
