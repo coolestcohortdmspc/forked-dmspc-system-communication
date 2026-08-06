@@ -39,6 +39,13 @@ def get_obs_events():
     ui_events = uiEvent.objects.order_by("-event_time")[:LAST_RECORDS]
     gbt_events = gbtEvent.objects.order_by("-event_time")[:LAST_RECORDS]
     dsoc_events = dsocEvent.objects.order_by("-event_time")[:LAST_RECORDS]
+    latest_image_event = (
+        ObservatoryEvent.objects
+        .exclude(image_key__isnull=True)
+        .exclude(image_key="")
+        .order_by("-event_time")
+        .first()
+    )
     avg_latency = latest_events.aggregate(Avg('latency_ms'))['latency_ms__avg'] or 0
     current_waveform = ui_events.first().selected_waveform if ui_events.exists() else None
     latest_etr_event = ETransferEvent.objects.order_by("-event_time").first()
@@ -51,7 +58,8 @@ def get_obs_events():
         'dsoc_event': dsoc_events.first() if dsoc_events else None,
         'avg_latency': round(avg_latency, 2),
         'current_waveform': current_waveform,
-        'latest_etr_event': latest_etr_event
+        'latest_etr_event': latest_etr_event,
+        'latest_image_event': latest_image_event
     }
 
 
