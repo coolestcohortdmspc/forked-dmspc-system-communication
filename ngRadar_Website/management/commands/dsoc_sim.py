@@ -196,36 +196,37 @@ def process_msg(msg, producer_topic=None, producer_config=None):
         message=message,
     )
 
-    previous_size = [0]
-    # resetting progress.json to 0 bytes received so that the progress bar on the front end resets when a new transfer starts
-    progress_data = {
-                "received_bytes": 0,
-                "total_bytes": 0,
-            } 
-    with open("/service/mock_assets/progress.json", "w") as f:
-        json.dump(progress_data, f)
+# PROGRESS BAR LOGIC. MOVED TO UTILS.PY CONSUME
 
-    while incoming_file.stat().st_size <= expected_num_bytes:
-        # timeout if previous_size has 30 of the same values in a row (15 seconds of no progress)
-        if any(sum(1 for _ in group) >= 30 for key, group in groupby(previous_size)):
-            print(f"Timeout: No progress in file size for {incoming_file} in the last 15 seconds.")
-            break
+#     previous_size = [0]
+#     # resetting progress.json to 0 bytes received so that the progress bar on the front end resets when a new transfer starts
+#     progress_data = {
+#                 "received_bytes": 0,
+#                 "total_bytes": 0,
+#             } 
+#     with open("/service/mock_assets/progress.json", "w") as f:
+#         json.dump(progress_data, f)
 
-        # print received bytes out of expected bytes and then write to a json file to be read by the progress bar on the front end
-        print(f"Received {incoming_file.stat().st_size} out of {expected_num_bytes} bytes")
-        progress_data = {
-            "received_bytes": incoming_file.stat().st_size,
-            "total_bytes": expected_num_bytes,
-        } 
-        with open("/service/mock_assets/progress.json", "w") as f:
-            json.dump(progress_data, f)
+#     while incoming_file.stat().st_size <= expected_num_bytes:
+#         # timeout if previous_size has 30 of the same values in a row (15 seconds of no progress)
+#         if any(sum(1 for _ in group) >= 30 for key, group in groupby(previous_size)):
+#             print(f"Timeout: No progress in file size for {incoming_file} in the last 15 seconds.")
+#             break
 
-        if incoming_file.stat().st_size == expected_num_bytes:
-            break
-        time.sleep(0.5)  # Sleep for a short duration before checking again
-        # append the current size of the file to the previous_size variable to check for progress in the next iteration
-        previous_size.append(incoming_file.stat().st_size)
+#         # print received bytes out of expected bytes and then write to a json file to be read by the progress bar on the front end
+#         print(f"Received {incoming_file.stat().st_size} out of {expected_num_bytes} bytes")
+#         progress_data = {
+#             "received_bytes": incoming_file.stat().st_size,
+#             "total_bytes": expected_num_bytes,
+#         } 
+#         with open("/service/mock_assets/progress.json", "w") as f:
+#             json.dump(progress_data, f)
 
+#         if incoming_file.stat().st_size == expected_num_bytes:
+#             break
+#         time.sleep(0.5)  # Sleep for a short duration before checking again
+#         # append the current size of the file to the previous_size variable to check for progress in the next iteration
+#         previous_size.append(incoming_file.stat().st_size)
 
 
     if status == Status.FAILED:
