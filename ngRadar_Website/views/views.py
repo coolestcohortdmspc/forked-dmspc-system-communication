@@ -1,11 +1,11 @@
 from django.shortcuts import redirect, render, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.cache import cache_control
-
+from django.views.decorators.http import require_GET
 
 #libraries used for data streaming
 import json
-from django.http import StreamingHttpResponse, JsonResponse, HttpResponse
+from django.http import StreamingHttpResponse, JsonResponse, HttpResponse, HttpResponseNotFound
 
 # serve_image imports
 from ngRadar_Website.utils import create_s3_client, bootstrap # , get_presigned_url
@@ -21,6 +21,7 @@ from django.db.models import Avg
 from confluent_kafka import Producer
 import uuid
 import os
+import time
 from datetime import datetime, timezone 
 # from ngRadar_Website.utils import views_bootstrap
 
@@ -302,13 +303,8 @@ def gbt_event_partial(request):
         get_obs_events(),
     )
 
-import json
-import os
-import time
-from django.http import StreamingHttpResponse, HttpResponseNotFound
-from django.views.decorators.http import require_GET
 
-PROGRESS_JSON_PATH = "/service/mock_assets/progress.json"  # <-- set this to your mounted path
+PROGRESS_JSON_PATH = "/service/mock_assets/progress.json"  # <-- endpoint to stream to front end for progress bar. progress.json is updated by dsoc_sim.py as e-transfer is occurring. 
 
 def sse(data: dict) -> str:
     # SSE format: "data: <json>\n\n"
