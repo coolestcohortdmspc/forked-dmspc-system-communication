@@ -74,7 +74,7 @@ def process_msg(msg, producer_topic, producer_config):
     transfer_uuid = uuid.uuid4()
     # frame_path = Path("/service/mock_assets/large_data/BT161A1_PT_No0008.large")
 
-    frame_path = Path("/service/testdata/hello.txt")
+    frame_path = Path("/service/mock_assets/large_data/BT161A1_PT_No0008.large")
     if not frame_path.is_file():
         send_kafka_message(
             producer_topic=producer_topic,
