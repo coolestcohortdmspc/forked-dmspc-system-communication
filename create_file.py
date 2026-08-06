@@ -1,9 +1,12 @@
 import uuid
+import subprocess
 import random
 
 
 def main():
     file_name = f"{uuid.uuid4()}.bin"
+
+    subprocess.run("pbcopy", text=True, input=file_name)
 
     file_mb = 10000
 
