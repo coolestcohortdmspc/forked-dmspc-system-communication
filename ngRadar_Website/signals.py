@@ -2,9 +2,11 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 from ngRadar_Website.enums import Stations
 from django.utils import timezone
+from django.utils import timezone
 from ngRadar_Website.models.models import (
     gbtEvent,
     dsocEvent,
+    ETransferEvent,
     ETransferEvent,
     ObservatoryEvent,
 )
@@ -38,6 +40,10 @@ def create_obsevent_from_dsoc(sender, instance, created, **kwargs):
     ObservatoryEvent.objects.create(
         object_id=instance.object_id,
         target=instance.target,
+        tx_waveform=None,
+        rec_waveform=None,
+        image_key=instance.image_key,
+        num_bytes=instance.num_bytes,
         tx_waveform=None,
         rec_waveform=None,
         image_key=instance.image_key,

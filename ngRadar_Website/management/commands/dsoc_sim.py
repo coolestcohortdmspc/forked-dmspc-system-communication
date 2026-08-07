@@ -12,6 +12,8 @@ from pathlib import Path
 import json
 import uuid
 import time
+from itertools import groupby
+
 
 
 """
@@ -41,7 +43,6 @@ def DB_columns(gbt_data):
 
 
 
-
 def publish_DB(
     *,
     image_key,
@@ -53,8 +54,14 @@ def publish_DB(
 ):
     payload_data = data.copy()
 
+
     payload_data.update({
         "image_key": image_key,
+        "num_bytes": num_bytes,
+        "xmit_station": xmit_station,
+        "rcvr_station": rcvr_station,
+        "transfer_uuid": transfer_uuid,
+        "status": Status.COMPLETED,
         "num_bytes": num_bytes,
         "xmit_station": xmit_station,
         "rcvr_station": rcvr_station,
@@ -67,7 +74,14 @@ def publish_DB(
           print("Payload saved to database successfully.")
           return record  # <-- Return the actual object record
   
+          # Create and capture the instantiated record model
+          record = dsocEvent.objects.create(**payload_data)
+          print("Payload saved to database successfully.")
+          return record  # <-- Return the actual object record
+  
     except Exception as e:
+          print(f"Database error: {e}")
+          return None  # <-- Return None if something broke
           print(f"Database error: {e}")
           return None  # <-- Return None if something broke
 
@@ -115,6 +129,7 @@ def save_image_to_seaweedfs(target, image_file, dsoc_uuid):
     print(f"Success: Image saved to SeaweedFS at {image_key}")
 
     return image_key
+
 
 
 
@@ -190,8 +205,6 @@ def process_msg(msg, producer_topic=None, producer_config=None):
         message=message,
     )
 
-    # filename = payload.get("filename")
-    # incoming_file = Path("/dsoc/incoming") / filename
     while incoming_file.stat().st_size <= expected_num_bytes:
         # print received bytes out of expected bytes and then write to a json file to be read by the progress bar on the front end
         print(f"Received {incoming_file.stat().st_size} out of {expected_num_bytes} bytes")
@@ -275,7 +288,13 @@ def process_msg(msg, producer_topic=None, producer_config=None):
 
         data = DB_columns(gbt_data)
         data["latency_ms"] = dsoc_latency
+        data = DB_columns(gbt_data)
+        data["latency_ms"] = dsoc_latency
 
+        object_id, target, tx_waveform, event_time = gbt_data
+
+        image_file, image_num_bytes = create_img(tx_waveform)
+        dsoc_uuid = str(uuid.uuid4())
         object_id, target, tx_waveform, event_time = gbt_data
 
         image_file, image_num_bytes = create_img(tx_waveform)

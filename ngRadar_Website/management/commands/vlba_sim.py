@@ -2,6 +2,7 @@ from django.core.management.base import BaseCommand
 from confluent_kafka import Producer
 from ngRadar_Website.utils import bootstrap, consume, etc_send
 from ngRadar_Website.enums import Stations, Status
+from ngRadar_Website.enums import Stations, Status
 from pathlib import Path
 import json
 import subprocess
