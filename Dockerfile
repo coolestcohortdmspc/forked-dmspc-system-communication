@@ -40,6 +40,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libffi-dev \
     libssl-dev \
     libsasl2-dev \
+    lsof \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .

@@ -1,22 +1,26 @@
-from datetime import datetime, timezone
-# from confluent_kafka.admin import AdminClient, NewTopic, KafkaException, KafkaError
-from dotenv import load_dotenv
-from ngRadar_Website.enums import Stations
-from confluent_kafka import Consumer
 import boto3
 import os
 import time
+import subprocess
+import random
+
 from botocore.config import Config
 from botocore.exceptions import (
     EndpointConnectionError,
     ConnectionError,
     ClientError,
 )
-import subprocess
+from datetime import datetime, timezone
+# from confluent_kafka.admin import AdminClient, NewTopic, KafkaException, KafkaError
+from dotenv import load_dotenv
+from ngRadar_Website.enums import Stations
+from confluent_kafka import Consumer
+from pathlib import Path
 
 #Program constants
 SESSION_TIMEOUT_MS = 45000
 MAX_BYTES = 8388608
+
 
 def latency_calc(event_time, sim=None):
     """
@@ -199,7 +203,6 @@ def consume(topic, config, process_msg, producer_topic=None, producer_config=Non
         raise
 
 
-
 def create_s3_client():
     """
     Creates the boto3 S3 client and waits for the S3 gateway
@@ -240,7 +243,6 @@ def create_s3_client():
     return s3
 
 
-
 # def get_presigned_url(s3, event):
 #     """
 #     Gets a presigned url, specifically for the serve_image in the views,
@@ -266,7 +268,6 @@ def create_s3_client():
 #         print("After replace:", presigned_url)
 
 #     return presigned_url
-
 
 
 def ensure_bucket_exists(s3):
@@ -303,7 +304,6 @@ def upload_seaweedfs(s3, image_key, file_data):
     return image_key
 
 
-
 # etransfer send data from client -> daemon util function
 def etc_send(frame_path):
     """
@@ -328,3 +328,30 @@ def etc_send(frame_path):
         ],
         check=True,
     )
+
+
+def create_file(file_path):
+    file_mb = 1000
+    file_size_bytes = file_mb * 1024 * 1024
+    num_buffers = 100
+
+    with open(file_path, "wb") as file:
+        for _ in range(num_buffers):
+            buffer = random.randbytes(int(file_size_bytes / num_buffers))
+            file.write(buffer)
+
+    print(f"Successfully created a {file_mb}MB random binary file at {file_path}")
+
+
+def watch_for_file(file_path):
+    while True:
+        result = subprocess.run(["lsof", file_path], capture_output=True, text=True)
+        output = result.stdout
+        if output.strip():
+            print("Output:\n", output)
+        else:
+            break
+
+        time.sleep(1)
+
+    # TODO SET ETRANSFER TO READY AND GIVE IT THIS FILE PATH
