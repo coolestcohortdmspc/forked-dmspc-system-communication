@@ -14,7 +14,7 @@ from ngRadar_Website.enums import Stations
 #libraries used for lock status
 from django.core.cache import cache
 
-from ngRadar_Website.models.models import ObservatoryEvent, uiEvent, gbtEvent, dsocEvent  # , ngrok_endpoint
+from ngRadar_Website.models.models import ObservatoryEvent, uiEvent, gbtEvent, dsocEvent, ETransferEvent  # , ngrok_endpoint
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout, logout
 from django.db.models import Avg
@@ -35,21 +35,48 @@ EXPIRE_TIME_SECONDS = 3600
 def get_obs_events():
     """Helper function to keep data uniform across view updates"""
 
-    latest_events = ObservatoryEvent.objects.order_by("-event_time")[:RECORDS_TO_DISPLAY]
+    # latest_events = ObservatoryEvent.objects.order_by("-event_time")[:RECORDS_TO_DISPLAY]
+    latest_events = ObservatoryEvent.objects.order_by(
+        "-event_time",
+        "-uuid",
+        )[:RECORDS_TO_DISPLAY]
     ui_events = uiEvent.objects.order_by("-event_time")[:LAST_RECORDS]
     gbt_events = gbtEvent.objects.order_by("-event_time")[:LAST_RECORDS]
     dsoc_events = dsocEvent.objects.order_by("-event_time")[:LAST_RECORDS]
+    latest_image_event = (
+        ObservatoryEvent.objects
+        .exclude(image_key__isnull=True)
+        .exclude(image_key="")
+        .order_by("-event_time")
+        .first()
+    )
     avg_latency = latest_events.aggregate(Avg('latency_ms'))['latency_ms__avg'] or 0
     current_waveform = ui_events.first().selected_waveform if ui_events.exists() else None
+    latest_etr_events = ETransferEvent.objects.order_by("-event_time")[:RECORDS_TO_DISPLAY]
+    current_transfer_uuid = latest_events.first().transfer_uuid if latest_events.exists() else None
+    latest_etr_event = ETransferEvent.objects.filter(transfer_uuid=current_transfer_uuid).order_by("-event_time").first()
 
     return {
         'latest_events': latest_events,
-        'latest_event': latest_events.first() if latest_events else None,
+        'latest_event': ObservatoryEvent.objects.order_by("-event_time").first() if latest_events else None,
         'ui_event': ui_events.first() if ui_events else None,
         'gbt_event': gbt_events.first() if gbt_events else None,
         'dsoc_event': dsoc_events.first() if dsoc_events else None,
         'avg_latency': round(avg_latency, 2),
-        'current_waveform': current_waveform
+        'current_waveform': current_waveform,
+        'latest_etr_events': latest_etr_events,
+        'latest_etr_event': latest_etr_event,
+        'latest_image_event': latest_image_event,
+    }
+
+
+def get_dsoc_events():
+    """Helper function to keep data uniform across view updates"""
+
+    latest_event = dsocEvent.objects.order_by("-event_time").first()
+    
+    return {
+        'dsoc_latest_event': latest_event
     }
 
 
@@ -120,7 +147,7 @@ def lock_status(request):
     lock_time = cache.get('submit_locked', None)
     if lock_time is None:
         return JsonResponse({"locked": False})
-    elif ObservatoryEvent.objects.filter(event_time__gt=lock_time, image_key__isnull=False):
+    elif dsocEvent.objects.filter(event_time__gt=lock_time):
         cache.delete('submit_locked')
         return JsonResponse({'locked':False})
     return JsonResponse({'locked':True})
@@ -268,6 +295,7 @@ def dsoc_event_partial(request):
         request,
         "ngRadar_Website/partials/dsoc_home_partial.html",
         get_obs_events(),
+        get_dsoc_events(),
     )
 
 
@@ -279,3 +307,53 @@ def gbt_event_partial(request):
         get_obs_events(),
     )
 
+import json
+import os
+import time
+from django.http import StreamingHttpResponse, HttpResponseNotFound
+from django.views.decorators.http import require_GET
+
+PROGRESS_JSON_PATH = "/service/mock_assets/progress.json"  # <-- set this to your mounted path
+
+def sse(data: dict) -> str:
+    # SSE format: "data: <json>\n\n"
+    return f"data: {json.dumps(data)}\n\n"
+
+@require_GET
+def progress_sse(request):
+    if not os.path.exists(PROGRESS_JSON_PATH):
+        return HttpResponseNotFound("Progress file not found")
+
+    def gen():
+        last_received = None
+        last_total = None
+
+        while True:
+            if not os.path.exists(PROGRESS_JSON_PATH):
+                time.sleep(0.5)
+                continue
+
+            try:
+                with open(PROGRESS_JSON_PATH, "r", encoding="utf-8") as f:
+                    payload = json.load(f)
+
+                received = payload.get("received_bytes")
+                total = payload.get("total_bytes")
+
+                # Emit only if changed (avoid spamming)
+                if received != last_received or total != last_total:
+                    last_received, last_total = received, total
+                    yield sse({"received": received, "total": total})
+                    if total and received is not None and received >= total:
+                        break
+
+            except Exception as e:
+                # Emit error event
+                yield f"event: error\ndata: {json.dumps({'message': str(e)})}\n\n"
+
+            time.sleep(0.5)
+
+    resp = StreamingHttpResponse(gen(), content_type="text/event-stream")
+    resp["Cache-Control"] = "no-cache"
+    resp["X-Accel-Buffering"] = "no"  # helps with nginx buffering
+    return resp

@@ -74,6 +74,12 @@
     {% include 'ngRadar_Website/partials/gbt_home_partial.html' %}
 </div>
 
+<div id="progress_bar_partial"
+    class="w-100 mb-4"></div>
+    {% include 'ngRadar_Website/partials/progress_bar_partial.html' %}
+</div>
+
+
 <!-- Row 4: DSOC Partial - HTMX: 1 second refresh -->
 <div id="home-dsoc-partial" 
      hx-get="{% url 'dsoc_events' %}" 
