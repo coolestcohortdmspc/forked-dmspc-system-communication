@@ -1,0 +1,46 @@
+<div class="mt-4 border rounded pt-3 pb-3 bg-white ps-3 pe-3 text-center mx-auto"
+style="max-width: 50rem;">
+  <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+    <div>Transfer progress</div>
+    <div id="statusText">0%</div>
+  </div>
+
+  <div style="height: 20px; background:#eee; border-radius: 10px; overflow:hidden;">
+    <div
+      id="bar"
+      style="height:100%; width:0%; background:#3b82f6; transition: width 0.2s ease;"
+    ></div>
+  </div>
+
+  <div style="margin-top:8px; font-family: monospace; font-size: 12px;" id="bytesText">
+    received: 0 / total: 0
+  </div>
+</div>
+
+<script>
+  const receivedLabel = document.getElementById("bytesText");
+  const bar = document.getElementById("bar");
+  const statusText = document.getElementById("statusText");
+
+  const es = new EventSource("/progress/stream/");
+
+  es.onmessage = (e) => {
+    const data = JSON.parse(e.data);
+    const received = data.received ?? 0;
+    const total = data.total ?? 0; 
+
+    let percent = 0;
+    if (total > 0) {
+      percent = Math.max(0, Math.min(100, (received / total) * 100));
+    }
+
+    bar.style.width = percent.toFixed(2) + "%";
+    statusText.textContent = total > 0 ? percent.toFixed(1) + "%" : "—";
+    receivedLabel.textContent = `received: ${received} / total: ${total}`;
+  };
+
+  es.addEventListener("error", (e) => {
+    // Optional: show an error in UI
+    console.error("SSE error", e);
+  });
+</script>

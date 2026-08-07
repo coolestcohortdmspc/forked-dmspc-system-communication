@@ -23,8 +23,8 @@ rebuild)
     # Take down kafka + sim containers
     docker compose stop $KAFKA_SERVICES
     docker compose rm -f $KAFKA_SERVICES
-    docker compose stop $KAFKA_SERVICES
-    docker compose rm -f $KAFKA_SERVICES
+    docker compose stop $SIM_SERVICES
+    docker compose rm -f $SIM_SERVICES
     # Take down the rest of the containers
     docker compose down
     # --no-cache ensures code changes are baked in cleanly

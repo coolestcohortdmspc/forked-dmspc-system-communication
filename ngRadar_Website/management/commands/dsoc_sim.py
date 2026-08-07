@@ -5,10 +5,13 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import io
-from ngRadar_Website.models.models import gbtEvent, dsocEvent
-from ngRadar_Website.enums import Stations
+from ngRadar_Website.models.models import gbtEvent, dsocEvent, ETransferEvent
+from ngRadar_Website.enums import Stations, Status
 from ngRadar_Website.utils import latency_calc, bootstrap, consume, create_s3_client, upload_seaweedfs
 from pathlib import Path
+import json
+import uuid
+import time
 
 
 """
@@ -37,24 +40,36 @@ def DB_columns(gbt_data):
     return data
 
 
-def publish_DB(image_key, num_bytes, data):
-    # Copy the dictionary so we don't accidentally mutate data out-of-scope
-    # since we are not using class based methods
+
+
+def publish_DB(
+    *,
+    image_key,
+    num_bytes,
+    data,
+    xmit_station,
+    rcvr_station,
+    transfer_uuid,
+):
     payload_data = data.copy()
+
     payload_data.update({
         "image_key": image_key,
-        "num_bytes": num_bytes
+        "num_bytes": num_bytes,
+        "xmit_station": xmit_station,
+        "rcvr_station": rcvr_station,
+        "transfer_uuid": transfer_uuid,
+        "status": Status.COMPLETED,
     })
-
     try:
-        # Create and capture the instantiated record model
-        record = dsocEvent.objects.create(**payload_data)
-        print("Payload saved to database successfully.")
-        return record  # <-- Return the actual object record
-
+          # Create and capture the instantiated record model
+          record = dsocEvent.objects.create(**payload_data)
+          print("Payload saved to database successfully.")
+          return record  # <-- Return the actual object record
+  
     except Exception as e:
-        print(f"Database error: {e}")
-        return None  # <-- Return None if something broke
+          print(f"Database error: {e}")
+          return None  # <-- Return None if something broke
 
 
 def create_img(tx_waveform):
@@ -100,53 +115,209 @@ def save_image_to_seaweedfs(target, image_file, dsoc_uuid):
     print(f"Success: Image saved to SeaweedFS at {image_key}")
 
     return image_key
-        
+
+
+
+# Verifies that the incoming file exists and has the expected number of bytes that VLBA sent in the kafka message.
+# Don't love this. We should
+def verify_incoming_transfer(
+    *,
+    incoming_file,
+    expected_num_bytes,
+    attempts=10,
+    delay_seconds=0.5,
+    ):
+        for _ in range(attempts):
+            if incoming_file.is_file():
+                actual_num_bytes = incoming_file.stat().st_size
+
+                if actual_num_bytes == expected_num_bytes:
+                    return actual_num_bytes
+
+            time.sleep(delay_seconds)
+
+        raise RuntimeError(
+            f"Transfer verification failed for {incoming_file}. "
+            f"Expected {expected_num_bytes} bytes."
+        )
+
+
+# Helper function to record the status of the e-transfer in the ETransferEvent table
+def record_transfer_event(
+    *,
+    transfer_uuid,
+    gbt_uuid,
+    station,
+    status,
+    num_bytes=0,
+    latency_ms=0.0,
+    message="",
+):
+    gbt_event = gbtEvent.objects.get(uuid=gbt_uuid)
+
+    return ETransferEvent.objects.create(
+        transfer_uuid=transfer_uuid,
+        gbt_uuid=gbt_uuid,
+        object_id=gbt_event.object_id,
+        target=gbt_event.target,
+        station=station,
+        event_time=datetime.now(timezone.utc),
+        latency_ms=latency_ms,
+        num_bytes=num_bytes,
+        status=status,
+        message=message,
+    )
+    
+
 
 def process_msg(msg, producer_topic=None, producer_config=None):
-    #decode the GBT payload that is a single string of just the uuid:
-    gbt_uuid = msg.key().decode("utf-8")
+    payload = json.loads(msg.value().decode("utf-8"))
 
-    #use the uuid from the payload to import the correct line of data from the GBT table:
-    gbt_data = DB_import(gbt_uuid)
+    transfer_uuid = uuid.UUID(payload["transfer_uuid"])
+    gbt_uuid = uuid.UUID(payload["gbt_uuid"])
+    status = Status(payload["status"])
+    filename = payload.get("filename")
+    expected_num_bytes = payload.get("num_bytes", 0)
+    message = payload.get("message", "")
+    incoming_file = Path("/dsoc/incoming") / filename
 
-    #calculate latency with event_time from the GBT import, before we update the event_time value in DB_columns
-    dsoc_latency = latency_calc(gbt_data[3])
+    record_transfer_event(
+        transfer_uuid=transfer_uuid,
+        gbt_uuid=gbt_uuid,
+        station=Stations.HN,
+        status=status,
+        num_bytes=expected_num_bytes,
+        message=message,
+    )
 
-    #create the rest of the column values specific to DSOC/images:
-    data = DB_columns(gbt_data)
-    data['latency_ms'] = dsoc_latency
+    # filename = payload.get("filename")
+    # incoming_file = Path("/dsoc/incoming") / filename
+    while incoming_file.stat().st_size <= expected_num_bytes:
+        # print received bytes out of expected bytes and then write to a json file to be read by the progress bar on the front end
+        print(f"Received {incoming_file.stat().st_size} out of {expected_num_bytes} bytes")
+        print(f"Received {incoming_file.stat().st_size} out of {expected_num_bytes} bytes")
+        progress_data = {
+            "received_bytes": incoming_file.stat().st_size,
+            "total_bytes": expected_num_bytes,
+            "total_bytes": expected_num_bytes,
+        }
+        with open("/service/mock_assets/progress.json", "w") as f:
+            json.dump(progress_data, f)
+        time.sleep(0.5)  # Sleep for a short duration before checking again
+        if incoming_file.stat().st_size == expected_num_bytes:
+            break
 
-    # Should we receive the etransfer here?
-    incoming = Path("/dsoc/incoming")
-    print(f"Scanning {incoming}")
+    if status == Status.FAILED:
+        return
 
-    for f in incoming.iterdir():
-        if f.is_file():
-            print(f"\nFound: {f.name}")
-            print(f"Size: {f.stat().st_size} bytes")
+    if status != Status.TRANSFERRED:
+        return
 
-            try:
-                print("Contents:")
-                print(f.read_text())
-            except UnicodeDecodeError:
-                print("(Binary file)")
+    already_completed = ETransferEvent.objects.filter(
+        transfer_uuid=transfer_uuid,
+        station=Stations.DSOC,
+        status=Status.COMPLETED,
+    ).exists()
 
-    # 1. Gather data and create the image file and dsoc_uuid first:
-    object_id, target, tx_waveform, event_time = gbt_data
-    image_file, num_bytes = create_img(tx_waveform)
-    dsoc_uuid = str(uuid.uuid4())
+    if already_completed:
+        print(f"This transfer {transfer_uuid} has already been processed. Skipping.")
+        return
 
-    # 2. Upload the image to SeaweedFS using your pre-generated uuid
-    image_key = save_image_to_seaweedfs(target, image_file, dsoc_uuid)
+    already_processing = ETransferEvent.objects.filter(
+        transfer_uuid=transfer_uuid,
+        station=Stations.DSOC,
+        status__in=[Status.VERIFYING],
+        ).exists()
 
-    # 3. Inject the UUID and image_key directly into the payload data
-    data['uuid'] = dsoc_uuid
+    if already_processing:
+        print(f"Transfer {transfer_uuid} is already being processed currently.")
+        return
 
-    # 4. Save everything at once
-    # To trigger the signal events to obsevent table
-    publish_DB(image_key=image_key, num_bytes=num_bytes, data=data)
+    if not filename:
+        record_transfer_event(
+            transfer_uuid=transfer_uuid,
+            station=Stations.DSOC,
+            status=Status.FAILED,
+            num_bytes=expected_num_bytes,
+            message="Kafka transfer message did not contain a filename",
+        )
+        return
 
-    print(f"Received message from {Stations.GBT.label} for object {object_id}; DDM is ready in SeaweedFS (Image Path: {image_key}.")
+
+    record_transfer_event(
+        transfer_uuid=transfer_uuid,
+        gbt_uuid=gbt_uuid,
+        station=Stations.DSOC,
+        status=Status.VERIFYING,
+        num_bytes=expected_num_bytes,
+        message=f"Verifying {filename}",
+    )
+
+    try:
+        actual_num_bytes = verify_incoming_transfer(
+            incoming_file=incoming_file,
+            expected_num_bytes=expected_num_bytes,
+        )
+    except Exception as exc:
+        record_transfer_event(
+            transfer_uuid=transfer_uuid,
+            gbt_uuid=gbt_uuid,
+            station=Stations.DSOC,
+            status=Status.FAILED,
+            num_bytes=0,
+            message=str(exc),
+        )
+        return
+
+    try:
+        gbt_data = DB_import(gbt_uuid)
+        dsoc_latency = latency_calc(gbt_data[3])
+
+        data = DB_columns(gbt_data)
+        data["latency_ms"] = dsoc_latency
+
+        object_id, target, tx_waveform, event_time = gbt_data
+
+        image_file, image_num_bytes = create_img(tx_waveform)
+        dsoc_uuid = str(uuid.uuid4())
+
+        image_key = save_image_to_seaweedfs(
+            target,
+            image_file,
+            dsoc_uuid,
+        )
+
+        data["uuid"] = dsoc_uuid
+
+        publish_DB(
+            image_key=image_key,
+            num_bytes=image_num_bytes,
+            data=data,
+            xmit_station=Stations.GBT,
+            rcvr_station=Stations.HN,
+            transfer_uuid=transfer_uuid,
+        )
+
+    except Exception as exc:
+        record_transfer_event(
+            transfer_uuid=transfer_uuid,
+            gbt_uuid=gbt_uuid,
+            station=Stations.DSOC,
+            status=Status.FAILED,
+            num_bytes=expected_num_bytes,
+            message=f"DSOC processing failed: {exc}",
+        )
+        return
+
+    record_transfer_event(
+        transfer_uuid=transfer_uuid,
+        gbt_uuid=gbt_uuid,
+        station=Stations.DSOC,
+        status=Status.COMPLETED,
+        num_bytes=actual_num_bytes,
+        latency_ms=dsoc_latency,
+        message="Transfer verified, transfer complete, image generated, and image stored.",
+    )
 
 
 class Command(BaseCommand):

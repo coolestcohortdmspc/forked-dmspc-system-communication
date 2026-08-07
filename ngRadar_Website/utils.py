@@ -317,6 +317,8 @@ def etc_send(frame_path):
         Use --resume flag in production.
     """
 
+    # Will need to add some logic here to determine when to use --overwrite vs --resume.
+
     subprocess.run(
         [
             "etc",
