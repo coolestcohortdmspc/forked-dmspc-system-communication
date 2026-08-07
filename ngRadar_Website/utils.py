@@ -13,6 +13,20 @@ from botocore.exceptions import (
     ClientError,
 )
 import subprocess
+import os
+import re
+import subprocess
+import json
+import select
+
+# regex patterns to match the progress output of the etc command
+PROGRESS_RE = re.compile(
+    r"\]\s+"
+    r"(?P<percent>\d+(?:\.\d+)?)%\s+"
+    r"(?P<received>\d+(?:\.\d+)?)\s+(?P<received_unit>\S+)\s+/\s+"
+    r"(?P<total>\d+(?:\.\d+)?)\s+(?P<total_unit>\S+)"
+)
+ANSI_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 
 #Program constants
 SESSION_TIMEOUT_MS = 45000
@@ -175,43 +189,6 @@ def consume(topic, config, process_msg, producer_topic=None, producer_config=Non
     Returns: N/A
     """
 
-
-    """
-    INSERT PROGRESS BAR LOGIC HERE. DEPEND ON DB TRANSFERRING STATUS TO TRIGGER THIS LOGIC.
-
-
-    previous_size = [0]
-    # resetting progress.json to 0 bytes received so that the progress bar on the front end resets when a new transfer starts
-    progress_data = {
-                "received_bytes": 0,
-                "total_bytes": 0,
-            } 
-    with open("/service/mock_assets/progress.json", "w") as f:
-        json.dump(progress_data, f)
-
-    while incoming_file.stat().st_size <= expected_num_bytes:
-        # timeout if previous_size has 30 of the same values in a row (15 seconds of no progress)
-        if any(sum(1 for _ in group) >= 30 for key, group in groupby(previous_size)):
-            print(f"Timeout: No progress in file size for {incoming_file} in the last 15 seconds.")
-            break
-
-        # print received bytes out of expected bytes and then write to a json file to be read by the progress bar on the front end
-        print(f"Received {incoming_file.stat().st_size} out of {expected_num_bytes} bytes")
-        progress_data = {
-            "received_bytes": incoming_file.stat().st_size,
-            "total_bytes": expected_num_bytes,
-        } 
-        with open("/service/mock_assets/progress.json", "w") as f:
-            json.dump(progress_data, f)
-
-        if incoming_file.stat().st_size == expected_num_bytes:
-            break
-        time.sleep(0.5)  # Sleep for a short duration before checking again
-        # append the current size of the file to the previous_size variable to check for progress in the next iteration
-        previous_size.append(incoming_file.stat().st_size)
-
-    """
-
     consumer = Consumer(config)
 
     #subscribes to the specified topic
@@ -342,11 +319,74 @@ def upload_seaweedfs(s3, image_key, file_data):
 
 
 
-# etransfer send data from client -> daemon util function
+
+#==========================
+# etransfer util functions
+#=========================
+
+#JSON-writing helper:
+def write_transfer_progress(
+    *,
+    received_bytes,
+    total_bytes,
+    percent,
+):
+    progress_path = "/service/mock_assets/progress.json"
+    temp_path = progress_path + ".tmp"
+
+    progress_data = {
+        "received_bytes": received_bytes,
+        "total_bytes": total_bytes,
+        "percent": percent,
+    }
+
+    with open(temp_path, "w", encoding="utf-8") as f:
+        json.dump(progress_data, f)
+
+    os.replace(temp_path, progress_path)
+
+
+# Intercepts etc CLI and parses output:
+def parse_etc_progress(line, *, expected_num_bytes):
+    # Remove terminal escape sequences such as ESC[K.
+    clean_line = ANSI_RE.sub("", line)
+
+    match = PROGRESS_RE.search(clean_line)
+
+    if not match:
+        return
+
+    percent = float(match.group("percent"))
+
+    # Since we already know the exact source file size,
+    # derive received bytes from the percentage instead
+    # of parsing etc's human-readable iB/MiB/GiB values.
+    received_bytes = round(
+        expected_num_bytes * (percent / 100.0)
+    )
+
+    if percent >= 100.0:
+        received_bytes = expected_num_bytes
+
+    print(
+        f"Transfer progress: "
+        f"{received_bytes}/{expected_num_bytes} bytes "
+        f"({percent:.1f}%)"
+    )
+
+    write_transfer_progress(
+        received_bytes=received_bytes,
+        total_bytes=expected_num_bytes,
+        percent=percent,
+    )
+
+
+# etransfer command to send data from client -> daemon 
 def etc_send(frame_path):
     """
     Sends data from the client to the daemon using e-transfer.
     Daemon is already set up when dsoc etd container starts (etr daemon)
+    Intercepts the output of the etc command and parses live the etc progress and updates progress.json
 
     Input: 
         frame_path = Path to the file that we want to send to the daemon. On the client machine.
@@ -357,12 +397,92 @@ def etc_send(frame_path):
 
     # Will need to add some logic here to determine when to use --overwrite vs --resume.
 
-    subprocess.run(
+    expected_num_bytes = frame_path.stat().st_size
+
+    # Reset progress at the beginning of a new transfer.
+    write_transfer_progress(
+        received_bytes=0,
+        total_bytes=expected_num_bytes,
+        percent=0.0,
+    )
+
+    master_fd, slave_fd = os.openpty()
+
+    process = subprocess.Popen(
         [
             "etc",
             str(frame_path),
-            os.environ["ETD_DESTINATION"], # env variable set in docker compose - will need to change in production to point to the actual daemon destination that is not localhost
+            os.environ["ETD_DESTINATION"],
             "--overwrite",
         ],
-        check=True,
+        stdin=slave_fd,
+        stdout=slave_fd,
+        stderr=slave_fd,
+        close_fds=True,
+    )
+
+    os.close(slave_fd)
+
+    buffer = ""
+
+    try:
+        while process.poll() is None:
+            readable, _, _ = select.select(
+                [master_fd],
+                [],
+                [],
+                0.5,
+            )
+
+            if not readable:
+                continue
+
+            try:
+                chunk = os.read(master_fd, 4096).decode(
+                    "utf-8",
+                    errors="replace",
+                )
+            except OSError:
+                break
+
+            # Print the actual etc output to Docker logs.
+            print(chunk, end="", flush=True)
+
+            buffer += chunk
+
+            # etc redraws the same terminal line using carriage returns.
+            parts = re.split(r"[\r\n]", buffer)
+
+            # Save any incomplete piece for the next chunk.
+            buffer = parts.pop()
+
+            for line in parts:
+                parse_etc_progress(
+                    line,
+                    expected_num_bytes=expected_num_bytes,
+                )
+
+        # Process anything left in the buffer.
+        if buffer:
+            parse_etc_progress(
+                buffer,
+                expected_num_bytes=expected_num_bytes,
+            )
+
+    finally:
+        os.close(master_fd)
+
+    return_code = process.wait()
+
+    if return_code != 0:
+        raise subprocess.CalledProcessError(
+            return_code,
+            process.args,
+        )
+
+    # Ensure progress ends exactly at 100%.
+    write_transfer_progress(
+        received_bytes=expected_num_bytes,
+        total_bytes=expected_num_bytes,
+        percent=100.0,
     )
