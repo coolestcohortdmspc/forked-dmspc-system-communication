@@ -208,7 +208,6 @@ def process_msg(msg, producer_topic=None, producer_config=None):
     while incoming_file.stat().st_size <= expected_num_bytes:
         # print received bytes out of expected bytes and then write to a json file to be read by the progress bar on the front end
         print(f"Received {incoming_file.stat().st_size} out of {expected_num_bytes} bytes")
-        print(f"Received {incoming_file.stat().st_size} out of {expected_num_bytes} bytes")
         progress_data = {
             "received_bytes": incoming_file.stat().st_size,
             "total_bytes": expected_num_bytes,
@@ -288,15 +287,8 @@ def process_msg(msg, producer_topic=None, producer_config=None):
 
         data = DB_columns(gbt_data)
         data["latency_ms"] = dsoc_latency
-        data = DB_columns(gbt_data)
-        data["latency_ms"] = dsoc_latency
 
         object_id, target, tx_waveform, event_time = gbt_data
-
-        image_file, image_num_bytes = create_img(tx_waveform)
-        dsoc_uuid = str(uuid.uuid4())
-        object_id, target, tx_waveform, event_time = gbt_data
-
         image_file, image_num_bytes = create_img(tx_waveform)
         dsoc_uuid = str(uuid.uuid4())
 
@@ -335,7 +327,7 @@ def process_msg(msg, producer_topic=None, producer_config=None):
         status=Status.COMPLETED,
         num_bytes=actual_num_bytes,
         latency_ms=dsoc_latency,
-        message="Transfer verified, transfer complete, image generated, and image stored.",
+        message="DSOC has verified etransfer, image generated, and image stored.",
     )
 
 

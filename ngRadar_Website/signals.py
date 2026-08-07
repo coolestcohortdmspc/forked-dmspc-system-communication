@@ -29,6 +29,7 @@ def create_obsevent_from_gbt(sender, instance, created, **kwargs):
         xmit_station=Stations.GBT, 
         rcvr_station=Stations.HN,
         status=None,
+        message=None,
     )
 
 
@@ -44,10 +45,6 @@ def create_obsevent_from_dsoc(sender, instance, created, **kwargs):
         rec_waveform=None,
         image_key=instance.image_key,
         num_bytes=instance.num_bytes,
-        tx_waveform=None,
-        rec_waveform=None,
-        image_key=instance.image_key,
-        num_bytes=instance.num_bytes,
         event_time=instance.event_time,
         latency_ms=instance.latency_ms,
         station=Stations.DSOC,
@@ -55,6 +52,7 @@ def create_obsevent_from_dsoc(sender, instance, created, **kwargs):
         rcvr_station=instance.rcvr_station,
         transfer_uuid=instance.transfer_uuid,
         status=None,
+        message=None,
     )
 
 
@@ -78,4 +76,5 @@ def create_obsevent_from_etransfer(sender, instance, created, **kwargs):
         rcvr_station=Stations.HN,
         transfer_uuid=instance.transfer_uuid,
         status=instance.status,
+        message=instance.message,
     )

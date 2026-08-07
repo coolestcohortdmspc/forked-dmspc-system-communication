@@ -112,7 +112,7 @@ def process_msg(msg, producer_topic, producer_config):
             station=Stations.HN,
             status=Status.READY,
             num_bytes=0,
-            message="VLBA data file complete. Ready for e-transfer.",
+            message="Hancock VLBA data file complete. Ready for e-transfer.",
         )
 
 
@@ -138,7 +138,7 @@ def process_msg(msg, producer_topic, producer_config):
                 station=Stations.HN,
                 status=Status.TRANSFERRING,
                 num_bytes=num_bytes,
-                message="VLBA e-transfer in progress",
+                message="Hancock VLBA e-transfer in progress",
             )
         etc_send(frame_path)
     except subprocess.CalledProcessError as exc:
@@ -178,7 +178,7 @@ def process_msg(msg, producer_topic, producer_config):
         status=Status.TRANSFERRED,
         num_bytes=num_bytes,
         filename=frame_path.name,
-        message="VLBA e-transfer completed successfully",
+        message="Hancock VLBA has sent data file to DSOC via e-transfer successfully",
     )
 
 
