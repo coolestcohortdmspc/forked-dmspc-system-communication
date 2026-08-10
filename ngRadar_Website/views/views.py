@@ -319,19 +319,22 @@ def gbt_event_partial(request):
 
 PROGRESS_JSON_PATH = "/service/mock_assets/progress.json"  # <-- endpoint to stream to front end for progress bar. progress.json is updated by etc_send() while the VLBA e-transfer is occurring.
 
-def sse(data: dict) -> str:
-    # SSE format: "data: <json>\n\n"
-    return f"data: {json.dumps(data)}\n\n"
-
 @require_GET
 def progress_sse(request):
     if not os.path.exists(PROGRESS_JSON_PATH):
         return HttpResponseNotFound("Progress file not found")
 
+    def sse(event=None, data=None):
+        out = ""
+        if event:
+            out += f"event: {event}\n"
+        if data is not None:
+            out += f"data: {data}\n"
+        return out + "\n"
+
     def gen():
-        last_received = None
-        last_total = None
-        last_percent = None
+        last_seen = None  # last full progress payload
+        last_transfer_id = None
 
         while True:
             if not os.path.exists(PROGRESS_JSON_PATH):
@@ -345,32 +348,43 @@ def progress_sse(request):
                 received = payload.get("received_bytes", 0)
                 total = payload.get("total_bytes", 0)
                 percent = payload.get("percent", 0.0)
+                transfer_id = payload.get("transfer_id", 0)
 
-                if (
-                    received != last_received
-                    or total != last_total
-                    or percent != last_percent
-                ):
-                    last_received = received
-                    last_total = total
-                    last_percent = percent
-
-                    yield sse({
+                # Always emit when the payload changes (or transfer changes)
+                if payload != last_seen:
+                    last_seen = payload
+                    yield sse(data=json.dumps({
                         "received": received,
                         "total": total,
                         "percent": percent,
-                    })
+                        "transfer_id": transfer_id,
+                    }))
 
+                # Emit a done event, but DO NOT break/close the stream
                 if total > 0 and received >= total:
-                    break
+                    # Only emit done once per transfer_id
+                    if transfer_id != last_transfer_id:
+                        last_transfer_id = transfer_id
+                        yield sse(event="done", data=json.dumps({
+                            "transfer_id": transfer_id,
+                            "percent": percent,
+                        }))
+                    # Wait for next transfer start (transfer_id changes)
+                    while True:
+                        time.sleep(0.5)
+                        if not os.path.exists(PROGRESS_JSON_PATH):
+                            continue
+                        with open(PROGRESS_JSON_PATH, "r", encoding="utf-8") as f:
+                            payload2 = json.load(f)
+                        next_transfer_id = payload2.get("transfer_id", 0)
+                        if next_transfer_id != transfer_id:
+                            last_seen = None
+                            break
 
             except Exception as e:
-                yield (
-                    "event: progress_error\n"
-                    f"data: {json.dumps({'message': str(e)})}\n\n"
-                )
+                yield sse(event="progress_error", data=json.dumps({"message": str(e)}))
 
-            time.sleep(0.5)
+            time.sleep(0.2)
 
     response = StreamingHttpResponse(
         gen(),
