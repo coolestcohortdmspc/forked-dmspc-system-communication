@@ -6,6 +6,7 @@ from django.core.management.base import BaseCommand
 from confluent_kafka import Producer
 from ngRadar_Website.utils import bootstrap, consume, etc_send, create_file, watch_for_file
 from ngRadar_Website.enums import Stations, Status
+from ngRadar_Website.enums import Stations, Status
 from pathlib import Path
 from django.utils import timezone
 from ngRadar_Website.models.models import gbtEvent, ETransferEvent
@@ -108,13 +109,15 @@ def process_msg(msg, producer_topic, producer_config):
 
     watch_for_file(frame_path)
 
+    # frame_path = Path("/service/mock_assets/large_data/old_aoc_data.large")
+
     record_transfer_event(
             transfer_uuid=transfer_uuid,
             gbt_uuid=gbt_uuid,
             station=Stations.HN,
             status=Status.READY,
             num_bytes=0,
-            message="VLBA data file complete. Ready for e-transfer.",
+            message="Hancock VLBA data file complete. Ready for e-transfer.",
         )
 
 
@@ -140,7 +143,7 @@ def process_msg(msg, producer_topic, producer_config):
                 station=Stations.HN,
                 status=Status.TRANSFERRING,
                 num_bytes=num_bytes,
-                message="VLBA e-transfer in progress",
+                message="Hancock VLBA e-transfer in progress",
             )
         etc_send(frame_path)
     except subprocess.CalledProcessError as exc:
@@ -180,7 +183,7 @@ def process_msg(msg, producer_topic, producer_config):
         status=Status.TRANSFERRED,
         num_bytes=num_bytes,
         filename=frame_path.name,
-        message="VLBA e-transfer completed successfully",
+        message="Hancock VLBA has sent data file to DSOC via e-transfer successfully",
     )
 
 

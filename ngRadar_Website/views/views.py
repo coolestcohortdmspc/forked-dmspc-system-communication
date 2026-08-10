@@ -1,11 +1,11 @@
 from django.shortcuts import redirect, render, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.cache import cache_control
-
+from django.views.decorators.http import require_GET
 
 #libraries used for data streaming
 import json
-from django.http import StreamingHttpResponse, JsonResponse, HttpResponse
+from django.http import StreamingHttpResponse, JsonResponse, HttpResponse, HttpResponseNotFound
 
 # serve_image imports
 from ngRadar_Website.utils import create_s3_client, bootstrap # , get_presigned_url
@@ -15,12 +15,14 @@ from ngRadar_Website.enums import Stations
 from django.core.cache import cache
 
 from ngRadar_Website.models.models import ObservatoryEvent, uiEvent, gbtEvent, dsocEvent, ETransferEvent  # , ngrok_endpoint
+from ngRadar_Website.models.models import ObservatoryEvent, uiEvent, gbtEvent, dsocEvent, ETransferEvent  # , ngrok_endpoint
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout, logout
 from django.db.models import Avg
 from confluent_kafka import Producer
 import uuid
 import os
+import time
 from datetime import datetime, timezone 
 # from ngRadar_Website.utils import views_bootstrap
 
@@ -43,6 +45,13 @@ def get_obs_events():
     ui_events = uiEvent.objects.order_by("-event_time")[:LAST_RECORDS]
     gbt_events = gbtEvent.objects.order_by("-event_time")[:LAST_RECORDS]
     dsoc_events = dsocEvent.objects.order_by("-event_time")[:LAST_RECORDS]
+    latest_image_event = (
+        ObservatoryEvent.objects
+        .exclude(image_key__isnull=True)
+        .exclude(image_key="")
+        .order_by("-event_time")
+        .first()
+    )
     latest_image_event = (
         ObservatoryEvent.objects
         .exclude(image_key__isnull=True)
@@ -307,13 +316,8 @@ def gbt_event_partial(request):
         get_obs_events(),
     )
 
-import json
-import os
-import time
-from django.http import StreamingHttpResponse, HttpResponseNotFound
-from django.views.decorators.http import require_GET
 
-PROGRESS_JSON_PATH = "/service/mock_assets/progress.json"  # <-- set this to your mounted path
+PROGRESS_JSON_PATH = "/service/mock_assets/progress.json"  # <-- endpoint to stream to front end for progress bar. progress.json is updated by etc_send() while the VLBA e-transfer is occurring.
 
 def sse(data: dict) -> str:
     # SSE format: "data: <json>\n\n"
@@ -327,6 +331,7 @@ def progress_sse(request):
     def gen():
         last_received = None
         last_total = None
+        last_percent = None
 
         while True:
             if not os.path.exists(PROGRESS_JSON_PATH):
@@ -337,23 +342,40 @@ def progress_sse(request):
                 with open(PROGRESS_JSON_PATH, "r", encoding="utf-8") as f:
                     payload = json.load(f)
 
-                received = payload.get("received_bytes")
-                total = payload.get("total_bytes")
+                received = payload.get("received_bytes", 0)
+                total = payload.get("total_bytes", 0)
+                percent = payload.get("percent", 0.0)
 
-                # Emit only if changed (avoid spamming)
-                if received != last_received or total != last_total:
-                    last_received, last_total = received, total
-                    yield sse({"received": received, "total": total})
-                    if total and received is not None and received >= total:
-                        break
+                if (
+                    received != last_received
+                    or total != last_total
+                    or percent != last_percent
+                ):
+                    last_received = received
+                    last_total = total
+                    last_percent = percent
+
+                    yield sse({
+                        "received": received,
+                        "total": total,
+                        "percent": percent,
+                    })
+
+                if total > 0 and received >= total:
+                    break
 
             except Exception as e:
-                # Emit error event
-                yield f"event: error\ndata: {json.dumps({'message': str(e)})}\n\n"
+                yield (
+                    "event: progress_error\n"
+                    f"data: {json.dumps({'message': str(e)})}\n\n"
+                )
 
             time.sleep(0.5)
 
-    resp = StreamingHttpResponse(gen(), content_type="text/event-stream")
-    resp["Cache-Control"] = "no-cache"
-    resp["X-Accel-Buffering"] = "no"  # helps with nginx buffering
-    return resp
+    response = StreamingHttpResponse(
+        gen(),
+        content_type="text/event-stream",
+    )
+    response["Cache-Control"] = "no-cache"
+    response["X-Accel-Buffering"] = "no"
+    return response

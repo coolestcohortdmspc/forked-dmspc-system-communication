@@ -12,6 +12,8 @@ from pathlib import Path
 import json
 import uuid
 import time
+from itertools import groupby
+
 
 
 """
@@ -41,7 +43,6 @@ def DB_columns(gbt_data):
 
 
 
-
 def publish_DB(
     *,
     image_key,
@@ -52,6 +53,7 @@ def publish_DB(
     transfer_uuid,
 ):
     payload_data = data.copy()
+
 
     payload_data.update({
         "image_key": image_key,
@@ -118,8 +120,8 @@ def save_image_to_seaweedfs(target, image_file, dsoc_uuid):
 
 
 
+
 # Verifies that the incoming file exists and has the expected number of bytes that VLBA sent in the kafka message.
-# Don't love this. We should
 def verify_incoming_transfer(
     *,
     incoming_file,
@@ -189,23 +191,6 @@ def process_msg(msg, producer_topic=None, producer_config=None):
         num_bytes=expected_num_bytes,
         message=message,
     )
-
-    # filename = payload.get("filename")
-    # incoming_file = Path("/dsoc/incoming") / filename
-    # while incoming_file.stat().st_size <= expected_num_bytes:
-    #     # print received bytes out of expected bytes and then write to a json file to be read by the progress bar on the front end
-    #     print(f"Received {incoming_file.stat().st_size} out of {expected_num_bytes} bytes")
-    #     print(f"Received {incoming_file.stat().st_size} out of {expected_num_bytes} bytes")
-    #     progress_data = {
-    #         "received_bytes": incoming_file.stat().st_size,
-    #         "total_bytes": expected_num_bytes,
-    #         "total_bytes": expected_num_bytes,
-    #     }
-    #     with open("/service/mock_assets/progress.json", "w") as f:
-    #         json.dump(progress_data, f)
-    #     time.sleep(0.5)  # Sleep for a short duration before checking again
-    #     if incoming_file.stat().st_size == expected_num_bytes:
-    #         break
 
     if status == Status.FAILED:
         return
@@ -277,7 +262,6 @@ def process_msg(msg, producer_topic=None, producer_config=None):
         data["latency_ms"] = dsoc_latency
 
         object_id, target, tx_waveform, event_time = gbt_data
-
         image_file, image_num_bytes = create_img(tx_waveform)
         dsoc_uuid = str(uuid.uuid4())
 
@@ -316,7 +300,7 @@ def process_msg(msg, producer_topic=None, producer_config=None):
         status=Status.COMPLETED,
         num_bytes=actual_num_bytes,
         latency_ms=dsoc_latency,
-        message="Transfer verified, transfer complete, image generated, and image stored.",
+        message="DSOC has verified etransfer, image generated, and image stored.",
     )
 
 
