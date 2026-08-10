@@ -78,20 +78,8 @@ def test_latency_calc_gbt(event_time, expected):
 
 # NOTE I attempted to make these two scenarios into one test with parametrize, but because they have a different number of variables/outputs, it was too awkward
 
-@patch("ngRadar_Website.utils.AdminClient")
-def test_config_func_GBT(mock_AdminClient):
+def test_config_func_GBT():
     """Scenario 1: sim is GBT"""
-
-    #dealing with the create_topic function, which calls f.result:
-    future = MagicMock()
-    future.result.return_value = None
-    
-    mock_admin = mock_AdminClient.return_value
-    mock_admin.create_topics.return_value = {
-        "user_input": future,
-        "GBT_data": future,
-    }
-
     sim = Stations.GBT
     bootstrap = "12345"
 
@@ -112,9 +100,6 @@ def test_config_func_GBT(mock_AdminClient):
             "group.id": "gbt-consumer-group",
             "auto.offset.reset": "earliest",
         }
-    mock_AdminClient.assert_called_once_with(
-        {"bootstrap.servers": bootstrap}
-    )
 
 
 @pytest.mark.parametrize("sim", [
@@ -122,20 +107,8 @@ def test_config_func_GBT(mock_AdminClient):
         (Stations.HN),
         (Stations.FD)
     ])
-@patch("ngRadar_Website.utils.AdminClient")
-def test_config_func_vlba(mock_AdminClient, sim):
+def test_config_func_vlba(sim):
     """Scenario 2: sim is a VLBA site"""
-
-    #dealing with the create_topic function, which calls f.result:
-    future = MagicMock()
-    future.result.return_value = None
-    
-    mock_admin = mock_AdminClient.return_value
-    mock_admin.create_topics.return_value = {
-        "GBT_data": future,
-        "VLBA_data": future,
-    }
-
     bootstrap = "12345"
 
     producer_topic, producer_config, consumer_topic, consumer_config = config_func(sim, bootstrap)
@@ -155,9 +128,7 @@ def test_config_func_vlba(mock_AdminClient, sim):
             "group.id": f"{sim.name.lower()}-consumer-group",
             "auto.offset.reset": "earliest",
         }
-    mock_AdminClient.assert_called_once_with(
-        {"bootstrap.servers": bootstrap}
-    )
+
 
 def test_config_func_DSOC():
     """Scenario 3: sim is DSOC"""
@@ -181,30 +152,31 @@ def test_config_func_DSOC():
 # 3. bootstrap Test
 # ==============================================================================
 
-@patch("ngRadar_Website.utils.Path.read_text")
+@patch("ngRadar_Website.utils.load_dotenv")
 @patch("ngRadar_Website.utils.config_func")
-def test_bootstrap_GBT(mock_config_func, mock_path):
+@patch("ngRadar_Website.utils.os.getenv")
+def test_bootstrap_GBT(mock_os_getenv, mock_config_func, mock_load_dotenv):
     """Scenario 1: sim = GBT"""
-
     sim = Stations.GBT
 
     mock_env_data = "BOOTSTRAP_SERVER=localhost:9092\nSOME_OTHER_VAR=value"
-    mock_path.return_value = mock_env_data
-    
+    mock_load_dotenv.return_value = mock_env_data
+    mock_os_getenv.return_value = "fake_bootstrap"
+
     mock_config_func.return_value = (
         "GBT_data",
-        {"bootstrap.servers": "localhost:9092"},
+        {"bootstrap.servers": "fake_bootstrap"},
         ["user_input"],
-        {"bootstrap.servers": "localhost:9092"},
+        {"bootstrap.servers": "fake_bootstrap"},
     )
 
     producer_topic, producer_config, consumer_topic, consumer_config = bootstrap(sim)
 
-    mock_config_func.assert_called_once_with(sim, "localhost:9092")
+    mock_config_func.assert_called_once_with(sim, "fake_bootstrap")
     assert producer_topic == "GBT_data"
-    assert producer_config == {"bootstrap.servers": "localhost:9092"}
+    assert producer_config == {"bootstrap.servers": "fake_bootstrap"}
     assert consumer_topic == ["user_input"]
-    assert consumer_config == {"bootstrap.servers": "localhost:9092"}
+    assert consumer_config == {"bootstrap.servers": "fake_bootstrap"}
 
 
 @patch("ngRadar_Website.utils.Path.read_text")
