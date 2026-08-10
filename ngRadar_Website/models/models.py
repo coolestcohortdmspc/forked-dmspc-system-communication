@@ -53,6 +53,7 @@ class ObservatoryEvent(models.Model):
         blank=True,
         null=True,
     )
+    message = models.TextField(blank=True, null=True, default="")
 
 
     def __str__(self):
@@ -100,6 +101,7 @@ class dsocEvent(models.Model):
         blank=True,
         null=True,
     )
+    message = models.TextField(blank=True, null=True, default="")
 
     def __str__(self):
         return f"DSOC Event: {self.object_id} | {self.event_time}"
@@ -162,7 +164,7 @@ class ETransferEvent(models.Model):
     status = models.PositiveSmallIntegerField(
         choices=Status.choices,
     )
-    message = models.TextField(blank=True, default="")
+    message = models.TextField(blank=True, null=True, default="")
 
     class Meta:
         ordering = ["event_time"]

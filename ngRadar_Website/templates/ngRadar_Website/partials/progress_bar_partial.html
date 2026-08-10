@@ -18,29 +18,39 @@ style="max-width: 50rem;">
 </div>
 
 <script>
-  const receivedLabel = document.getElementById("bytesText");
-  const bar = document.getElementById("bar");
-  const statusText = document.getElementById("statusText");
+(() => {
+    const receivedLabel = document.getElementById("bytesText");
+    const bar = document.getElementById("bar");
+    const statusText = document.getElementById("statusText");
 
-  const es = new EventSource("/progress/stream/");
+    const es = new EventSource("/progress/stream/");
 
-  es.onmessage = (e) => {
-    const data = JSON.parse(e.data);
-    const received = data.received ?? 0;
-    const total = data.total ?? 0; 
+    es.onmessage = (e) => {
+        const data = JSON.parse(e.data);
 
-    let percent = 0;
-    if (total > 0) {
-      percent = Math.max(0, Math.min(100, (received / total) * 100));
-    }
+        const received = data.received ?? 0;
+        const total = data.total ?? 0;
+        const percent = data.percent ?? 0;
 
-    bar.style.width = percent.toFixed(2) + "%";
-    statusText.textContent = total > 0 ? percent.toFixed(1) + "%" : "—";
-    receivedLabel.textContent = `received: ${received} / total: ${total}`;
-  };
+        bar.style.width = `${percent.toFixed(2)}%`;
+        statusText.textContent =
+            total > 0 ? `${percent.toFixed(1)}%` : "—";
 
-  es.addEventListener("error", (e) => {
-    // Optional: show an error in UI
-    console.error("SSE error", e);
-  });
+        receivedLabel.textContent =
+            `received: ${received} / total: ${total}`;
+
+        if (percent >= 100) {
+            es.close();
+        }
+    };
+
+    es.addEventListener("progress_error", (e) => {
+        const data = JSON.parse(e.data);
+        console.error("Transfer progress error:", data.message);
+    });
+
+    es.onerror = (e) => {
+        console.error("SSE connection error:", e);
+    };
+})();
 </script>

@@ -2,9 +2,11 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 from ngRadar_Website.enums import Stations
 from django.utils import timezone
+from django.utils import timezone
 from ngRadar_Website.models.models import (
     gbtEvent,
     dsocEvent,
+    ETransferEvent,
     ETransferEvent,
     ObservatoryEvent,
 )
@@ -27,6 +29,7 @@ def create_obsevent_from_gbt(sender, instance, created, **kwargs):
         xmit_station=Stations.GBT, 
         rcvr_station=Stations.HN,
         status=None,
+        message=None,
     )
 
 
@@ -49,6 +52,7 @@ def create_obsevent_from_dsoc(sender, instance, created, **kwargs):
         rcvr_station=instance.rcvr_station,
         transfer_uuid=instance.transfer_uuid,
         status=None,
+        message=None,
     )
 
 
@@ -72,4 +76,5 @@ def create_obsevent_from_etransfer(sender, instance, created, **kwargs):
         rcvr_station=Stations.HN,
         transfer_uuid=instance.transfer_uuid,
         status=instance.status,
+        message=instance.message,
     )
