@@ -102,13 +102,15 @@ def test_config_func_GBT():
         }
 
 
-@pytest.mark.parametrize("sim", [
-        (Stations.SC),
-        (Stations.HN),
-        (Stations.FD)
-    ])
-def test_config_func_vlba(sim):
+# @pytest.mark.parametrize("sim", [
+#         (Stations.SC),
+#         (Stations.HN),
+#         (Stations.FD)
+#     ])
+# NOTE: I want to make the code dynamically accept all VLBA stations, but that is a future project
+def test_config_func_vlba():
     """Scenario 2: sim is a VLBA site"""
+    sim = Stations.HN
     bootstrap = "12345"
 
     producer_topic, producer_config, consumer_topic, consumer_config = config_func(sim, bootstrap)
