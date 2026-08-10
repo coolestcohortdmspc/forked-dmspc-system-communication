@@ -101,11 +101,8 @@ def record_transfer_event(
 def process_msg(msg, producer_topic, producer_config):
     gbt_uuid = msg.key().decode("utf-8")
     transfer_uuid = uuid.uuid4()
-    # frame_path = Path("/service/mock_assets/large_data/BT161A1_PT_No0008.large")
 
-    # frame_path = Path("/service/testdata/hello.txt")
     frame_path = Path("/raw_data") / f"{transfer_uuid}.bin"
-    file_name = f"{transfer_uuid}.bin"
 
     Thread(target=create_file, args=(frame_path,), daemon=True).start()
 
