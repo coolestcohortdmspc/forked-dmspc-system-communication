@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import uuid
 # from confluent_kafka.admin import AdminClient, NewTopic, KafkaException, KafkaError
 from dotenv import load_dotenv
 from ngRadar_Website.enums import Stations
@@ -330,6 +331,7 @@ def write_transfer_progress(
     received_bytes,
     total_bytes,
     percent,
+    transfer_id,
 ):
     progress_path = "/service/mock_assets/progress.json"
     temp_path = progress_path + ".tmp"
@@ -338,6 +340,7 @@ def write_transfer_progress(
         "received_bytes": received_bytes,
         "total_bytes": total_bytes,
         "percent": percent,
+        "transfer_id": transfer_id,
     }
 
     with open(temp_path, "w", encoding="utf-8") as f:
@@ -347,7 +350,7 @@ def write_transfer_progress(
 
 
 # Intercepts etc CLI and parses output:
-def parse_etc_progress(line, *, expected_num_bytes):
+def parse_etc_progress(line, *, expected_num_bytes, transfer_id):
     # Remove terminal escape sequences such as ESC[K.
     clean_line = ANSI_RE.sub("", line)
 
@@ -378,6 +381,7 @@ def parse_etc_progress(line, *, expected_num_bytes):
         received_bytes=received_bytes,
         total_bytes=expected_num_bytes,
         percent=percent,
+        transfer_id=transfer_id,
     )
 
 
@@ -398,12 +402,13 @@ def etc_send(frame_path):
     # Will need to add some logic here to determine when to use --overwrite vs --resume.
 
     expected_num_bytes = frame_path.stat().st_size
-
+    transfer_id = str(uuid.uuid4())
     # Reset progress at the beginning of a new transfer.
     write_transfer_progress(
         received_bytes=0,
         total_bytes=expected_num_bytes,
         percent=0.0,
+        transfer_id=transfer_id,
     )
 
     master_fd, slave_fd = os.openpty()
@@ -438,7 +443,7 @@ def etc_send(frame_path):
                 continue
 
             try:
-                chunk = os.read(master_fd, 4096).decode(
+                chunk = os.read(master_fd, 1024).decode(
                     "utf-8",
                     errors="replace",
                 )
@@ -459,14 +464,14 @@ def etc_send(frame_path):
             for line in parts:
                 parse_etc_progress(
                     line,
-                    expected_num_bytes=expected_num_bytes,
+                    expected_num_bytes=expected_num_bytes, transfer_id=transfer_id
                 )
 
         # Process anything left in the buffer.
         if buffer:
             parse_etc_progress(
                 buffer,
-                expected_num_bytes=expected_num_bytes,
+                expected_num_bytes=expected_num_bytes, transfer_id=transfer_id
             )
 
     finally:
@@ -485,4 +490,5 @@ def etc_send(frame_path):
         received_bytes=expected_num_bytes,
         total_bytes=expected_num_bytes,
         percent=100.0,
+        transfer_id=transfer_id,
     )
