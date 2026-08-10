@@ -24,6 +24,7 @@ with patch("pathlib.Path.read_text", return_value=mock_env_data):
         create_img,
         save_image_to_seaweedfs,
         verify_incoming_transfer,
+        record_transfer_event,
         process_msg,
     )
 
@@ -202,8 +203,49 @@ def test_verify_incoming_transfer_nofile(mock_sleep):
     assert mock_sleep.call_count == 10
     assert str(exc_info.value) == (f"Transfer verification failed for {incoming_file}. ""Expected 500 bytes.")
 
+
 # ==============================================================================
-# 7. process_msg Test
+# 7. record_transfer_event Test
+# ==============================================================================
+
+@patch("ngRadar_Website.management.commands.dsoc_sim.gbtEvent")
+@patch("ngRadar_Website.management.commands.dsoc_sim.ETransferEvent")
+def test_record_transfer_event(mock_etr_event, mock_gbt_event):
+
+    mock_gbt_data = MagicMock()
+    mock_gbt_data.object_id = "123"
+    mock_gbt_data.target = "Venus"
+
+    mock_gbt_event.objects.get.return_value = mock_gbt_data
+
+    etr_record = MagicMock()
+    mock_etr_event.objects.create.return_value = etr_record
+
+    record_transfer_event(
+        transfer_uuid="transfer-uuid",
+        gbt_uuid="gbt-uuid",
+        station=Stations.DSOC,
+        status=Status.TRANSFERRED,
+        num_bytes=2048,
+        latency_ms=500,
+        message="Test message")
+
+    mock_gbt_event.objects.get.assert_called_once_with(uuid="gbt-uuid")
+    mock_etr_event.objects.create.assert_called_once_with(
+        transfer_uuid="transfer-uuid",
+        gbt_uuid="gbt-uuid",
+        object_id="123",
+        target="Venus",
+        station=Stations.DSOC,
+        event_time=mock_etr_event.objects.create.call_args[1]['event_time'],
+        latency_ms=500,
+        num_bytes=2048,
+        status=Status.TRANSFERRED,
+        message="Test message")
+
+
+# ==============================================================================
+# 8. process_msg Test
 # ==============================================================================
 
 #We don't want to actually call all of these functions
