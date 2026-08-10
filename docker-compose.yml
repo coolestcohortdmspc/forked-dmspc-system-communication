@@ -355,6 +355,7 @@ services:
     volumes:
       - .:/service
       # - ngrok_env:/out
+      - vlba_data:/raw_data
     networks:
       - ngradar_website_network
     profiles: ["kafka"]
@@ -474,6 +475,7 @@ volumes:
   seaweed_data:
   # ngrok_env:
   dsoc_transfer:
+  vlba_data:
 
 networks:
   ngradar_website_network:

@@ -1,16 +1,17 @@
-from django.core.management.base import BaseCommand
-from confluent_kafka import Producer
-from ngRadar_Website.utils import bootstrap, consume, etc_send
-from ngRadar_Website.enums import Stations, Status
-from ngRadar_Website.enums import Stations, Status
-from pathlib import Path
 import json
 import subprocess
 import uuid
+
+from django.core.management.base import BaseCommand
+from confluent_kafka import Producer
+from ngRadar_Website.utils import bootstrap, consume, etc_send, create_file, watch_for_file
+from ngRadar_Website.enums import Stations, Status
+from ngRadar_Website.enums import Stations, Status
+from pathlib import Path
 from django.utils import timezone
 from ngRadar_Website.models.models import gbtEvent, ETransferEvent
 from datetime import datetime, timezone
-
+from threading import Thread
 
 
 """
@@ -98,14 +99,17 @@ def record_transfer_event(
     )
 
 
-
 def process_msg(msg, producer_topic, producer_config):
     gbt_uuid = msg.key().decode("utf-8")
     transfer_uuid = uuid.uuid4()
-    # frame_path = Path("/service/mock_assets/large_data/BT161A1_PT_No0008.large")
-    frame_path = Path("/service/mock_assets/large_data/old_aoc_data.large")
 
-    # frame_path = Path("/service/testdata/hello.txt")
+    frame_path = Path("/raw_data") / f"{transfer_uuid}.bin"
+
+    Thread(target=create_file, args=(frame_path,), daemon=True).start()
+
+    watch_for_file(frame_path)
+
+    # frame_path = Path("/service/mock_assets/large_data/old_aoc_data.large")
 
     record_transfer_event(
             transfer_uuid=transfer_uuid,
@@ -181,7 +185,6 @@ def process_msg(msg, producer_topic, producer_config):
         filename=frame_path.name,
         message="Hancock VLBA has sent data file to DSOC via e-transfer successfully",
     )
-
 
 
 class Command(BaseCommand):
