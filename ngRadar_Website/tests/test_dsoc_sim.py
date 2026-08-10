@@ -23,6 +23,7 @@ with patch("pathlib.Path.read_text", return_value=mock_env_data):
         publish_DB,
         create_img,
         save_image_to_seaweedfs,
+        verify_incoming_transfer,
         process_msg,
     )
 
@@ -162,8 +163,47 @@ def test_save_image_to_seaweedfs_success(mock_upload, mock_s3):
     mock_s3.assert_called_once()
     mock_upload.assert_called_once_with(mock_instance, f"ddm/Venus/12345.png", b"fake png bytes")
 
+
 # ==============================================================================
-# 6. process_msg Test
+# 6. verify_incoming_transfer Test
+# ==============================================================================
+
+@patch("ngRadar_Website.management.commands.dsoc_sim.time.sleep")
+def test_verify_incoming_transfer_success(mock_sleep):
+    """Scenario 1: file is there, correct size"""
+    incoming_file = MagicMock()
+    incoming_file.is_file.return_value = True
+    incoming_file.stat.return_value.st_size = 500
+    expected_num_bytes = 500
+
+    mock_sleep.return_value = None
+
+    result = verify_incoming_transfer(
+        incoming_file=incoming_file,
+        expected_num_bytes=expected_num_bytes)
+
+    assert result == expected_num_bytes
+    mock_sleep.assert_not_called()
+
+@patch("ngRadar_Website.management.commands.dsoc_sim.time.sleep")
+def test_verify_incoming_transfer_nofile(mock_sleep):
+    """Scenario 2: file not found"""
+    incoming_file = MagicMock()
+    incoming_file.is_file.return_value = False
+    expected_num_bytes = 500
+
+    mock_sleep.return_value = None
+
+    with pytest.raises(RuntimeError) as exc_info:
+        verify_incoming_transfer(
+            incoming_file=incoming_file,
+            expected_num_bytes=expected_num_bytes)
+
+    assert mock_sleep.call_count == 10
+    assert str(exc_info.value) == (f"Transfer verification failed for {incoming_file}. ""Expected 500 bytes.")
+
+# ==============================================================================
+# 7. process_msg Test
 # ==============================================================================
 
 #We don't want to actually call all of these functions
@@ -327,7 +367,7 @@ def test_process_msg_fail(
     ])
 @patch("ngRadar_Website.management.commands.dsoc_sim.json.loads")
 @patch("ngRadar_Website.management.commands.dsoc_sim.record_transfer_event")
-def test_process_msg_fail(
+def test_process_msg_fail_else(
                     mock_rec_transfer,
                     mock_json,
                     number,
