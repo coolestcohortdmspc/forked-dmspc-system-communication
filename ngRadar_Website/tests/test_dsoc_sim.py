@@ -3,6 +3,7 @@ from unittest.mock import patch, MagicMock
 from ngRadar_Website.enums import Stations, Status
 import uuid
 from pathlib import Path
+import pytest
 
 
 # =============================================
@@ -277,3 +278,92 @@ def test_process_msg(mock_publish_DB,
     mock_create_img.assert_called_once_with(gbt_data[2])
     mock_save_image.assert_called_once_with(gbt_data[1], img_file, "54321")
     mock_publish_DB.assert_called_once_with(image_key=image_key, num_bytes=num_bytes, data=data, xmit_station=Stations.GBT, rcvr_station=Stations.HN, transfer_uuid=transfer_uuid)
+
+
+@patch("ngRadar_Website.management.commands.dsoc_sim.json.loads")
+@patch("ngRadar_Website.management.commands.dsoc_sim.record_transfer_event")
+def test_process_msg_fail(
+                    mock_rec_transfer,
+                    mock_json
+                ):
+    """Scenario 2: status = failed directly from VLBA"""
+    #The fake kafka message in the correct format:
+    msg = MagicMock()
+    msg.value.return_value = b'{"message"}'
+
+    #giving fake uuid's in the correct format so that 'uuid.UUID()' works on it in the function:
+    transfer_uuid = uuid.UUID("11111111-1111-1111-1111-111111111111")
+    gbt_uuid = uuid.UUID("22222222-2222-2222-2222-222222222222")
+
+    #The fake output of the json.loads() function:
+    mock_payload = {
+            "transfer_uuid": str(transfer_uuid),
+            "gbt_uuid": str(gbt_uuid),
+            "status": int(7),
+            "status_label": str("FAILED"),
+            "num_bytes": 2048,
+            "filename": str("fake_filename.png"),
+            "event_time": datetime(2026, 7, 15, 12, 0, 0, tzinfo=timezone.utc),
+            "message": str("fake_message"),
+            "stations": str("fake_station"),
+        }
+
+    mock_json.return_value = mock_payload
+
+    mock_rec_transfer.return_value = None
+
+    process_msg(msg)
+
+    first = mock_rec_transfer.call_args_list[0]
+    assert mock_rec_transfer.call_count == 1
+    assert first.kwargs["status"] == Status.FAILED
+
+
+@pytest.mark.parametrize("number, label", [
+        (1, "READY"),
+        (2, "QUEUED"),
+        (3, "BLOCKED"),
+        (4, "TRANSFERRING")
+    ])
+@patch("ngRadar_Website.management.commands.dsoc_sim.json.loads")
+@patch("ngRadar_Website.management.commands.dsoc_sim.record_transfer_event")
+def test_process_msg_fail(
+                    mock_rec_transfer,
+                    mock_json,
+                    number,
+                    label
+                ):
+    """Scenario 3: status != transferred directly from VLBA"""
+    #The fake kafka message in the correct format:
+    msg = MagicMock()
+    msg.value.return_value = b'{"message"}'
+
+    #giving fake uuid's in the correct format so that 'uuid.UUID()' works on it in the function:
+    transfer_uuid = uuid.UUID("11111111-1111-1111-1111-111111111111")
+    gbt_uuid = uuid.UUID("22222222-2222-2222-2222-222222222222")
+
+    #The fake output of the json.loads() function:
+    mock_payload = {
+            "transfer_uuid": str(transfer_uuid),
+            "gbt_uuid": str(gbt_uuid),
+            "status": int(number),
+            "status_label": str(label),
+            "num_bytes": 2048,
+            "filename": str("fake_filename.png"),
+            "event_time": datetime(2026, 7, 15, 12, 0, 0, tzinfo=timezone.utc),
+            "message": str("fake_message"),
+            "stations": str("fake_station"),
+        }
+
+    mock_json.return_value = mock_payload
+
+    mock_rec_transfer.return_value = None
+
+    process_msg(msg)
+
+    first = mock_rec_transfer.call_args_list[0]
+    assert mock_rec_transfer.call_count == 1
+    assert first.kwargs["status"] == Status(number)
+
+
+#NOTE: We still need more scenarios here 
