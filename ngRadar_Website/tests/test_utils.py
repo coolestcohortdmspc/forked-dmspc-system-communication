@@ -159,7 +159,7 @@ def test_bootstrap_GBT(mock_os_getenv, mock_config_func, mock_load_dotenv):
     """Scenario 1: sim = GBT"""
     sim = Stations.GBT
 
-    mock_env_data = "BOOTSTRAP_SERVER=localhost:9092\nSOME_OTHER_VAR=value"
+    mock_env_data = "BOOTSTRAP_SERVER=fake_bootstrap\nSOME_OTHER_VAR=value"
     mock_load_dotenv.return_value = mock_env_data
     mock_os_getenv.return_value = "fake_bootstrap"
 
@@ -179,44 +179,50 @@ def test_bootstrap_GBT(mock_os_getenv, mock_config_func, mock_load_dotenv):
     assert consumer_config == {"bootstrap.servers": "fake_bootstrap"}
 
 
-@patch("ngRadar_Website.utils.Path.read_text")
+@patch("ngRadar_Website.utils.load_dotenv")
 @patch("ngRadar_Website.utils.config_func")
-def test_bootstrap_DSOC(mock_config_func, mock_path):
+@patch("ngRadar_Website.utils.os.getenv")
+def test_bootstrap_DSOC(mock_os_getenv, mock_config_func, mock_load_dotenv):
     """Scenario 2: sim = DSOC"""
-
     sim = Stations.DSOC
 
-    mock_env_data = "BOOTSTRAP_SERVER=localhost:9092\nSOME_OTHER_VAR=value"
-    mock_path.return_value = mock_env_data
+    mock_env_data = "BOOTSTRAP_SERVER=fake_bootstrap\nSOME_OTHER_VAR=value"
+    mock_load_dotenv.return_value = mock_env_data
+    mock_os_getenv.return_value = "fake_bootstrap"
     
     mock_config_func.return_value = (
-        "GBT_data",
-        {"bootstrap.servers": "localhost:9092"},
+        "VLBA_data",
+        {"bootstrap.servers": "fake_bootstrap"},
     )
 
     topic, config = bootstrap(sim)
 
-    mock_config_func.assert_called_once_with(sim, "localhost:9092")
-    assert topic == "GBT_data"
-    assert config == {"bootstrap.servers": "localhost:9092"}
+    mock_config_func.assert_called_once_with(sim, "fake_bootstrap")
+    assert topic == "VLBA_data"
+    assert config == {"bootstrap.servers": "fake_bootstrap"}
 
 
-@pytest.mark.parametrize("sim", [
-        (Stations.GBT),
-        (Stations.DSOC)
-    ])
-@patch("ngRadar_Website.utils.Path.read_text")
-def test_bootstrap_none(mock_path, sim):
-    """Scenario 3: bootstrap not found"""
+@patch("ngRadar_Website.utils.load_dotenv")
+@patch("ngRadar_Website.utils.config_func")
+@patch("ngRadar_Website.utils.os.getenv")
+def test_bootstrap_none(mock_os_getenv, mock_config_func, mock_load_dotenv):
+    """Scenario 3: sim is UI user input"""
+    sim = Stations.UI
 
-    mock_env_data = "BOOTSTRAP_SERVER=\nSOME_OTHER_VAR=value"
-    mock_path.return_value = mock_env_data
+    mock_env_data = "BOOTSTRAP_SERVER=fake_bootstrap\nSOME_OTHER_VAR=value"
+    mock_load_dotenv.return_value = mock_env_data
+    mock_os_getenv.return_value = "fake_bootstrap"
 
-    with pytest.raises(
-        RuntimeError,
-        match="BOOTSTRAP_SERVER not found in /out/ngrok_endpoint.env",
-    ):
-        bootstrap(sim)
+    mock_config_func.return_value = (
+        "user_input",
+        {"bootstrap.servers": "fake_bootstrap"},
+    )
+
+    topic, config = bootstrap(sim)
+
+    mock_config_func.assert_called_once_with(sim, "fake_bootstrap")
+    assert topic == "user_input"
+    assert config == {"bootstrap.servers": "fake_bootstrap"}
 
 
 
