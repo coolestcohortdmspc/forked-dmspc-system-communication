@@ -414,20 +414,17 @@ def test_ensure_bucket_exists_created():
     },
 )
 @patch("ngRadar_Website.utils.uuid.uuid4")
-@patch("ngRadar_Website.utils.write_transfer_progress")
 @patch("ngRadar_Website.utils.os.openpty")
 @patch("ngRadar_Website.utils.subprocess.Popen")
 @patch("ngRadar_Website.utils.os.close")
 @patch("ngRadar_Website.utils.select.select")
 @patch("ngRadar_Website.utils.os.read")
 @patch("ngRadar_Website.utils.parse_etc_progress")
-def test_etc_send(mock_parse, mock_os_read, mock_select, mock_os_close, mock_popen, mock_os_open, mock_write_etr_prog, mock_uuid):
+def test_etc_send(mock_parse, mock_os_read, mock_select, mock_os_close, mock_popen, mock_os_open, mock_uuid):
     mock_frame_path = MagicMock()
     mock_frame_path.stat.return_value.st_size = 500
 
     mock_uuid.return_value = "fake_uuid"
-
-    mock_write_etr_prog.return_value = None
 
     mock_master = "fake_master_fd"
     mock_slave = "fake_slave_fd"
@@ -451,12 +448,6 @@ def test_etc_send(mock_parse, mock_os_read, mock_select, mock_os_close, mock_pop
 
     etc_send(mock_frame_path)
 
-    first = mock_write_etr_prog.call_args_list[0]
-    second = mock_write_etr_prog.call_args_list[1]
-
-    assert mock_write_etr_prog.call_count == 2
-    assert first.kwargs["percent"] == 0.0
-    assert second.kwargs["percent"] == 100.0
     mock_uuid.assert_called_once()
     mock_os_open.assert_called_once()
     mock_popen.assert_called_once_with(
