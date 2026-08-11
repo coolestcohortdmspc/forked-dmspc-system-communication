@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+import os
 import pytest
 from unittest.mock import patch, MagicMock
 from ngRadar_Website.enums import Stations
@@ -27,6 +28,7 @@ with patch("pathlib.Path.read_text", return_value=mock_env_data):
         bootstrap,
         consume,
         create_s3_client,
+        ensure_bucket_exists,
     )
 
 # ==============================================================================
@@ -282,7 +284,7 @@ def test_consume(mock_Consumer):
 @patch("ngRadar_Website.utils.boto3.client")
 @patch("ngRadar_Website.utils.ensure_bucket_exists")
 @patch("ngRadar_Website.utils.Config")
-def test_create_s3_client(mock_Config, mock_ensure_bucket, mock_boto3):
+def test_create_s3_client_success(mock_Config, mock_ensure_bucket, mock_boto3):
     """Scenario 1: s3 client is ready"""
     mock_s3 = MagicMock()
     mock_boto3.return_value = mock_s3
@@ -305,3 +307,96 @@ def test_create_s3_client(mock_Config, mock_ensure_bucket, mock_boto3):
                 config=config_value
     )
     mock_ensure_bucket.assert_called_once_with(mock_s3)
+
+
+@patch.dict(
+    "os.environ",
+    {
+        "WEED_S3_ENDPOINT": "fake_endpoint",
+        "WEED_S3_ACCESS_KEY": "fake_key",
+        "WEED_S3_SECRET_KEY": "fake_secret"
+    },
+)
+@patch("ngRadar_Website.utils.boto3.client")
+@patch("ngRadar_Website.utils.time.sleep")
+@patch("ngRadar_Website.utils.ensure_bucket_exists")
+@patch("ngRadar_Website.utils.Config")
+def test_create_s3_client_connection_error(mock_Config, mock_ensure_bucket, mock_sleep, mock_boto3):
+    """Scenario 2: connection error"""
+    mock_s3 = MagicMock()
+    mock_boto3.return_value = mock_s3
+    mock_s3.list_buckets.side_effect = EndpointConnectionError(endpoint_url=os.environ["WEED_S3_ENDPOINT"])
+
+    mock_ensure_bucket.return_value = None
+
+    config_value = "fake_config"
+    mock_Config.return_value = config_value
+
+    mock_sleep.return_value = None
+
+    with pytest.raises(RuntimeError) as exc_info:
+        s3_client = create_s3_client()
+
+    assert mock_sleep.call_count == 30
+    mock_boto3.assert_called_once_with(
+        "s3",
+        endpoint_url="fake_endpoint",
+        aws_access_key_id="fake_key",
+        aws_secret_access_key="fake_secret",
+        region_name="us-east-1",
+                config=config_value
+    )
+    mock_ensure_bucket.assert_not_called()
+    assert mock_s3.list_buckets.call_count == 30
+
+#NOTE: needs one more scenario for client error
+
+
+# ==============================================================================
+# 5. ensure_bucket_exists Test
+# ==============================================================================
+
+@patch.dict(
+    "os.environ",
+    {
+        "WEED_S3_BUCKET": "fake_bucket",
+    },
+)
+def test_ensure_bucket_exists():
+    """Scenario 1: bucket exists"""
+    mock_s3 = MagicMock()
+    mock_s3.head_bucket.return_value = {"Buckets": [{"Name": "fake_bucket"}]}
+
+    ensure_bucket_exists(mock_s3)
+
+    mock_s3.head_bucket.assert_called_once_with(Bucket="fake_bucket")
+    mock_s3.create_bucket.assert_not_called()
+
+
+@patch.dict(
+    "os.environ",
+    {
+        "WEED_S3_BUCKET": "fake_bucket",
+    },
+)
+def test_ensure_bucket_exists_created():
+    """Scenario 2: bucket needs to be created"""
+    mock_s3 = MagicMock()
+    mock_s3.head_bucket.side_effect = ClientError(
+        error_response={
+            "Error": {
+                "Code": "404",
+                "Message": "Not Found",
+            },
+            "ResponseMetadata": {
+                "HTTPStatusCode": 404,
+            },
+        },
+        operation_name="HeadBucket",
+    )
+    mock_s3.create_bucket.return_value = None
+
+    ensure_bucket_exists(mock_s3)
+
+    mock_s3.head_bucket.assert_called_once_with(Bucket="fake_bucket")
+    mock_s3.create_bucket.assert_called_once_with(Bucket="fake_bucket")
