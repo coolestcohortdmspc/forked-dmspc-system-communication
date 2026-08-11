@@ -29,6 +29,7 @@ with patch("pathlib.Path.read_text", return_value=mock_env_data):
         consume,
         create_s3_client,
         ensure_bucket_exists,
+        etc_send,
     )
 
 # ==============================================================================
@@ -400,3 +401,71 @@ def test_ensure_bucket_exists_created():
 
     mock_s3.head_bucket.assert_called_once_with(Bucket="fake_bucket")
     mock_s3.create_bucket.assert_called_once_with(Bucket="fake_bucket")
+
+
+# ==============================================================================
+# 5. etc_send Test
+# ==============================================================================
+
+@patch.dict(
+    "os.environ",
+    {
+        "ETD_DESTINATION": "fake_path",
+    },
+)
+@patch("ngRadar_Website.utils.uuid.uuid4")
+@patch("ngRadar_Website.utils.write_transfer_progress")
+@patch("ngRadar_Website.utils.os.openpty")
+@patch("ngRadar_Website.utils.subprocess.Popen")
+@patch("ngRadar_Website.utils.os.close")
+@patch("ngRadar_Website.utils.select.select")
+@patch("ngRadar_Website.utils.os.read")
+@patch("ngRadar_Website.utils.parse_etc_progress")
+def test_etc_send(mock_parse, mock_os_read, mock_select, mock_os_close, mock_popen, mock_os_open, mock_write_etr_prog, mock_uuid):
+    mock_frame_path = MagicMock()
+    mock_frame_path.stat.return_value.st_size = 500
+
+    mock_uuid.return_value = "fake_uuid"
+
+    mock_write_etr_prog.return_value = None
+
+    mock_master = "fake_master_fd"
+    mock_slave = "fake_slave_fd"
+    mock_os_open.return_value = (mock_master, mock_slave)
+
+    mock_process = MagicMock()
+    mock_popen.return_value = mock_process
+
+    mock_os_close.return_value = None
+
+    mock_select.return_value = ([mock_master], [], [])
+
+    mock_os_read.return_value = b"50% 250/500\r"
+
+    mock_parse.return_value = None
+
+    #only run through the while loop twice to avoid infinite loop in test:
+    mock_process.poll.side_effect = [None, 0]
+    mock_process.wait.return_value = 0
+    mock_process.args = ["etc", "fake_file"]
+
+    etc_send(mock_frame_path)
+
+    first = mock_write_etr_prog.call_args_list[0]
+    second = mock_write_etr_prog.call_args_list[1]
+
+    assert mock_write_etr_prog.call_count == 2
+    assert first.kwargs["percent"] == 0.0
+    assert second.kwargs["percent"] == 100.0
+    mock_uuid.assert_called_once()
+    mock_os_open.assert_called_once()
+    mock_popen.assert_called_once_with(
+        ["etc", str(mock_frame_path), os.environ["ETD_DESTINATION"], "--overwrite",],
+        stdin=mock_slave,
+        stdout=mock_slave,
+        stderr=mock_slave,
+        close_fds=True,
+    )
+    assert mock_os_close.call_count == 2
+    mock_os_read.assert_called_once_with(mock_master, 4096)
+    mock_parse.assert_called_once_with("50% 250/500", expected_num_bytes=500, transfer_id=mock_uuid.return_value)
