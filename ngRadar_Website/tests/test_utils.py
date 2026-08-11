@@ -2,6 +2,12 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from unittest.mock import patch, MagicMock
 from ngRadar_Website.enums import Stations
+from botocore.config import Config
+from botocore.exceptions import (
+    EndpointConnectionError,
+    ConnectionError,
+    ClientError,
+)
 
 
 # ===============================================
@@ -20,6 +26,7 @@ with patch("pathlib.Path.read_text", return_value=mock_env_data):
         config_func,
         bootstrap,
         consume,
+        create_s3_client,
     )
 
 # ==============================================================================
@@ -258,3 +265,43 @@ def test_consume(mock_Consumer):
     mock_Consumer.assert_called_once_with("config")
     mock_consumer.subscribe.assert_called_once_with("topic")
     mock_process_msg.assert_called_once_with(mock_msg, None, None)
+
+
+# ==============================================================================
+# 4. create_s3_client Test
+# ==============================================================================
+
+@patch.dict(
+    "os.environ",
+    {
+        "WEED_S3_ENDPOINT": "fake_endpoint",
+        "WEED_S3_ACCESS_KEY": "fake_key",
+        "WEED_S3_SECRET_KEY": "fake_secret"
+    },
+)
+@patch("ngRadar_Website.utils.boto3.client")
+@patch("ngRadar_Website.utils.ensure_bucket_exists")
+@patch("ngRadar_Website.utils.Config")
+def test_create_s3_client(mock_Config, mock_ensure_bucket, mock_boto3):
+    """Scenario 1: s3 client is ready"""
+    mock_s3 = MagicMock()
+    mock_boto3.return_value = mock_s3
+    mock_s3.list_buckets.return_value = {"Buckets": [{"Name": "fake_bucket"}]}
+
+    mock_ensure_bucket.return_value = None
+
+    config_value = "fake_config"
+    mock_Config.return_value = config_value
+
+    s3_client = create_s3_client()
+
+    assert s3_client == mock_s3
+    mock_boto3.assert_called_once_with(
+        "s3",
+        endpoint_url="fake_endpoint",
+        aws_access_key_id="fake_key",
+        aws_secret_access_key="fake_secret",
+        region_name="us-east-1",
+                config=config_value
+    )
+    mock_ensure_bucket.assert_called_once_with(mock_s3)
