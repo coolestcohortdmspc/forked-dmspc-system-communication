@@ -8,7 +8,7 @@ import json
 from django.http import StreamingHttpResponse, JsonResponse, HttpResponse, HttpResponseNotFound
 
 # serve_image imports
-from ngRadar_Website.utils import create_s3_client, bootstrap # , get_presigned_url
+from ngRadar_Website.utils import create_s3_client, bootstrap, write_transfer_progress # , get_presigned_url
 from ngRadar_Website.enums import Stations
 
 #libraries used for lock status
@@ -94,27 +94,82 @@ def get_dsoc_events():
 #     # this is the initial view to load the newObservation page
 #     return render(request, 'ngRadar_Website/newObservation.html')
 
-def get_Message_Latency():
-    #create empty arrays for message latency and time
-    message_latency_arr=[]
-    message_time_arr=[]
-    database_events = ObservatoryEvent.objects.order_by("-event_time")
-    latest_events = database_events[:RECORDS_TO_DISPLAY]
 
-    for object in latest_events: #loop will
-        unformatted_date_time = str(object.event_time)
-        formatted_date_time = unformatted_date_time[0:10], unformatted_date_time[11:19]#format the time in the views rather than in the front end
-        
-        # Prevent the tx off messages from being displayed since they do not have latency
-        if(str(object.tx_waveform)!= "Tx_OFF"):
-            message_latency_arr.append(str(round(object.latency_ms,3)))#round the latency to 3 decimal places
-            message_time_arr.append(formatted_date_time)
-    
+def get_Message_Latency():
+    database_events = (
+        ObservatoryEvent.objects
+        .exclude(tx_waveform="Tx_OFF")
+        .order_by("-event_time")[:RECORDS_TO_DISPLAY]
+    )
+
+    # so it will read left to right in the graph, we need to reverse the order of the events
+    latest_events = list(reversed(database_events))
+
+    latency_array = []
+    event_source_array = []
+    event_metadata_array = []
+
+    for event in latest_events:
+        latency_array.append(round(event.latency_ms, 3))
+
+
+        station_short = (
+            Stations(event.station).name
+            if event.station is not None
+            else "Unknown"
+        )
+
+        station_full = (
+            event.get_station_display()
+            if event.station is not None
+            else "Unknown"
+        )
+
+        event_source_array.append(station_short)
+
+        event_metadata_array.append({
+            "station": station_full,
+            "status": (
+                event.get_status_display()
+                if event.status is not None
+                else "-"
+            ),
+            "time": event.event_time.strftime("%Y-%m-%d %H:%M:%S"),
+            "object_id": event.object_id or "-",
+            "target": event.target or "-",
+        })
+
     data_to_send = {
-        "latency_array": message_latency_arr,
-        "time_sent_array": message_time_arr
+        "latency_array": latency_array,
+        "event_source_array": event_source_array,
+        "event_metadata_array": event_metadata_array,
     }
+
     yield f"data: {json.dumps(data_to_send)}\n\n"
+
+
+# def get_Message_Latency():
+#     #create empty arrays for message latency and time
+#     message_latency_arr=[]
+#     message_time_arr=[]
+#     database_events = ObservatoryEvent.objects.order_by("-event_time")
+#     latest_events = database_events[:RECORDS_TO_DISPLAY]
+
+#     for object in latest_events: #loop will
+#         unformatted_date_time = str(object.event_time)
+#         formatted_date_time = unformatted_date_time[0:10], unformatted_date_time[11:19]#format the time in the views rather than in the front end
+        
+#         # Prevent the tx off messages from being displayed since they do not have latency
+#         if(str(object.tx_waveform)!= "Tx_OFF"):
+#             message_latency_arr.append(str(round(object.latency_ms,3)))#round the latency to 3 decimal places
+#             message_time_arr.append(formatted_date_time)
+    
+#     data_to_send = {
+#         "latency_array": message_latency_arr,
+#         "time_sent_array": message_time_arr
+#     }
+#     yield f"data: {json.dumps(data_to_send)}\n\n"
+
 
 
 def latency_graphing(request):
@@ -208,6 +263,7 @@ def submit_waveform(request):
             key = uuid_input.hex  # Use the UUID as the key for the Kafka message
             value = json.dumps(message).encode("utf-8")
             produce(topic, config, key, value)
+            write_transfer_progress(received_bytes=0, total_bytes=0, percent=0.0, transfer_id=0)  # Reset the progress bar after sending the message
         main()
         
         # add a cache for submit time
