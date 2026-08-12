@@ -502,11 +502,6 @@ volumes:
   seaweed_data:
   # ngrok_env:
   dsoc_transfer:
-    driver: local
-    driver_opts: 
-      type: tmpfs
-      device: tmpfs
-      o: "size=${DSOC_VOLUME_SIZE}"
   vlba_data:
 
 networks:

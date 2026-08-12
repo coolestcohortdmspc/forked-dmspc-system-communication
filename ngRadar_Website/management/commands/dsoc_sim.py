@@ -13,7 +13,8 @@ import json
 import uuid
 import time
 from itertools import groupby
-
+import os
+import subprocess
 
 
 """
@@ -175,9 +176,37 @@ def record_transfer_event(
 def process_msg(msg, producer_topic=None, producer_config=None):
     match msg.key().decode("utf-8"):
         case Message.VLBA_REQUEST_STORAGE:
-            pass
+            # storage check logic
+            payload = json.loads(msg.value().decode("utf-8"))
+            
+            transfer_uuid = uuid.UUID(payload["transfer_uuid"])
+            gbt_uuid = uuid.UUID(payload["gbt_uuid"])
+            status = Status(payload["status"])
+            filename = payload.get("filename")
+            expected_num_bytes = payload.get("num_bytes", 0)
+            message = payload.get("message", "")
+
+            incoming_file = Path("/dsoc/incoming") / filename
+
+            volume_limit = os.envrion["DSOC_VOLUME_SIZE"]
+            storage_used = subprocess.run() #TODO script here to grab current size of dsoc/incoming folder
+
+            if storage_used+expected_num_bytes >= volume_limit-1:
+                # if the current storage plus the incoming file gets within 1GB of our imposed limit, we decline the e-transfer
+            
+                #TODO Send Kafka message saying No
+                pass
+
+            else:
+                #TODO Send Kafka message saying Yes
+                pass
+
+
         case Message.VLBA_TRANSFERRING:
+            #TODO write to progress.json logic
+
             pass
+
         case _:
             print("Invalid Kafka Message Key!")
     payload = json.loads(msg.value().decode("utf-8"))
@@ -190,14 +219,14 @@ def process_msg(msg, producer_topic=None, producer_config=None):
     message = payload.get("message", "")
     incoming_file = Path("/dsoc/incoming") / filename
 
-    record_transfer_event(
-        transfer_uuid=transfer_uuid,
-        gbt_uuid=gbt_uuid,
-        station=Stations.HN,
-        status=status,
-        num_bytes=expected_num_bytes,
-        message=message,
-    )
+    # record_transfer_event(
+    #     transfer_uuid=transfer_uuid,
+    #     gbt_uuid=gbt_uuid,
+    #     station=Stations.HN,
+    #     status=status,
+    #     num_bytes=expected_num_bytes,
+    #     message=message,
+    # )
 
     if status == Status.FAILED:
         return

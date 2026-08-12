@@ -101,6 +101,7 @@ def record_transfer_event(
 def process_msg(msg, producer_topic, producer_config):
     match msg.key().decode("utf-8"):
         case Message.GBT_TX:
+            print("Received Kafka message from GBT.")
             gbt_uuid = msg.value().decode("utf-8")
             transfer_uuid = uuid.uuid4()
         
@@ -111,18 +112,29 @@ def process_msg(msg, producer_topic, producer_config):
             watch_for_file(frame_path)
         
             # frame_path = Path("/service/mock_assets/large_data/old_aoc_data.large")
+            if frame_path.is_file():
+                num_bytes = frame_path.stat().st_size
         
-            record_transfer_event(
+                record_transfer_event(
+                        transfer_uuid=transfer_uuid,
+                        gbt_uuid=gbt_uuid,
+                        station=Stations.HN,
+                        status=Status.READY,
+                        num_bytes=0,
+                        message="Hancock VLBA data file complete. Ready for e-transfer.",
+                    )
+                send_kafka_message(
+                    producer_topic=producer_topic,
+                    producer_config=producer_config,
                     transfer_uuid=transfer_uuid,
                     gbt_uuid=gbt_uuid,
-                    station=Stations.HN,
                     status=Status.READY,
-                    num_bytes=0,
-                    message="Hancock VLBA data file complete. Ready for e-transfer.",
+                    num_bytes=num_bytes,
+                    filename=frame_path.name,
+                    message="U got storage??",
                 )
-        
-        
-            if not frame_path.is_file():
+
+            else:
                 send_kafka_message(
                     producer_topic=producer_topic,
                     producer_config=producer_config,
@@ -135,73 +147,72 @@ def process_msg(msg, producer_topic, producer_config):
                 )
                 return
         
-            num_bytes = frame_path.stat().st_size
         
-            try:
-                record_transfer_event(
-                    transfer_uuid=transfer_uuid,
-                    gbt_uuid=gbt_uuid,
-                    station=Stations.HN,
-                    status=Status.TRANSFERRING,
-                    num_bytes=num_bytes,
-                    message="Hancock VLBA e-transfer in progress",
-                )
-        
-                send_kafka_message(
-                    producer_topic=producer_topic,
-                    producer_config=producer_config,
-                    transfer_uuid=transfer_uuid,
-                    gbt_uuid=gbt_uuid,
-                    status=Status.READY,
-                    num_bytes=num_bytes,
-                    filename=frame_path.name,
-                    message="U got storage??",
-                )
-                
-                etc_send(frame_path)
-            except subprocess.CalledProcessError as exc:
-                send_kafka_message(
-                    producer_topic=producer_topic,
-                    producer_config=producer_config,
-                    transfer_uuid=transfer_uuid,
-                    gbt_uuid=gbt_uuid,
-                    status=Status.FAILED,
-                    num_bytes=num_bytes,
-                    filename=frame_path.name,
-                    message=(
-                        "E-transfer failed with return code: "
-                        f"{exc.returncode}"
-                    ),
-                )
-                return
-            except Exception as exc:
-                send_kafka_message(
-                    producer_topic=producer_topic,
-                    producer_config=producer_config,
-                    transfer_uuid=transfer_uuid,
-                    gbt_uuid=gbt_uuid,
-                    status=Status.FAILED,
-                    num_bytes=num_bytes,
-                    filename=frame_path.name,
-                    message=f"Unexpected e-transfer failure: {exc}",
-                )
-                return
         case Message.DSOC_RESPOND_STORAGE:
             print("Received DSOC's storage check response!")
             payload = json.loads(msg.value().decode("utf-8"))
             if payload["Message"] == "Yes":
-                send_kafka_message(
-                    producer_topic=producer_topic,
-                    producer_config=producer_config,
-                    transfer_uuid=transfer_uuid,
-                    gbt_uuid=gbt_uuid,
-                    status=Status.TRANSFERRING,
-                    num_bytes=num_bytes,
-                    filename=frame_path.name,
-                    message="Hancock VLBA has started to send the data file to DSOC via e-transfer",
-                )
+
+                try:
+                    record_transfer_event(
+                        transfer_uuid=transfer_uuid,
+                        gbt_uuid=gbt_uuid,
+                        station=Stations.HN,
+                        status=Status.TRANSFERRING,
+                        num_bytes=num_bytes,
+                        message="Hancock VLBA e-transfer in progress",
+                    )
+            
+                    send_kafka_message(
+                        producer_topic=producer_topic,
+                        producer_config=producer_config,
+                        transfer_uuid=transfer_uuid,
+                        gbt_uuid=gbt_uuid,
+                        status=Status.TRANSFERRING,
+                        num_bytes=num_bytes,
+                        filename=frame_path.name,
+                        message="Hancock VLBA has started to send the data file to DSOC via e-transfer",
+                    )
+                    
+                    etc_send(frame_path)
+    
+                #NOTE: Figure out how dsoc will handle the exceptions below. It will have already received a message saying Transferring, and it will receive a second message saying Failed if the excptions below are triggered.
+    
+                except subprocess.CalledProcessError as exc:
+                    print(f"E-transfer failed with return code: {exc.returncode}")
+                    # send_kafka_message(
+                    #     producer_topic=producer_topic,
+                    #     producer_config=producer_config,
+                    #     transfer_uuid=transfer_uuid,
+                    #     gbt_uuid=gbt_uuid,
+                    #     status=Status.FAILED,
+                    #     num_bytes=num_bytes,
+                    #     filename=frame_path.name,
+                    #     message=(
+                    #         "E-transfer failed with return code: "
+                    #         f"{exc.returncode}"
+                    #     ),
+                    # )
+                    return
+                except Exception as exc:
+                    print(f"Unexpected e-transfer failure: {exc}")
+                    # send_kafka_message(
+                    #     producer_topic=producer_topic,
+                    #     producer_config=producer_config,
+                    #     transfer_uuid=transfer_uuid,
+                    #     gbt_uuid=gbt_uuid,
+                    #     status=Status.FAILED,
+                    #     num_bytes=num_bytes,
+                    #     filename=frame_path.name,
+                    #     message=f"Unexpected e-transfer failure: {exc}",
+                    # )
+                    return
+    
+
             else:  # No
+                
                 pass
+
         case Message.VLBA_DELETE:
             print("Deleting raw data now!")
         case _:
