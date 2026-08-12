@@ -1,7 +1,9 @@
-<div class="Live_Latency_Graph" style="display:flex; justify-content:center; align-items:center;">
+<div class="Live_Latency_Graph" style="display:flex; justify-content:center; align-items:center">
     <title>Live Graph</title>
+    <!-- Add JS Charts and Annotations Library -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <canvas id="LatencyChart" width="1000" height="500"></canvas>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+    <canvas id="LatencyChart" width="1000" height="540"></canvas>
     <style>
         #LatencyChart {
             background: #ffffff;
@@ -11,6 +13,7 @@
             padding-bottom: 20px;
         }
     </style>
+    <!-- URL to views file still needs to be inside HTML for graph data to transmit -->
     <script>
         window.Latency_SSE_URL = "{% url 'latency_graphing' %}"
     </script>

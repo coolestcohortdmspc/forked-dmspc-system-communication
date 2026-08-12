@@ -17,6 +17,13 @@ const ctx = document.getElementById('LatencyChart').getContext('2d');
 
             options: {
                 responsive: false,
+                clip: false,
+
+                  layout: {
+                    padding: {
+                    bottom: 20
+                    }
+                },
 
                 plugins: {
                     legend: {
@@ -57,6 +64,49 @@ const ctx = document.getElementById('LatencyChart').getContext('2d');
                                 ];
                             }
                         }
+                    },
+                    annotation: {
+                        annotations: {
+                            newestMessageLabel: {
+                                type: 'label',
+
+                                xScaleID: 'x',
+                                yScaleID: 'x',
+
+                                xValue: 0,
+                                yValue: 0,
+
+                                //Adjust label position
+                                xAdjust: 890,
+                                yAdjust: 440,
+
+                                content: ['Newest', 'Message'],
+                                backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                                color: '#000',
+                                font: { size: 12 },
+
+                                textAlign: 'center'
+                            },
+                            oldestMessageLabel: {
+                                type: 'label',
+
+                                xScaleID: 'x',
+                                yScaleID: 'x',
+
+                                xValue: 0,
+                                yValue: 0,
+
+                                xAdjust: 0,
+                                yAdjust: 440,
+
+                                content: ['Oldest', 'Message'],
+                                backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                                color: '#000000',
+                                font: { size: 12 },
+
+                                textAlign: 'center'
+                            },
+                        }
                     }
                 },
 
@@ -64,7 +114,7 @@ const ctx = document.getElementById('LatencyChart').getContext('2d');
                     x: {
                         title: {
                             display: true,
-                            text: 'Event Source',
+                            text: 'Event Source and Time Received',
                             font: { size: 14 },
                             color: '#000'
                         },
