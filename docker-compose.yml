@@ -506,7 +506,7 @@ volumes:
     driver_opts: 
       type: tmpfs
       device: tmpfs
-      o: "size=5g"
+      o: "size=${DSOC_VOLUME_SIZE}"
   vlba_data:
 
 networks:
