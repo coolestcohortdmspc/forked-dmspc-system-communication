@@ -523,3 +523,12 @@ def watch_for_file(file_path):
             break
 
         time.sleep(1)
+
+
+def delete_observation_data(file_name):
+    file_path = Path("/raw_data") / file_name
+    if os.path.exists(file_path):
+        os.remove(file_path)
+        print(f"Successfully deleted {file_name}")
+    else:
+        print(f"File {file_name} does not exists")

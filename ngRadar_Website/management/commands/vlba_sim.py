@@ -203,7 +203,9 @@ def process_msg(msg, producer_topic, producer_config):
             else:  # No
                 pass
         case Message.VLBA_DELETE:
-            print("Deleting raw data now!")
+            payload = json.loads(msg.value().decode("utf-8"))
+            file_name = payload["filename"]
+            delete_observation_data(file_name)
         case _:
             print("NOT A VALID KAFKA MESSAGE VALUE!")
 
