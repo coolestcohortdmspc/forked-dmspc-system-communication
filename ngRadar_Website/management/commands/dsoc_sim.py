@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 import uuid
 from django.core.management.base import BaseCommand
+from confluent_kafka import Producer
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
@@ -25,6 +26,19 @@ This code will:
 - save image file to seaweedfs object store
 - load the image key + the uuid into the DB
 """
+
+
+def produce(topic, config, key, value):
+    # creates a new producer instance
+    producer = Producer(config)
+
+    # producing a message to the specified topic 
+    producer.produce(topic, key=key, value=value)
+    print(f"Produced message to topic {topic} with key {key}.")
+
+    # send any outstanding or buffered messages to the Kafka broker
+    producer.flush()
+
 
 def DB_import(uuid):
     
@@ -338,6 +352,13 @@ def process_msg(msg, producer_topic=None, producer_config=None):
         latency_ms=dsoc_latency,
         message="DSOC has verified etransfer, image generated, and image stored.",
     )
+    
+    produce(
+        producer_topic,
+        producer_config,
+        Message.VLBA_DELETE,
+        transfer_uuid
+    )
 
 
 class Command(BaseCommand):
@@ -346,6 +367,6 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         print("Starting DSOC simulator")
 
-        topic, config = bootstrap(Stations.DSOC)
+        topic, config, producer_topic, producer_config = bootstrap(Stations.DSOC)
 
-        consume(topic, config, process_msg)
+        consume(topic, config, process_msg, producer_topic, producer_config)
