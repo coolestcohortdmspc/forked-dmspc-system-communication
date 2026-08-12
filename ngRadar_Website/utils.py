@@ -20,6 +20,7 @@ from botocore.exceptions import (
     ClientError,
 )
 from pathlib import Path
+from confluent_kafka import Producer
 
 # regex patterns to match the progress output of the etc command
 PROGRESS_RE = re.compile(
@@ -528,3 +529,15 @@ def watch_for_file(file_path):
         time.sleep(1)
 
     # TODO SET ETRANSFER TO READY AND GIVE IT THIS FILE PATH
+
+
+def produce(topic, config, key, value):
+    # creates a new producer instance
+    producer = Producer(config)
+
+    # producing a message to the specified topic 
+    producer.produce(topic, key=key, value=value)
+    print(f"Produced message to topic {topic} with key {key}.")
+
+    # send any outstanding or buffered messages to the Kafka broker
+    producer.flush()

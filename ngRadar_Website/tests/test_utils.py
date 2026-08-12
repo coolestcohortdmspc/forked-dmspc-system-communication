@@ -31,6 +31,7 @@ with patch("pathlib.Path.read_text", return_value=mock_env_data):
         ensure_bucket_exists,
         etc_send,
         watch_for_file,
+        produce,
     )
 
 # ==============================================================================
@@ -500,3 +501,23 @@ def test_watch_for_file(mock_sleep, mock_subprocess):
     assert mock_subprocess.call_count == 2
     assert first.kwargs["capture_output"] == True
     assert second.kwargs["capture_output"] == True
+
+
+# ==============================================================================
+# 6. produce Test
+# ==============================================================================
+
+@patch("ngRadar_Website.utils.Producer")
+def test_produce(mock_Producer):
+    topic = "topic"
+    config = "config"
+    key = "key"
+    value = "value"
+    
+    mock_producer = mock_Producer.return_value
+
+    produce(topic, config, key, value)
+
+    mock_Producer.assert_called_once_with(config)
+    mock_producer.produce.assert_called_once_with(topic, key=key, value=value)
+    mock_producer.flush.assert_called_once_with()

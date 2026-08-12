@@ -8,7 +8,7 @@ from ngRadar_Website.models.models import uiEvent
 from ngRadar_Website.models.models import gbtEvent
 # from dotenv import find_dotenv
 from pathlib import Path
-from ngRadar_Website.utils import latency_calc, bootstrap, consume
+from ngRadar_Website.utils import latency_calc, bootstrap, consume, produce
 
 
 # payload that will be inserted in the gbtEvent db table
@@ -59,18 +59,6 @@ def publish_to_db(payload):
     gbt_event = gbtEvent.objects.create(**payload)
 
     return gbt_event.uuid
-
-
-def produce(topic, config, key, value):
-    # creates a new producer instance
-    producer = Producer(config)
-
-    # producing a message to the specified topic 
-    producer.produce(topic, key=key, value=value)
-    print(f"Produced message to topic {topic} with key {key}.")
-
-    # send any outstanding or buffered messages to the Kafka broker
-    producer.flush()
 
 
 def process_msg(msg, producer_topic, producer_config):

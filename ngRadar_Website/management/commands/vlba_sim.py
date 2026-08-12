@@ -3,8 +3,7 @@ import subprocess
 import uuid
 
 from django.core.management.base import BaseCommand
-from confluent_kafka import Producer
-from ngRadar_Website.utils import bootstrap, consume, etc_send, create_file, watch_for_file
+from ngRadar_Website.utils import bootstrap, consume, etc_send, create_file, watch_for_file, produce
 from ngRadar_Website.enums import Stations, Status
 from ngRadar_Website.enums import Stations, Status
 from pathlib import Path
@@ -26,18 +25,6 @@ Note: I am going to treat this sim as the Hancock VLBA site (Stations.HN) for ha
     Stations enum: HN  = 91, "Hancock (25-m, VLBA)"
 
 """
-
-
-def produce(topic, config, key, value):
-    # creates a new producer instance
-    producer = Producer(config)
-
-    # producing a message to the specified topic 
-    producer.produce(topic, key=key, value=value)
-    print(f"Produced message to topic {topic} with key {key}.")
-
-    # send any outstanding or buffered messages to the Kafka broker
-    producer.flush()
 
 
 def send_kafka_message(
