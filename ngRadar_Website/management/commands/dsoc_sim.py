@@ -187,7 +187,7 @@ def record_transfer_event(
     
 
 
-def process_msg(msg, producer_topic=None, producer_config=None):
+def process_msg(msg, producer_topic, producer_config):
     match msg.key().decode("utf-8"):
         case Message.VLBA_REQUEST_STORAGE:
             # storage check logic
@@ -205,15 +205,43 @@ def process_msg(msg, producer_topic=None, producer_config=None):
             volume_limit = os.envrion["DSOC_VOLUME_SIZE"]
             storage_used = subprocess.run() #TODO script here to grab current size of dsoc/incoming folder
 
+            key = str(transfer_uuid)
+
             if storage_used+expected_num_bytes >= volume_limit-1:
                 # if the current storage plus the incoming file gets within 1GB of our imposed limit, we decline the e-transfer
             
-                #TODO Send Kafka message saying No
-                pass
+                value = json.dumps(
+                    {
+                        "transfer_uuid": str(transfer_uuid),
+                        "gbt_uuid": str(gbt_uuid),
+                        "event_time": datetime.now(timezone.utc).isoformat(),
+                        "filename": filename, #NOTE make sure VLBA reads this as a path. It's currently a string
+                        "message": "No",
+                    }
+                )
+                produce(
+                    producer_topic,
+                    producer_config,
+                    key,
+                    value,
+                )
 
             else:
-                #TODO Send Kafka message saying Yes
-                pass
+                value = json.dumps(
+                    {
+                        "transfer_uuid": str(transfer_uuid),
+                        "gbt_uuid": str(gbt_uuid),
+                        "event_time": datetime.now(timezone.utc).isoformat(),
+                        "filename": filename, #NOTE make sure VLBA reads this as a path. It's currently a string
+                        "message": "Yes",
+                    }
+                )
+                produce(
+                    producer_topic,
+                    producer_config,
+                    key,
+                    value,
+                )
 
 
         case Message.VLBA_TRANSFERRING:
@@ -367,6 +395,6 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         print("Starting DSOC simulator")
 
-        topic, config, producer_topic, producer_config = bootstrap(Stations.DSOC)
+        consumer_topic, consumer_config, producer_topic, producer_config = bootstrap(Stations.DSOC)
 
-        consume(topic, config, process_msg, producer_topic, producer_config)
+        consume(consumer_topic, consumer_config, process_msg, producer_topic=producer_topic, producer_config=producer_config)

@@ -151,7 +151,7 @@ def process_msg(msg, producer_topic, producer_config):
         case Message.DSOC_RESPOND_STORAGE:
             print("Received DSOC's storage check response!")
             payload = json.loads(msg.value().decode("utf-8"))
-            if payload["Message"] == "Yes":
+            if payload["message"] == "Yes":
 
                 try:
                     record_transfer_event(
