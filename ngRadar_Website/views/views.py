@@ -11,7 +11,7 @@ from django.http import StreamingHttpResponse, JsonResponse, HttpResponse, HttpR
 
 # serve_image imports
 from ngRadar_Website.utils import create_s3_client, bootstrap, write_transfer_progress # , get_presigned_url
-from ngRadar_Website.enums import Stations
+from ngRadar_Website.enums import Stations, Message
 
 #libraries used for lock status
 from django.core.cache import cache
@@ -253,7 +253,7 @@ def submit_waveform(request):
         #     "bootstrap.servers": bootstrap,
         #     "message.max.bytes": 8388608,
         #     "client.id": "ui-producer"}
-        message = "User input a new waveform."
+        # message = "User input a new waveform."
 
         def produce(topic, config, key, value):
             producer = Producer(config)
@@ -262,8 +262,8 @@ def submit_waveform(request):
             producer.flush()
 
         def main():
-            key = uuid_input.hex  # Use the UUID as the key for the Kafka message
-            value = json.dumps(message).encode("utf-8")
+            key = Message.UI_EVENT
+            value = uuid_input.hex  # Use the UUID as the value for the Kafka message
             produce(topic, config, key, value)
             write_transfer_progress(received_bytes=0, total_bytes=0, percent=0.0, transfer_id=0)  # Reset the progress bar after sending the message
         main()
@@ -276,35 +276,6 @@ def submit_waveform(request):
 #====================================================
 # Render the templates
 #====================================================
-
-
-# @cache_control(no_cache=True, must_revalidate=True, no_store=True, max_age=0) #Desmond's Auth token fix - comment if we decide not to use
-# def login_view(request):
-#     #logout_view(request)
-    
-#     if(request.user.is_authenticated):#will log the user out if they come to the login page and are still logged in
-#         return logout_view(request)#goes to logout message
-
-
-#     if request.method == 'POST':
-#         username_input = request.POST['username']
-#         password_input = request.POST['password']
-        
-#         # This automatically uses the Argon2 settings to verify the password string
-#         user = authenticate(request, username=username_input, password=password_input)
-        
-#         if user is not None:
-#             login(request, user)
-#             return redirect('home')
-#         else:
-#             messages.error(request, "Invalid username or password.")
-#             return render(request, 'registration/login.html')
-        
-#     # Tung's auth token fix - uncomment if we decide to use this
-#     # response = render(request, 'registration/login.html')
-#     # response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-
-#     return render(request, 'registration/login.html')
 
 @cache_control(
     no_cache=True,

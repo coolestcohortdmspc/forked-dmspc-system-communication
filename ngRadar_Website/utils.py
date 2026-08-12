@@ -65,20 +65,20 @@ def config_func(sim, bootstrap):
     """
 
     # determine the type of sim being used - each one has unique kafka topics:
-    if sim in [Stations.GBT, Stations.HN]:
+    if sim in [Stations.GBT, Stations.HN, Stations.DSOC]:
         type = "producer and consumer"
         if sim == Stations.GBT:
             # GBT consumes from UI, produces to GBT
-            topic1 = "user_input"
+            topic1 = ["user_input"]
             topic2 = "GBT_data"
-        else:
-            # VLBA consumes from GBT, produces to VLBA
-            topic1 = "GBT_data"
-            topic2 = "VLBA_data"
-    elif sim == Stations.DSOC:
-        # DSOC is now consuming from VLBA
-        type = "consumer"
-        topic = ["VLBA_data"]  #consumes from the GBT's topic
+        elif sim == Stations.HN:
+            # VLBA consumes from GBT and DSOC, produces to DSOC
+            topic1 = ["GBT_data", "DSOC_notif"]
+            topic2 = "VLBA_notif"
+        elif sim == Stations.DSOC:
+            # DSOC is now consuming from and producing to VLBA
+            topic1 = ["VLBA_notif"]  #consumes from the GBT's topic
+            topic2 = "DSOC_notif"
     elif sim == Stations.ETR:
         type = "consumer"
         topic = ["GBT_data"]
@@ -116,7 +116,7 @@ def config_func(sim, bootstrap):
             "client.id": f"{sim.name.lower()}-producer",
         }
 
-        consumer_topic = [topic1]
+        consumer_topic = topic1
         consumer_config = {
             "bootstrap.servers": bootstrap,
             "fetch.max.bytes": MAX_BYTES,
@@ -124,7 +124,7 @@ def config_func(sim, bootstrap):
             "client.id": f"{sim.name.lower()}-consumer",
             "group.id": f"{sim.name.lower()}-consumer-group",
             "auto.offset.reset": "earliest",
-        }
+        }  # TODO make sure this works
         return producer_topic, producer_config, consumer_topic, consumer_config
     elif type == "consumer":
         # config for just consumer
@@ -199,6 +199,7 @@ def consume(topic, config, process_msg, producer_topic=None, producer_config=Non
 
     #subscribes to the specified topic
     consumer.subscribe(topic)
+    # TODO make sure works with multiple topics
     
     try:
         while True:
@@ -522,5 +523,3 @@ def watch_for_file(file_path):
             break
 
         time.sleep(1)
-
-    # TODO SET ETRANSFER TO READY AND GIVE IT THIS FILE PATH

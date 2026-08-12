@@ -4,9 +4,8 @@ import uuid
 
 from django.core.management.base import BaseCommand
 from confluent_kafka import Producer
-from ngRadar_Website.utils import bootstrap, consume, etc_send, create_file, watch_for_file
-from ngRadar_Website.enums import Stations, Status
-from ngRadar_Website.enums import Stations, Status
+from ngRadar_Website.utils import bootstrap, consume, etc_send, create_file, watch_for_file, delete_observation_data
+from ngRadar_Website.enums import Stations, Status, Message
 from pathlib import Path
 from django.utils import timezone
 from ngRadar_Website.models.models import gbtEvent, ETransferEvent
@@ -100,91 +99,113 @@ def record_transfer_event(
 
 
 def process_msg(msg, producer_topic, producer_config):
-    gbt_uuid = msg.key().decode("utf-8")
-    transfer_uuid = uuid.uuid4()
-
-    frame_path = Path("/raw_data") / f"{transfer_uuid}.bin"
-
-    Thread(target=create_file, args=(frame_path,), daemon=True).start()
-
-    watch_for_file(frame_path)
-
-    # frame_path = Path("/service/mock_assets/large_data/old_aoc_data.large")
-
-    record_transfer_event(
-            transfer_uuid=transfer_uuid,
-            gbt_uuid=gbt_uuid,
-            station=Stations.HN,
-            status=Status.READY,
-            num_bytes=0,
-            message="Hancock VLBA data file complete. Ready for e-transfer.",
-        )
-
-
-    if not frame_path.is_file():
-        send_kafka_message(
-            producer_topic=producer_topic,
-            producer_config=producer_config,
-            transfer_uuid=transfer_uuid,
-            gbt_uuid=gbt_uuid,
-            status=Status.FAILED,
-            num_bytes=0,
-            filename=frame_path.name,
-            message="Source file does not exist",
-        )
-        return
-
-    num_bytes = frame_path.stat().st_size
-
-    try:
-        record_transfer_event(
-                transfer_uuid=transfer_uuid,
-                gbt_uuid=gbt_uuid,
-                station=Stations.HN,
-                status=Status.TRANSFERRING,
-                num_bytes=num_bytes,
-                message="Hancock VLBA e-transfer in progress",
-            )
-        etc_send(frame_path)
-    except subprocess.CalledProcessError as exc:
-        send_kafka_message(
-            producer_topic=producer_topic,
-            producer_config=producer_config,
-            transfer_uuid=transfer_uuid,
-            gbt_uuid=gbt_uuid,
-            status=Status.FAILED,
-            num_bytes=num_bytes,
-            filename=frame_path.name,
-            message=(
-                "E-transfer failed with return code: "
-                f"{exc.returncode}"
-            ),
-        )
-        return
-    except Exception as exc:
-        send_kafka_message(
-            producer_topic=producer_topic,
-            producer_config=producer_config,
-            transfer_uuid=transfer_uuid,
-            gbt_uuid=gbt_uuid,
-            status=Status.FAILED,
-            num_bytes=num_bytes,
-            filename=frame_path.name,
-            message=f"Unexpected e-transfer failure: {exc}",
-        )
-        return
-
-
-    send_kafka_message(
-        producer_topic=producer_topic,
-        producer_config=producer_config,
-        transfer_uuid=transfer_uuid,
-        gbt_uuid=gbt_uuid,
-        status=Status.TRANSFERRED,
-        num_bytes=num_bytes,
-        filename=frame_path.name,
-        message="Hancock VLBA has sent data file to DSOC via e-transfer successfully",
-    )
+    match msg.key().decode("utf-8"):
+        case Message.GBT_TX:
+            gbt_uuid = msg.value().decode("utf-8")
+            transfer_uuid = uuid.uuid4()
+        
+            frame_path = Path("/raw_data") / f"{transfer_uuid}.bin"
+        
+            Thread(target=create_file, args=(frame_path,), daemon=True).start()
+        
+            watch_for_file(frame_path)
+        
+            # frame_path = Path("/service/mock_assets/large_data/old_aoc_data.large")
+        
+            record_transfer_event(
+                    transfer_uuid=transfer_uuid,
+                    gbt_uuid=gbt_uuid,
+                    station=Stations.HN,
+                    status=Status.READY,
+                    num_bytes=0,
+                    message="Hancock VLBA data file complete. Ready for e-transfer.",
+                )
+        
+        
+            if not frame_path.is_file():
+                send_kafka_message(
+                    producer_topic=producer_topic,
+                    producer_config=producer_config,
+                    transfer_uuid=transfer_uuid,
+                    gbt_uuid=gbt_uuid,
+                    status=Status.FAILED,
+                    num_bytes=0,
+                    filename=frame_path.name,
+                    message="Source file does not exist",
+                )
+                return
+        
+            num_bytes = frame_path.stat().st_size
+        
+            try:
+                record_transfer_event(
+                    transfer_uuid=transfer_uuid,
+                    gbt_uuid=gbt_uuid,
+                    station=Stations.HN,
+                    status=Status.TRANSFERRING,
+                    num_bytes=num_bytes,
+                    message="Hancock VLBA e-transfer in progress",
+                )
+        
+                send_kafka_message(
+                    producer_topic=producer_topic,
+                    producer_config=producer_config,
+                    transfer_uuid=transfer_uuid,
+                    gbt_uuid=gbt_uuid,
+                    status=Status.READY,
+                    num_bytes=num_bytes,
+                    filename=frame_path.name,
+                    message="U got storage??",
+                )
+                
+                etc_send(frame_path)
+            except subprocess.CalledProcessError as exc:
+                send_kafka_message(
+                    producer_topic=producer_topic,
+                    producer_config=producer_config,
+                    transfer_uuid=transfer_uuid,
+                    gbt_uuid=gbt_uuid,
+                    status=Status.FAILED,
+                    num_bytes=num_bytes,
+                    filename=frame_path.name,
+                    message=(
+                        "E-transfer failed with return code: "
+                        f"{exc.returncode}"
+                    ),
+                )
+                return
+            except Exception as exc:
+                send_kafka_message(
+                    producer_topic=producer_topic,
+                    producer_config=producer_config,
+                    transfer_uuid=transfer_uuid,
+                    gbt_uuid=gbt_uuid,
+                    status=Status.FAILED,
+                    num_bytes=num_bytes,
+                    filename=frame_path.name,
+                    message=f"Unexpected e-transfer failure: {exc}",
+                )
+                return
+        case Message.DSOC_RESPOND_STORAGE:
+            print("Received DSOC's storage check response!")
+            payload = json.loads(msg.value().decode("utf-8"))
+            if payload["Message"] == "Yes":
+                send_kafka_message(
+                    producer_topic=producer_topic,
+                    producer_config=producer_config,
+                    transfer_uuid=transfer_uuid,
+                    gbt_uuid=gbt_uuid,
+                    status=Status.TRANSFERRING,
+                    num_bytes=num_bytes,
+                    filename=frame_path.name,
+                    message="Hancock VLBA has started to send the data file to DSOC via e-transfer",
+                )
+            else:  # No
+                pass
+        case Message.VLBA_DELETE:
+            print("Deleting raw data now!")
+        case _:
+            print("NOT A VALID KAFKA MESSAGE VALUE!")
 
 
 class Command(BaseCommand):
