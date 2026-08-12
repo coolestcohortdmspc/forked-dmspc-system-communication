@@ -1,7 +1,9 @@
-from django.shortcuts import redirect, render, get_object_or_404
+# auth imports
+from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
+from django.shortcuts import redirect, render, get_object_or_404
 from django.views.decorators.cache import cache_control
-from django.views.decorators.http import require_GET
+from django.views.decorators.http import require_POST, require_GET
 
 #libraries used for data streaming
 import json
@@ -276,44 +278,73 @@ def submit_waveform(request):
 #====================================================
 
 
-@cache_control(no_cache=True, must_revalidate=True, no_store=True, max_age=0) #Desmond's Auth token fix - comment if we decide not to use
-def login_view(request):
-    #logout_view(request)
+# @cache_control(no_cache=True, must_revalidate=True, no_store=True, max_age=0) #Desmond's Auth token fix - comment if we decide not to use
+# def login_view(request):
+#     #logout_view(request)
     
-    if(request.user.is_authenticated):#will log the user out if they come to the login page and are still logged in
-        return logout_view(request)#goes to logout message
+#     if(request.user.is_authenticated):#will log the user out if they come to the login page and are still logged in
+#         return logout_view(request)#goes to logout message
 
 
-    if request.method == 'POST':
-        username_input = request.POST['username']
-        password_input = request.POST['password']
+#     if request.method == 'POST':
+#         username_input = request.POST['username']
+#         password_input = request.POST['password']
         
-        # This automatically uses the Argon2 settings to verify the password string
-        user = authenticate(request, username=username_input, password=password_input)
+#         # This automatically uses the Argon2 settings to verify the password string
+#         user = authenticate(request, username=username_input, password=password_input)
         
+#         if user is not None:
+#             login(request, user)
+#             return redirect('home')
+#         else:
+#             messages.error(request, "Invalid username or password.")
+#             return render(request, 'registration/login.html')
+        
+#     # Tung's auth token fix - uncomment if we decide to use this
+#     # response = render(request, 'registration/login.html')
+#     # response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+
+#     return render(request, 'registration/login.html')
+
+@cache_control(
+    no_cache=True,
+    must_revalidate=True,
+    no_store=True,
+    max_age=0,
+)
+def login_view(request):
+    if request.user.is_authenticated:
+        return redirect("home")
+
+    if request.method == "POST":
+        username_input = request.POST["username"]
+        password_input = request.POST["password"]
+
+        user = authenticate(
+            request,
+            username=username_input,
+            password=password_input,
+        )
+
         if user is not None:
             login(request, user)
-            return redirect('home')
-        else:
-            messages.error(request, "Invalid username or password.")
-            return render(request, 'registration/login.html')
-        
-    # Tung's auth token fix - uncomment if we decide to use this
-    # response = render(request, 'registration/login.html')
-    # response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+            return redirect("home")
 
-    return render(request, 'registration/login.html')
+        messages.error(
+            request,
+            "Invalid username or password.",
+        )
 
-#@cache_control(no_cache=True, must_revalidate=True, no_store=True, max_age=0)
+    return render(
+        request,
+        "registration/login.html",
+    )
+
+
+@require_POST
 def logout_view(request):
     logout(request)
-    response = logging_out_message(request)
-    return response
-
-
-#@cache_control(no_cache=True, must_revalidate=True, no_store=True, max_age=0)
-def logging_out_message(request):
-    return render(request, 'ngRadar_Website/partials/log_out_partial.html')
+    return redirect("login")
 
 
 @cache_control(no_cache=True, must_revalidate=True, no_store=True, max_age=0)
@@ -334,6 +365,7 @@ def dashboard_view(request):
     return response
 
 
+@login_required
 def event_table_partial(request):
     # this is the partial template view for updating the observatory events table
     return render(
@@ -343,6 +375,7 @@ def event_table_partial(request):
     )
 
 
+@login_required
 def status_partial(request):
     # this is the partial template view for the status box on the home page
 
@@ -353,6 +386,7 @@ def status_partial(request):
     )
 
 
+@login_required
 def dsoc_event_partial(request):
     # this is the partial template view for latest dsoc event image on home page
 
@@ -364,6 +398,7 @@ def dsoc_event_partial(request):
     )
 
 
+@login_required
 def gbt_event_partial(request):
     # this is the partial template view for latest gbt event data on home page
     return render(
@@ -375,6 +410,7 @@ def gbt_event_partial(request):
 
 PROGRESS_JSON_PATH = "/service/mock_assets/progress.json"  # <-- endpoint to stream to front end for progress bar. progress.json is updated by etc_send() while the VLBA e-transfer is occurring.
 
+@login_required
 @require_GET
 def progress_sse(request):
     if not os.path.exists(PROGRESS_JSON_PATH):
