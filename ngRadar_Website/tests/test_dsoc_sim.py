@@ -319,11 +319,7 @@ def test_process_msg(mock_publish_DB,
 
     mock_latency_calc.return_value = 1000
     
-    data = {
-        "event_time": datetime(2026, 7, 16, 12, 0, 0, tzinfo=timezone.utc),
-        "object_id": gbt_data[0],
-        "target": gbt_data[1],
-    }
+    data = MagicMock()
     mock_DB_columns.return_value = data
 
     img_file = b"bytes"

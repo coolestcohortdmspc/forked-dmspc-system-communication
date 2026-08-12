@@ -30,6 +30,7 @@ with patch("pathlib.Path.read_text", return_value=mock_env_data):
         create_s3_client,
         ensure_bucket_exists,
         etc_send,
+        watch_for_file,
     )
 
 # ==============================================================================
@@ -460,3 +461,32 @@ def test_etc_send(mock_parse, mock_os_read, mock_select, mock_os_close, mock_pop
     assert mock_os_close.call_count == 2
     mock_os_read.assert_called_once_with(mock_master, 4096)
     mock_parse.assert_called_once_with("50% 250/500", expected_num_bytes=500, transfer_id=mock_uuid.return_value)
+
+
+# ==============================================================================
+# 5. watch_for_file Test
+# ==============================================================================
+
+@patch("ngRadar_Website.utils.subprocess.run")
+@patch("ngRadar_Website.utils.time.sleep")
+def test_watch_for_file(mock_sleep, mock_subprocess):
+    file_path = "filepath"
+
+    first_result = MagicMock()
+    first_result.stdout = "exists"
+    second_result = MagicMock()
+    second_result.stdout = ""
+
+    mock_subprocess.side_effect = [first_result, second_result]
+
+    mock_sleep.return_value = None
+
+    watch_for_file(file_path)
+
+    first = mock_subprocess.call_args_list[0]
+    second = mock_subprocess.call_args_list[1]
+
+    mock_sleep.assert_called_once()
+    assert mock_subprocess.call_count == 2
+    assert first.kwargs["capture_output"] == True
+    assert second.kwargs["capture_output"] == True
