@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import io
 from ngRadar_Website.models.models import gbtEvent, dsocEvent, ETransferEvent
-from ngRadar_Website.enums import Stations, Status
+from ngRadar_Website.enums import Stations, Status, Message
 from ngRadar_Website.utils import latency_calc, bootstrap, consume, create_s3_client, upload_seaweedfs
 from pathlib import Path
 import json
@@ -173,6 +173,13 @@ def record_transfer_event(
 
 
 def process_msg(msg, producer_topic=None, producer_config=None):
+    match msg.key().decode("utf-8"):
+        case Message.VLBA_REQUEST_STORAGE:
+            pass
+        case Message.VLBA_TRANSFERRING:
+            pass
+        case _:
+            print("Invalid Kafka Message Key!")
     payload = json.loads(msg.value().decode("utf-8"))
 
     transfer_uuid = uuid.UUID(payload["transfer_uuid"])

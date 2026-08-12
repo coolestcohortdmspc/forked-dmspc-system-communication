@@ -11,7 +11,7 @@ from django.http import StreamingHttpResponse, JsonResponse, HttpResponse, HttpR
 
 # serve_image imports
 from ngRadar_Website.utils import create_s3_client, bootstrap, write_transfer_progress # , get_presigned_url
-from ngRadar_Website.enums import Stations
+from ngRadar_Website.enums import Stations, Message
 
 #libraries used for lock status
 from django.core.cache import cache
@@ -253,7 +253,7 @@ def submit_waveform(request):
         #     "bootstrap.servers": bootstrap,
         #     "message.max.bytes": 8388608,
         #     "client.id": "ui-producer"}
-        message = "User input a new waveform."
+        # message = "User input a new waveform."
 
         def produce(topic, config, key, value):
             producer = Producer(config)
@@ -262,8 +262,8 @@ def submit_waveform(request):
             producer.flush()
 
         def main():
-            key = uuid_input.hex  # Use the UUID as the key for the Kafka message
-            value = json.dumps(message).encode("utf-8")
+            key = Message.UI_EVENT
+            value = uuid_input.hex  # Use the UUID as the value for the Kafka message
             produce(topic, config, key, value)
             write_transfer_progress(received_bytes=0, total_bytes=0, percent=0.0, transfer_id=0)  # Reset the progress bar after sending the message
         main()
