@@ -3,7 +3,7 @@ import uuid
 # from confluent_kafka.admin import AdminClient, NewTopic, KafkaException, KafkaError
 from dotenv import load_dotenv
 from ngRadar_Website.enums import Stations
-from confluent_kafka import Consumer
+from confluent_kafka import Consumer, Producer
 import boto3
 import os
 import time
@@ -491,13 +491,49 @@ def etc_send(frame_path):
             process.args,
         )
 
-    # Ensure progress ends exactly at 100%.
-    # write_transfer_progress(
-    #     received_bytes=expected_num_bytes,
-    #     total_bytes=expected_num_bytes,
-    #     percent=100.0,
-    #     transfer_id=transfer_id,
-    # )
+
+def produce(topic, config, key, value):
+    # creates a new producer instance
+    producer = Producer(config)
+
+    # producing a message to the specified topic 
+    producer.produce(topic, key=key, value=value)
+    print(f"Produced message to topic {topic} with key {key}.")
+
+    # send any outstanding or buffered messages to the Kafka broker
+    producer.flush()
+
+def send_kafka_message(
+    *,
+    key,
+    producer_topic,
+    producer_config,
+    transfer_uuid,
+    gbt_uuid,
+    status=None,
+    num_bytes,
+    filename=None,
+    message="",
+    stations=Stations.HN,
+):
+    payload = {
+        "transfer_uuid": str(transfer_uuid),
+        "gbt_uuid": str(gbt_uuid),
+        "status": int(status),
+        "num_bytes": num_bytes,
+        "filename": filename,
+        "event_time": datetime.now(timezone.utc).isoformat(),
+        "message": message,
+        "stations": stations.label,
+    }
+
+    produce(
+        producer_topic,
+        producer_config,
+        key,
+        json.dumps(payload),
+    )
+
 
     
 def create_file(file_path):

@@ -8,7 +8,7 @@ import numpy as np
 import io
 from ngRadar_Website.models.models import gbtEvent, dsocEvent, ETransferEvent
 from ngRadar_Website.enums import Stations, Status, Message
-from ngRadar_Website.utils import latency_calc, bootstrap, consume, create_s3_client, upload_seaweedfs
+from ngRadar_Website.utils import latency_calc, bootstrap, consume, create_s3_client, upload_seaweedfs, produce, send_kafka_message
 from pathlib import Path
 import json
 import uuid
@@ -26,18 +26,6 @@ This code will:
 - save image file to seaweedfs object store
 - load the image key + the uuid into the DB
 """
-
-
-def produce(topic, config, key, value):
-    # creates a new producer instance
-    producer = Producer(config)
-
-    # producing a message to the specified topic 
-    producer.produce(topic, key=key, value=value)
-    print(f"Produced message to topic {topic} with key {key}.")
-
-    # send any outstanding or buffered messages to the Kafka broker
-    producer.flush()
 
 
 def DB_import(uuid):
@@ -184,82 +172,191 @@ def record_transfer_event(
         status=status,
         message=message,
     )
-    
+
+def get_storage_used(folder_path):
+    storage_used = 0
+
+    for file in folder_path.rglob("*"):
+        if file.is_file():
+            storage_used += file.stat().st_size
+        return storage_used
 
 
 def process_msg(msg, producer_topic, producer_config):
-    match msg.key().decode("utf-8"):
-        case Message.VLBA_REQUEST_STORAGE:
-            # storage check logic
-            payload = json.loads(msg.value().decode("utf-8"))
-            
-            transfer_uuid = uuid.UUID(payload["transfer_uuid"])
-            gbt_uuid = uuid.UUID(payload["gbt_uuid"])
-            status = Status(payload["status"])
-            filename = payload.get("filename")
-            expected_num_bytes = payload.get("num_bytes", 0)
-            message = payload.get("message", "")
+    incoming_key = msg.key().decode("utf-8")
+    payload = json.loads(msg.value().decode("utf-8"))
+    if incoming_key == Message.VLBA_REQUEST_STORAGE:
+        # storage check logic
+        transfer_uuid = uuid.UUID(payload["transfer_uuid"])
+        gbt_uuid = uuid.UUID(payload["gbt_uuid"])
+        status = Status(payload["status"])
+        filename = payload.get("filename")
+        expected_num_bytes = payload.get("num_bytes", 0)
 
-            incoming_file = Path("/dsoc/incoming") / filename
-
-            volume_limit = os.envrion["DSOC_VOLUME_SIZE"]
-            storage_used = subprocess.run() #TODO script here to grab current size of dsoc/incoming folder
-
-            key = str(transfer_uuid)
-
-            if storage_used+expected_num_bytes >= volume_limit-1:
-                # if the current storage plus the incoming file gets within 1GB of our imposed limit, we decline the e-transfer
-            
-                value = json.dumps(
-                    {
-                        "transfer_uuid": str(transfer_uuid),
-                        "gbt_uuid": str(gbt_uuid),
-                        "event_time": datetime.now(timezone.utc).isoformat(),
-                        "filename": filename, #NOTE make sure VLBA reads this as a path. It's currently a string
-                        "message": "No",
-                    }
-                )
-                produce(
-                    producer_topic,
-                    producer_config,
-                    key,
-                    value,
-                )
-
-            else:
-                value = json.dumps(
-                    {
-                        "transfer_uuid": str(transfer_uuid),
-                        "gbt_uuid": str(gbt_uuid),
-                        "event_time": datetime.now(timezone.utc).isoformat(),
-                        "filename": filename, #NOTE make sure VLBA reads this as a path. It's currently a string
-                        "message": "Yes",
-                    }
-                )
-                produce(
-                    producer_topic,
-                    producer_config,
-                    key,
-                    value,
-                )
-
-
-        case Message.VLBA_TRANSFERRING:
-            #TODO write to progress.json logic
-
+        key = Message.DSOC_RESPOND_STORAGE #produced message will have this key no matter what the result of the below logic is
+        
+        if payload["status"] == Status.FAILED: #NOTE is this correct syntax?
+            #TODO: Handle FAILED status Kafka message just in case.
             pass
 
-        case _:
-            print("Invalid Kafka Message Key!")
-    payload = json.loads(msg.value().decode("utf-8"))
+        volume_path = Path("/dsoc/incoming") / filename
 
-    transfer_uuid = uuid.UUID(payload["transfer_uuid"])
-    gbt_uuid = uuid.UUID(payload["gbt_uuid"])
-    status = Status(payload["status"])
-    filename = payload.get("filename")
-    expected_num_bytes = payload.get("num_bytes", 0)
-    message = payload.get("message", "")
-    incoming_file = Path("/dsoc/incoming") / filename
+        volume_limit = os.envrion["DSOC_VOLUME_SIZE"]
+        storage_used = get_storage_used(volume_path) 
+
+        if storage_used+expected_num_bytes >= volume_limit-1:
+            # if the current storage plus the incoming file gets within 1GB of our imposed limit, we decline the e-transfer
+            send_kafka_message(
+                key = key, 
+                producer_topic=producer_topic,
+                producer_config=producer_config, 
+                transfer_uuid=transfer_uuid,
+                gbt_uuid=gbt_uuid,
+                num_bytes=expected_num_bytes,
+                filename=filename,
+                message="No",
+            )
+
+        else:
+            send_kafka_message(
+                key = key, 
+                producer_topic=producer_topic,
+                producer_config=producer_config, 
+                transfer_uuid=transfer_uuid,
+                gbt_uuid=gbt_uuid,
+                num_bytes=expected_num_bytes,
+                filename=filename,
+                message="Yes",
+            )
+
+
+    elif incoming_key == Message.VLBA_TRANSFERRING:
+        payload = json.loads(msg.value().decode("utf-8")) 
+        key = Message.VLBA_DELETE
+        if payload["status"] == Status.FAILED:
+            #TODO Handle receiving a FAILED transfer later.
+            pass
+        else:
+            while True:
+                #TODO write to progress.json logic. Can get rid of etr_progress_writer worker later. For now, just check every 0.5 seconds if it's complete.
+                #TODO To avoid getting stuck in inifinite loop when we interrupt transfers, poll DB for most recent status under the transfer_uuid and break if status is FAILED.
+                filename = payload["filename"]
+                transfer_uuid = uuid.UUID(payload["transfer_uuid"])
+                gbt_uuid = uuid.UUID(payload["gbt_uuid"])
+                incoming_file = Path("/dsoc/incoming") / filename
+                with open("/service/mock_assets/progress.json", "r", encoding="utf-8") as f:
+                    payload = json.load(f)
+                if payload["percent"] == 100.0:
+                    break
+                else:
+                    time.sleep(0.5)
+
+
+            record_transfer_event(
+                transfer_uuid=payload["transfer_uuid"],
+                gbt_uuid=payload["gbt_uuid"],
+                station=Stations.HN,
+                status=Status.TRANSFERRED,
+                num_bytes=payload["num_bytes"],
+                message="Hancock VLBA e-transfer in progress",
+            )
+
+            record_transfer_event(
+                transfer_uuid=payload["transfer_uuid"],
+                gbt_uuid=payload["gbt_uuid"],
+                station=Stations.DSOC,
+                status=Status.VERIFYING,
+                num_bytes=payload["num_bytes"],
+                message=f"Verifying {payload["filename"]}",
+            )
+
+            try:
+                actual_num_bytes = verify_incoming_transfer( 
+                    incoming_file=incoming_file,
+                    expected_num_bytes=expected_num_bytes,
+                )
+            except Exception as exc:
+                record_transfer_event(
+                    transfer_uuid=payload["transfer_uuid"],
+                    gbt_uuid=payload["gbt_uuid"],
+                    station=Stations.DSOC,
+                    status=Status.FAILED,
+                    num_bytes=0,
+                    message=str(exc),
+                )
+                return
+
+            try:
+                gbt_data = DB_import(payload["gbt_uuid"])
+                dsoc_latency = latency_calc(gbt_data[3])
+
+                data = DB_columns(gbt_data)
+                data["latency_ms"] = dsoc_latency
+
+                object_id, target, tx_waveform, event_time = gbt_data
+                image_file, image_num_bytes = create_img(tx_waveform)
+                dsoc_uuid = str(uuid.uuid4())
+
+                image_key = save_image_to_seaweedfs(
+                    target,
+                    image_file,
+                    dsoc_uuid,
+                )
+
+                data["uuid"] = dsoc_uuid
+
+                publish_DB(
+                    image_key=image_key,
+                    num_bytes=image_num_bytes,
+                    data=data,
+                    xmit_station=Stations.GBT,
+                    rcvr_station=Stations.HN,
+                    transfer_uuid=payload["transfer_uuid"],
+                )
+
+            except Exception as exc:
+                record_transfer_event(
+                    transfer_uuid=payload["transfer_uuid"],
+                    gbt_uuid=payload["gbt_uuid"],
+                    station=Stations.DSOC,
+                    status=Status.FAILED,
+                    num_bytes=payload["num_bytes"],
+                    message=f"DSOC image processing failed: {exc}",
+                )
+                return
+
+            record_transfer_event(
+                transfer_uuid=payload["transfer_uuid"],
+                gbt_uuid=payload["gbt_uuid"],
+                station=Stations.DSOC,
+                status=Status.COMPLETED,
+                num_bytes=actual_num_bytes,
+                latency_ms=dsoc_latency,
+                message="DSOC has verified etransfer, image generated, and image stored.",
+            )
+
+            send_kafka_message(
+                key = key, 
+                producer_topic=producer_topic,
+                producer_config=producer_config, 
+                transfer_uuid=payload["transfer_uuid"],
+                gbt_uuid=payload["gbt_uuid"],
+                num_bytes=payload["num_bytes"],
+                filename=payload["filename"],
+                message="Processing complete. Delete your raw data.",
+            )
+        
+    else:
+        print("Invalid Kafka Message Key!")
+    # payload = json.loads(msg.value().decode("utf-8"))
+
+    # transfer_uuid = uuid.UUID(payload["transfer_uuid"])
+    # gbt_uuid = uuid.UUID(payload["gbt_uuid"])
+    # status = Status(payload["status"])
+    # filename = payload.get("filename")
+    # expected_num_bytes = payload.get("num_bytes", 0)
+    # message = payload.get("message", "")
+    # incoming_file = Path("/dsoc/incoming") / filename
 
     # record_transfer_event(
     #     transfer_uuid=transfer_uuid,
@@ -270,123 +367,44 @@ def process_msg(msg, producer_topic, producer_config):
     #     message=message,
     # )
 
-    if status == Status.FAILED:
-        return
+# NOTE Figure out where to put the safegaurds below
+    # if status == Status.FAILED:
+    #     return
 
-    if status != Status.TRANSFERRED:
-        return
+    # if status != Status.TRANSFERRED:
+    #     return
 
-    already_completed = ETransferEvent.objects.filter(
-        transfer_uuid=transfer_uuid,
-        station=Stations.DSOC,
-        status=Status.COMPLETED,
-    ).exists()
+    # already_completed = ETransferEvent.objects.filter(
+    #     transfer_uuid=transfer_uuid,
+    #     station=Stations.DSOC,
+    #     status=Status.COMPLETED,
+    # ).exists()
 
-    if already_completed:
-        print(f"This transfer {transfer_uuid} has already been processed. Skipping.")
-        return
+    # if already_completed:
+    #     print(f"This transfer {transfer_uuid} has already been processed. Skipping.")
+    #     return
 
-    already_processing = ETransferEvent.objects.filter(
-        transfer_uuid=transfer_uuid,
-        station=Stations.DSOC,
-        status__in=[Status.VERIFYING],
-        ).exists()
+    # already_processing = ETransferEvent.objects.filter(
+    #     transfer_uuid=transfer_uuid,
+    #     station=Stations.DSOC,
+    #     status__in=[Status.VERIFYING],
+    #     ).exists()
 
-    if already_processing:
-        print(f"Transfer {transfer_uuid} is already being processed currently.")
-        return
+    # if already_processing:
+    #     print(f"Transfer {transfer_uuid} is already being processed currently.")
+    #     return
 
-    if not filename:
-        record_transfer_event(
-            transfer_uuid=transfer_uuid,
-            station=Stations.DSOC,
-            status=Status.FAILED,
-            num_bytes=expected_num_bytes,
-            message="Kafka transfer message did not contain a filename",
-        )
-        return
+    # if not filename:
+    #     record_transfer_event(
+    #         transfer_uuid=transfer_uuid,
+    #         station=Stations.DSOC,
+    #         status=Status.FAILED,
+    #         num_bytes=expected_num_bytes,
+    #         message="Kafka transfer message did not contain a filename",
+    #     )
+    #     return
 
 
-    record_transfer_event(
-        transfer_uuid=transfer_uuid,
-        gbt_uuid=gbt_uuid,
-        station=Stations.DSOC,
-        status=Status.VERIFYING,
-        num_bytes=expected_num_bytes,
-        message=f"Verifying {filename}",
-    )
-
-    try:
-        actual_num_bytes = verify_incoming_transfer(
-            incoming_file=incoming_file,
-            expected_num_bytes=expected_num_bytes,
-        )
-    except Exception as exc:
-        record_transfer_event(
-            transfer_uuid=transfer_uuid,
-            gbt_uuid=gbt_uuid,
-            station=Stations.DSOC,
-            status=Status.FAILED,
-            num_bytes=0,
-            message=str(exc),
-        )
-        return
-
-    try:
-        gbt_data = DB_import(gbt_uuid)
-        dsoc_latency = latency_calc(gbt_data[3])
-
-        data = DB_columns(gbt_data)
-        data["latency_ms"] = dsoc_latency
-
-        object_id, target, tx_waveform, event_time = gbt_data
-        image_file, image_num_bytes = create_img(tx_waveform)
-        dsoc_uuid = str(uuid.uuid4())
-
-        image_key = save_image_to_seaweedfs(
-            target,
-            image_file,
-            dsoc_uuid,
-        )
-
-        data["uuid"] = dsoc_uuid
-
-        publish_DB(
-            image_key=image_key,
-            num_bytes=image_num_bytes,
-            data=data,
-            xmit_station=Stations.GBT,
-            rcvr_station=Stations.HN,
-            transfer_uuid=transfer_uuid,
-        )
-
-    except Exception as exc:
-        record_transfer_event(
-            transfer_uuid=transfer_uuid,
-            gbt_uuid=gbt_uuid,
-            station=Stations.DSOC,
-            status=Status.FAILED,
-            num_bytes=expected_num_bytes,
-            message=f"DSOC processing failed: {exc}",
-        )
-        return
-
-    record_transfer_event(
-        transfer_uuid=transfer_uuid,
-        gbt_uuid=gbt_uuid,
-        station=Stations.DSOC,
-        status=Status.COMPLETED,
-        num_bytes=actual_num_bytes,
-        latency_ms=dsoc_latency,
-        message="DSOC has verified etransfer, image generated, and image stored.",
-    )
-    
-    produce(
-        producer_topic,
-        producer_config,
-        Message.VLBA_DELETE,
-        transfer_uuid
-    )
 
 
 class Command(BaseCommand):
