@@ -80,7 +80,7 @@ const ctx = document.getElementById('LatencyChart').getContext('2d');
                                 xAdjust: 890,
                                 yAdjust: 440,
 
-                                content: ['Newest', 'Message'],
+                                content: ['Newest', 'Record'],
                                 backgroundColor: 'rgba(255, 255, 255, 0.9)',
                                 color: '#000',
                                 font: { size: 12 },
@@ -99,7 +99,7 @@ const ctx = document.getElementById('LatencyChart').getContext('2d');
                                 xAdjust: 0,
                                 yAdjust: 440,
 
-                                content: ['Oldest', 'Message'],
+                                content: ['Oldest', 'Record'],
                                 backgroundColor: 'rgba(255, 255, 255, 0.9)',
                                 color: '#000000',
                                 font: { size: 12 },
