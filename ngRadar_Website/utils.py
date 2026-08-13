@@ -510,9 +510,9 @@ def send_kafka_message(
     producer_config,
     transfer_uuid,
     gbt_uuid,
-    status=None,
+    status,
     num_bytes,
-    filename=None,
+    filename,
     message="",
     stations=Stations.HN,
 ):
@@ -537,7 +537,7 @@ def send_kafka_message(
 
     
 def create_file(file_path):
-    file_mb = 500
+    file_mb = 100
     file_size_bytes = file_mb * 1024 * 1024
     num_buffers = 100
 

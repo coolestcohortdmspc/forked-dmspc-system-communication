@@ -85,7 +85,7 @@ def process_msg(msg, producer_topic, producer_config):
     # publish new transmission to the db
     gbt_uuid = publish_to_db(payload)
 
-    key, value = Message.GBT_TX, f"{gbt_uuid}"
+    key, value = f"{Message.GBT_TX}", f"{gbt_uuid}"
 
     # produce this new message, lets DSOC know to produce image(s)
     produce(producer_topic, producer_config, key, value)
@@ -102,6 +102,6 @@ class Command(BaseCommand):
         # generate a dummy data payload, publish this data to the db, produce a message with this payload, then start consuming
         payload = set_payload_dict('W48', -1)
         gbt_uuid = publish_to_db(payload)
-        key, value = Message.GBT_TX, f"{gbt_uuid}"
+        key, value = f"{Message.GBT_TX}", f"{gbt_uuid}"
         produce(producer_topic, producer_config, key, value)
         consume(consumer_topic, consumer_config, process_msg, producer_topic=producer_topic, producer_config=producer_config)

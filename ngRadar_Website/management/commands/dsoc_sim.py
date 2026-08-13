@@ -179,21 +179,22 @@ def get_storage_used(folder_path):
     for file in folder_path.rglob("*"):
         if file.is_file():
             storage_used += file.stat().st_size
-        return storage_used
+            print(f"Size of folder: {storage_used} bytes")
+    return storage_used
 
 
 def process_msg(msg, producer_topic, producer_config):
-    incoming_key = msg.key().decode("utf-8")
+    incoming_key = int(msg.key().decode("utf-8"))
     payload = json.loads(msg.value().decode("utf-8"))
-    if incoming_key == Message.VLBA_REQUEST_STORAGE:
+    if incoming_key == Message.VLBA_REQUEST_STORAGE.value:
         # storage check logic
         transfer_uuid = uuid.UUID(payload["transfer_uuid"])
         gbt_uuid = uuid.UUID(payload["gbt_uuid"])
         status = Status(payload["status"])
-        filename = payload.get("filename")
-        expected_num_bytes = payload.get("num_bytes", 0)
+        filename = payload["filename"]
+        expected_num_bytes = int(payload["num_bytes"])
 
-        key = Message.DSOC_RESPOND_STORAGE #produced message will have this key no matter what the result of the below logic is
+        key = f"{Message.DSOC_RESPOND_STORAGE}" #produced message will have this key no matter what the result of the below logic is
         
         if payload["status"] == Status.FAILED: #NOTE is this correct syntax?
             #TODO: Handle FAILED status Kafka message just in case.
@@ -201,10 +202,11 @@ def process_msg(msg, producer_topic, producer_config):
 
         volume_path = Path("/dsoc/incoming") / filename
 
-        volume_limit = os.envrion["DSOC_VOLUME_SIZE"]
-        storage_used = get_storage_used(volume_path) 
-
-        if storage_used+expected_num_bytes >= volume_limit-1:
+        storage_limit = int(os.environ["DSOC_VOLUME_SIZE"]) * 1000000000
+        print(f"DSOC has {storage_limit} bytes of storage total.")
+        storage_used = int(get_storage_used(volume_path))
+        print(f"DSOC has {storage_used}/{storage_limit} bytes of storage capacity.")
+        if storage_used+expected_num_bytes >= storage_limit-1:
             # if the current storage plus the incoming file gets within 1GB of our imposed limit, we decline the e-transfer
             send_kafka_message(
                 key = key, 
@@ -212,6 +214,7 @@ def process_msg(msg, producer_topic, producer_config):
                 producer_config=producer_config, 
                 transfer_uuid=transfer_uuid,
                 gbt_uuid=gbt_uuid,
+                status=payload["status"],
                 num_bytes=expected_num_bytes,
                 filename=filename,
                 message="No",
@@ -224,32 +227,35 @@ def process_msg(msg, producer_topic, producer_config):
                 producer_config=producer_config, 
                 transfer_uuid=transfer_uuid,
                 gbt_uuid=gbt_uuid,
+                status=payload["status"],
                 num_bytes=expected_num_bytes,
                 filename=filename,
                 message="Yes",
             )
 
 
-    elif incoming_key == Message.VLBA_TRANSFERRING:
+    elif incoming_key == Message.VLBA_TRANSFERRING.value:
         payload = json.loads(msg.value().decode("utf-8")) 
-        key = Message.VLBA_DELETE
+        key = f"{Message.VLBA_DELETE}"
         if payload["status"] == Status.FAILED:
             #TODO Handle receiving a FAILED transfer later.
             pass
         else:
+            filename = payload["filename"]
+            transfer_uuid = uuid.UUID(payload["transfer_uuid"])
+            gbt_uuid = uuid.UUID(payload["gbt_uuid"])
+            incoming_file = Path("/dsoc/incoming") / filename
             while True:
                 #TODO write to progress.json logic. Can get rid of etr_progress_writer worker later. For now, just check every 0.5 seconds if it's complete.
                 #TODO To avoid getting stuck in inifinite loop when we interrupt transfers, poll DB for most recent status under the transfer_uuid and break if status is FAILED.
-                filename = payload["filename"]
-                transfer_uuid = uuid.UUID(payload["transfer_uuid"])
-                gbt_uuid = uuid.UUID(payload["gbt_uuid"])
-                incoming_file = Path("/dsoc/incoming") / filename
+                
                 with open("/service/mock_assets/progress.json", "r", encoding="utf-8") as f:
-                    payload = json.load(f)
-                if payload["percent"] == 100.0:
-                    break
-                else:
-                    time.sleep(0.5)
+                    progress_payload = json.load(f)
+                    print(f"Progress Payload %: {progress_payload['percent']}")
+                    if progress_payload["percent"] == "100.0":
+                        break
+                    else:
+                        time.sleep(0.5)
 
 
             record_transfer_event(
@@ -267,13 +273,13 @@ def process_msg(msg, producer_topic, producer_config):
                 station=Stations.DSOC,
                 status=Status.VERIFYING,
                 num_bytes=payload["num_bytes"],
-                message=f"Verifying {payload["filename"]}",
+                message=f"Verifying {payload['filename']}",
             )
 
             try:
                 actual_num_bytes = verify_incoming_transfer( 
                     incoming_file=incoming_file,
-                    expected_num_bytes=expected_num_bytes,
+                    expected_num_bytes=payload["num_bytes"],
                 )
             except Exception as exc:
                 record_transfer_event(
@@ -341,6 +347,7 @@ def process_msg(msg, producer_topic, producer_config):
                 producer_config=producer_config, 
                 transfer_uuid=payload["transfer_uuid"],
                 gbt_uuid=payload["gbt_uuid"],
+                status=payload["status"],
                 num_bytes=payload["num_bytes"],
                 filename=payload["filename"],
                 message="Processing complete. Delete your raw data.",
@@ -413,6 +420,6 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         print("Starting DSOC simulator")
 
-        consumer_topic, consumer_config, producer_topic, producer_config = bootstrap(Stations.DSOC)
+        producer_topic, producer_config, consumer_topic, consumer_config = bootstrap(Stations.DSOC)
 
         consume(consumer_topic, consumer_config, process_msg, producer_topic=producer_topic, producer_config=producer_config)

@@ -55,13 +55,15 @@ def record_transfer_event(
 
 
 def process_msg(msg, producer_topic, producer_config):
-    key = msg.key().decode("utf-8")
-    if key == Message.GBT_TX:
+    incoming_key = int(msg.key().decode("utf-8"))
+    raw_data_path = Path("/raw_data")
+    if incoming_key == Message.GBT_TX.value:
         print("Received Kafka message from GBT.")
+        key = f"{Message.VLBA_REQUEST_STORAGE}"
         gbt_uuid = msg.value().decode("utf-8")
         transfer_uuid = uuid.uuid4()
-    
-        frame_path = Path("/raw_data") / f"{transfer_uuid}.bin"
+
+        frame_path = raw_data_path / f"{transfer_uuid}.bin"
     
         Thread(target=create_file, args=(frame_path,), daemon=True).start()
     
@@ -79,7 +81,7 @@ def process_msg(msg, producer_topic, producer_config):
                     message="Hancock VLBA data file complete. Ready for e-transfer.",
                 )
             send_kafka_message(
-                key = Message.VLBA_REQUEST_STORAGE,
+                key = key,
                 producer_topic=producer_topic,
                 producer_config=producer_config,
                 transfer_uuid=transfer_uuid,
@@ -92,7 +94,7 @@ def process_msg(msg, producer_topic, producer_config):
 
         else:
             send_kafka_message(
-                key = Message.VLBA_REQUEST_STORAGE,
+                key = key,
                 producer_topic=producer_topic,
                 producer_config=producer_config,
                 transfer_uuid=transfer_uuid,
@@ -105,8 +107,9 @@ def process_msg(msg, producer_topic, producer_config):
             return
     
     
-    elif key == Message.DSOC_RESPOND_STORAGE:
+    elif incoming_key == Message.DSOC_RESPOND_STORAGE.value:
         print("Received DSOC's storage check response!")
+        key = f"{Message.VLBA_TRANSFERRING}"
         payload = json.loads(msg.value().decode("utf-8"))
         if payload["message"] == "Yes":
 
@@ -121,7 +124,7 @@ def process_msg(msg, producer_topic, producer_config):
                 )
         
                 send_kafka_message(
-                    key = Message.VLBA_TRANSFERRING,
+                    key = key,
                     producer_topic=producer_topic,
                     producer_config=producer_config,
                     transfer_uuid=payload["transfer_uuid"],
@@ -131,7 +134,7 @@ def process_msg(msg, producer_topic, producer_config):
                     filename=payload["filename"],
                     message="Hancock VLBA has started to send the data file to DSOC via e-transfer",
                 )
-                
+                frame_path = raw_data_path / f"{payload['transfer_uuid']}.bin"
                 etc_send(frame_path)
 
             #NOTE: Figure out how dsoc will handle the exceptions below. It will have already received a message saying Transferring, and it will receive a second message saying Failed if the excptions below are triggered.
@@ -171,7 +174,7 @@ def process_msg(msg, producer_topic, producer_config):
             #Loop back to storage check message?
             pass
 
-    elif key == Message.VLBA_DELETE:
+    elif incoming_key == Message.VLBA_DELETE.value:
         payload = json.loads(msg.value().decode("utf-8"))
         file_name = payload["filename"]
         delete_observation_data(file_name)
