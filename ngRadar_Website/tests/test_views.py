@@ -28,6 +28,7 @@ with patch("pathlib.Path.read_text", return_value=mock_env_data):
         submit_waveform,
         login_view,
         logout_view,
+        latency_graphing,
     )
 
 
@@ -221,3 +222,99 @@ def test_login_view_post_invalid(mock_logout, mock_msg_error, mock_render, mock_
     mock_msg_error.assert_called_once_with(request, "Invalid username or password.")
     mock_render.assert_called_once_with(request, 'registration/login.html')
     mock_logout.assert_not_called()
+
+
+# ==============================================================================
+# 4. latency_graphing Test
+# ==============================================================================
+
+@patch("ngRadar_Website.views.views.StreamingHttpResponse")
+@patch("ngRadar_Website.views.views.get_Message_Latency")
+def test_latency_graphing(mock_get_msg, mock_streaming):
+    response = MagicMock()
+    mock_streaming.return_value = response
+
+    output = latency_graphing("request")
+
+    assert output == response
+    mock_streaming.assert_called_once_with(mock_get_msg(), content_type="text/event-stream; charset=utf-8")
+
+
+# ==============================================================================
+# 5. lock_status Test
+# ==============================================================================
+
+@patch("ngRadar_Website.views.views.cache.get")
+@patch("ngRadar_Website.views.views.JsonResponse")
+def test_lock_status_none(mock_json, mock_cache_get):
+    """Scenario 1: lock time is None"""
+    mock_cache_get.return_value = None
+
+    mock_json.return_value = "fake_json_response"
+
+    output = lock_status("request")
+
+    assert output == "fake_json_response"
+    mock_cache_get.assert_called_once_with('submit_locked', None)
+    mock_json.assert_called_once_with({'locked':False})
+
+
+@patch("ngRadar_Website.views.views.cache.get")
+@patch("ngRadar_Website.views.views.dsocEvent")
+@patch("ngRadar_Website.views.views.cache.delete")
+@patch("ngRadar_Website.views.views.JsonResponse")
+def test_lock_matching_event_time(mock_json, mock_cache_delete, mock_dsocEvent, mock_cache_get):
+    """Scenario 2: lock time matches the event time"""
+    mock_cache_get.return_value = "fake_time"
+
+    mock_dsocEvent.objects.filter.return_value.exists.return_value = True
+
+    mock_cache_delete.return_value = None
+
+    mock_json.return_value = "fake_json_response"
+
+    output = lock_status("request")
+
+    assert output == "fake_json_response"
+    mock_cache_get.assert_called_once_with('submit_locked', None)
+    mock_dsocEvent.objects.filter.assert_called_once_with(event_time__gt="fake_time")
+    mock_cache_delete.assert_called_once_with('submit_locked')
+    mock_json.assert_called_once_with({'locked':False})
+
+
+@patch("ngRadar_Website.views.views.cache.get")
+@patch("ngRadar_Website.views.views.dsocEvent")
+@patch("ngRadar_Website.views.views.JsonResponse")
+def test_lock_true(mock_json, mock_dsocEvent, mock_cache_get):
+    """Scenario 3: lock status is True"""
+    mock_cache_get.return_value = "fake_time"
+
+    mock_dsocEvent.objects.filter.return_value.exists.return_value = False
+
+    mock_json.return_value = "fake_json_response"
+
+    output = lock_status("request")
+
+    assert output == "fake_json_response"
+    mock_cache_get.assert_called_once_with('submit_locked', None)
+    mock_dsocEvent.objects.filter.assert_called_once_with(event_time__gt="fake_time")
+    mock_json.assert_called_once_with({'locked':True})
+
+
+# ==============================================================================
+# 6. logout_view Test
+# ==============================================================================
+
+@patch("ngRadar_Website.views.views.logout")
+@patch("ngRadar_Website.views.views.logging_out_message")
+def test_logout_view(mock_logout_msg, mock_logout):
+    request = MagicMock()
+    mock_logout.return_value = None
+
+    mock_logout_msg.return_value = "response"
+
+    output = logout_view(request)
+
+    assert output == "response"
+    mock_logout.assert_called_once_with(request)
+    mock_logout_msg.assert_called_once_with(request)
