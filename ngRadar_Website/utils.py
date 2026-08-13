@@ -397,11 +397,8 @@ def etc_send(frame_path):
     Input: 
         frame_path = Path to the file that we want to send to the daemon. On the client machine.
     Output: 
-        Command line output of the etc command, which will show the progress of the transfer and any errors that may occur. Overwrite flag used for now to demmonstrate sequencing even if same file is being sent multiple times.
-        Use --resume flag in production.
+        Command line output of the etc command, which will show the progress of the transfer and any errors that may occur. Uses --resume: frame_path is always a brand-new file per Kafka message (see process_msg), so --resume behaves identically to --overwrite for fresh transfers, and correctly picks up partial transfers when the same path is manually re-invoked after an interruption.
     """
-
-    # Will need to add some logic here to determine when to use --overwrite vs --resume.
 
     expected_num_bytes = frame_path.stat().st_size
     transfer_id = str(uuid.uuid4())
@@ -420,7 +417,7 @@ def etc_send(frame_path):
             "etc",
             str(frame_path),
             os.environ["ETD_DESTINATION"],
-            "--overwrite",
+            "--resume",
         ],
         stdin=slave_fd,
         stdout=slave_fd,
