@@ -186,6 +186,7 @@ def get_storage_used(folder_path):
 def process_msg(msg, producer_topic, producer_config):
     incoming_key = int(msg.key().decode("utf-8"))
     payload = json.loads(msg.value().decode("utf-8"))
+    
     if incoming_key == Message.VLBA_REQUEST_STORAGE.value:
         # storage check logic
         transfer_uuid = uuid.UUID(payload["transfer_uuid"])

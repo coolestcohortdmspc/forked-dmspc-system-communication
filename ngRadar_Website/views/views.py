@@ -262,7 +262,7 @@ def submit_waveform(request):
             producer.flush()
 
         def main():
-            key = Message.UI_EVENT
+            key = str(Message.UI_EVENT)
             value = uuid_input.hex  # Use the UUID as the value for the Kafka message
             produce(topic, config, key, value)
             write_transfer_progress(received_bytes=0, total_bytes=0, percent=0.0, transfer_id=0)  # Reset the progress bar after sending the message
