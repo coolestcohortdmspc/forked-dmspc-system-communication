@@ -3,7 +3,7 @@ import os, time
 from django.core.management.base import BaseCommand
 from confluent_kafka import Producer
 from confluent_kafka import Consumer
-from ngRadar_Website.enums import Stations
+from ngRadar_Website.enums import Stations, Message
 from ngRadar_Website.models.models import uiEvent
 from ngRadar_Website.models.models import gbtEvent
 # from dotenv import find_dotenv
@@ -74,7 +74,7 @@ def produce(topic, config, key, value):
 
 
 def process_msg(msg, producer_topic, producer_config):
-    ui_uuid = msg.key().decode("utf-8")  # this is the uuid of the ui_event
+    ui_uuid = msg.value().decode("utf-8")  # this is the uuid of the ui_event
 
     # turn off the transmitter for 5 seconds
     turn_off_transmitter()
@@ -85,7 +85,7 @@ def process_msg(msg, producer_topic, producer_config):
     # publish new transmission to the db
     gbt_uuid = publish_to_db(payload)
 
-    key, value = f"{gbt_uuid}", "GBT transmitting"
+    key, value = f"{Message.GBT_TX}", f"{gbt_uuid}"
 
     # produce this new message, lets DSOC know to produce image(s)
     produce(producer_topic, producer_config, key, value)
@@ -102,6 +102,6 @@ class Command(BaseCommand):
         # generate a dummy data payload, publish this data to the db, produce a message with this payload, then start consuming
         payload = set_payload_dict('W48', -1)
         gbt_uuid = publish_to_db(payload)
-        key, value = f"{gbt_uuid}", "GBT transmitting"
+        key, value = f"{Message.GBT_TX}", f"{gbt_uuid}"
         produce(producer_topic, producer_config, key, value)
         consume(consumer_topic, consumer_config, process_msg, producer_topic=producer_topic, producer_config=producer_config)
