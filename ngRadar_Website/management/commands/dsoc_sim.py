@@ -8,7 +8,7 @@ import numpy as np
 import io
 from ngRadar_Website.models.models import gbtEvent, dsocEvent, ETransferEvent
 from ngRadar_Website.enums import Stations, Status, Message
-from ngRadar_Website.utils import latency_calc, bootstrap, consume, create_s3_client, upload_seaweedfs, produce, send_kafka_message
+from ngRadar_Website.utils import latency_calc, bootstrap, consume, create_s3_client, upload_seaweedfs, write_transfer_progress, send_kafka_message
 from pathlib import Path
 import json
 import uuid
@@ -183,9 +183,49 @@ def get_storage_used(folder_path):
     return storage_used
 
 
+
+def track_etransfer_progress(payload, incoming_file: Path):
+    transfer_uuid = payload["transfer_uuid"] # syntax?
+    num_bytes = payload["num_bytes"] # make this an int?
+    received_bytes = 0
+    write_transfer_progress( # resetting progress.json to zero so below logic doesn't read from previous run. Submit button does this too, but not on system-up :(
+        received_bytes=0,
+        total_bytes=0,
+        percent=0,
+        transfer_id=0,
+    )
+
+    while ETransferEvent.objects.filter(transfer_uuid=transfer_uuid).order_by("-event_time").values_list("status", flat=True).first() == Status.TRANSFERRING:
+        # while loop will break prematurely if status in DB ever changes - ex. if it changes to FAILED mid e-transfer.
+        if incoming_file.exists():
+            received_bytes = incoming_file.stat().st_size
+            percent = (received_bytes / num_bytes * 100)
+
+            write_transfer_progress(
+                received_bytes=received_bytes,
+                total_bytes=num_bytes,
+                percent=f"{percent:.1f}",
+                transfer_id=f"{transfer_uuid}",
+            )
+            time.sleep(0.5)
+        else:
+            time.sleep(0.5)
+
+        if received_bytes >= num_bytes:
+            print(f"Progress for {transfer_uuid}.bin is done being written.")
+            break
+
+    if ETransferEvent.objects.filter(transfer_uuid=transfer_uuid).order_by("-event_time").values_list("status", flat=True).first() == Status.FAILED:
+        raise ValueError("E-Transfer client reported a FAILED status.")
+
+    if received_bytes != num_bytes:
+        raise ValueError("Progress stopped writing but not all bytes have been transferred. Has the e-transfer been interrupted?")
+
+ 
 def process_msg(msg, producer_topic, producer_config):
     incoming_key = int(msg.key().decode("utf-8"))
     payload = json.loads(msg.value().decode("utf-8"))
+    volume_folder = Path("/dsoc/incoming")
     
     if incoming_key == Message.VLBA_REQUEST_STORAGE.value:
         # storage check logic
@@ -201,7 +241,7 @@ def process_msg(msg, producer_topic, producer_config):
             #TODO: Handle FAILED status Kafka message just in case.
             pass
 
-        volume_path = Path("/dsoc/incoming") / filename
+        volume_path = volume_folder / filename
 
         storage_limit = int(os.environ["DSOC_VOLUME_SIZE"]) * 1000000000
         print(f"DSOC has {storage_limit} bytes of storage total.")
@@ -238,44 +278,36 @@ def process_msg(msg, producer_topic, producer_config):
     elif incoming_key == Message.VLBA_TRANSFERRING.value:
         payload = json.loads(msg.value().decode("utf-8")) 
         key = f"{Message.VLBA_DELETE}"
+        incoming_file = volume_folder / f"{payload['transfer_uuid']}.bin"
+
         if payload["status"] == Status.FAILED:
             #TODO Handle receiving a FAILED transfer later.
             pass
         else:
-            filename = payload["filename"]
-            transfer_uuid = uuid.UUID(payload["transfer_uuid"])
-            gbt_uuid = uuid.UUID(payload["gbt_uuid"])
-            incoming_file = Path("/dsoc/incoming") / filename
-            while True:
-                #TODO write to progress.json logic. Can get rid of etr_progress_writer worker later. For now, just check every 0.5 seconds if it's complete.
-                #TODO To avoid getting stuck in inifinite loop when we interrupt transfers, poll DB for most recent status under the transfer_uuid and break if status is FAILED.
-                
-                with open("/service/mock_assets/progress.json", "r", encoding="utf-8") as f:
-                    progress_payload = json.load(f)
-                    print(f"Progress Payload %: {progress_payload['percent']}")
-                    if progress_payload["percent"] == "100.0":
-                        break
-                    else:
-                        time.sleep(0.5)
+            try:
+                track_etransfer_progress(payload, incoming_file)
 
+                record_transfer_event(
+                    transfer_uuid=payload["transfer_uuid"],
+                    gbt_uuid=payload["gbt_uuid"],
+                    station=Stations.HN,
+                    status=Status.TRANSFERRED,
+                    num_bytes=payload["num_bytes"],
+                    message="Hancock VLBA e-transfer in progress",
+                )
+                record_transfer_event(
+                    transfer_uuid=payload["transfer_uuid"],
+                    gbt_uuid=payload["gbt_uuid"],
+                    station=Stations.DSOC,
+                    status=Status.VERIFYING,
+                    num_bytes=payload["num_bytes"],
+                    message=f"Verifying {payload['filename']}",
+                )
 
-            record_transfer_event(
-                transfer_uuid=payload["transfer_uuid"],
-                gbt_uuid=payload["gbt_uuid"],
-                station=Stations.HN,
-                status=Status.TRANSFERRED,
-                num_bytes=payload["num_bytes"],
-                message="Hancock VLBA e-transfer in progress",
-            )
+            except Exception as exc:
+                print(f"Incoming data progress interrupted: {exc}")
+                return
 
-            record_transfer_event(
-                transfer_uuid=payload["transfer_uuid"],
-                gbt_uuid=payload["gbt_uuid"],
-                station=Stations.DSOC,
-                status=Status.VERIFYING,
-                num_bytes=payload["num_bytes"],
-                message=f"Verifying {payload['filename']}",
-            )
 
             try:
                 actual_num_bytes = verify_incoming_transfer( 

@@ -141,6 +141,15 @@ def process_msg(msg, producer_topic, producer_config):
 
             except subprocess.CalledProcessError as exc:
                 print(f"E-transfer failed with return code: {exc.returncode}")
+                record_transfer_event(
+                    transfer_uuid=payload["transfer_uuid"],
+                    gbt_uuid=payload["gbt_uuid"],
+                    station=Stations.HN,
+                    status=Status.FAILED,
+                    num_bytes=payload["num_bytes"],
+                    message=(f"E-transfer failed with return code: {exc.returncode}")
+                )
+                
                 # send_kafka_message(
                 #     producer_topic=producer_topic,
                 #     producer_config=producer_config,
@@ -157,6 +166,14 @@ def process_msg(msg, producer_topic, producer_config):
                 return
             except Exception as exc:
                 print(f"Unexpected e-transfer failure: {exc}")
+                record_transfer_event(
+                    transfer_uuid=payload["transfer_uuid"],
+                    gbt_uuid=payload["gbt_uuid"],
+                    station=Stations.HN,
+                    status=Status.FAILED,
+                    num_bytes=payload["num_bytes"],
+                    message=(f"Unexpected e-transfer failure: {exc}")
+                )
                 # send_kafka_message(
                 #     producer_topic=producer_topic,
                 #     producer_config=producer_config,
