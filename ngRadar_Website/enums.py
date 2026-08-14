@@ -27,3 +27,13 @@ class Status(models.IntegerChoices):
     FAILED = 7, "Failed"        
     COMPLETED = 8, "Completed"          # This status would be used when the e-transfer has completed successfully and the data has been verified, processed, and stored appropriately.
 
+
+class Message(models.IntegerChoices):
+    VLBA_REQUEST_STORAGE = 1, "VLBA requests DSOC storage check."
+    DSOC_RESPOND_STORAGE = 2, "DSOC sends result from storage check."
+    VLBA_TRANSFERRING = 3, "VLBA notifies DSOC that etransfer has started."
+    VLBA_DELETE = 4, "DSOC gives VLBA green light to delete raw data."
+    GBT_TX = 5, "GBT is transmitting."
+    UI_EVENT = 6, "Submit Waveform from UI."
+
+    # UI_EVENT = 5, "User input a new waveform."

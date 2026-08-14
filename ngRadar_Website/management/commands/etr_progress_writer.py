@@ -14,7 +14,7 @@ etd_path = Path("/dsoc/incoming")
 
 
 def process_msg(msg, producer_topic=None, producer_config=None):
-    gbt_uuid = msg.key().decode("utf-8")
+    gbt_uuid = msg.value().decode("utf-8")
     #print(gbt_uuid)
 
     while True:
