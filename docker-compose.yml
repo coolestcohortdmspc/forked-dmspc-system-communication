@@ -109,7 +109,13 @@ services:
 
       kafka-topics --bootstrap-server kafka-broker:29092 \
         --create --if-not-exists \
-        --topic VLBA_data \
+        --topic VLBA_notif \
+        --partitions 1 \
+        --replication-factor 1
+
+      kafka-topics --bootstrap-server kafka-broker:29092 \
+        --create --if-not-exists \
+        --topic DSOC_notif \
         --partitions 1 \
         --replication-factor 1
 
