@@ -1,8 +1,8 @@
 # ===========================================================================
 # We use 1 Dockerfile and 1 docker-compose.yml file to build and 
 # run the Django application in a containerized environment.
-# If hosted locallly, it uses the local Postgres database. If in production, 
-# it uses the Render-hosted Postgres database.
+# If hosted locallly, it uses local .env and a local Postgres database. 
+# For live demo, it uses demo .env and the Render-hosted Postgres database.
 # ===========================================================================
 
 
@@ -78,18 +78,6 @@ services:
     networks:
       - ngradar_website_network
 
-  # ngrok:
-  #   image: ngrok/ngrok:latest
-  #   profiles: ["kafka"]
-  #   env_file:
-  #     - .env
-  #   environment:
-  #     NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN}
-  #   command: tcp broker:9092 --log stdout
-  #   ports:
-  #     - "4040:4040"
-  #   networks:
-  #     - ngradar_website_network
 
 
 # a one-shot init service that creates the 3 kafka topics before the broker starts
@@ -336,33 +324,6 @@ services:
     #     python manage.py dsoc_sim
   
 
-
-  etr_progress_writer:
-    build:
-      context: .
-      target: base
-    env_file:
-      - .env
-    depends_on:
-      postgres:
-        condition: service_healthy
-      kafka-broker:
-        condition: service_healthy
-      kafka-init:
-        condition: service_completed_successfully
-    volumes:
-      - .:/service
-      - dsoc_transfer:/dsoc/incoming
-    networks:
-      - ngradar_website_network
-    profiles: ["kafka"]
-    environment:
-      BOOTSTRAP_SERVER: kafka-broker:29092
-    entrypoint:
-        - python
-        - manage.py
-        - etr_progress_writer
-
   
 
   vlba:
@@ -489,6 +450,33 @@ services:
       - tcp://:4004
       - --data
       - srt://:8008
+
+
+  etr_progress_writer:
+    build:
+      context: .
+      target: base
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka-broker:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+    volumes:
+      - .:/service
+      - dsoc_transfer:/dsoc/incoming
+    networks:
+      - ngradar_website_network
+    profiles: ["kafka"]
+    environment:
+      BOOTSTRAP_SERVER: kafka-broker:29092
+    entrypoint:
+        - python
+        - manage.py
+        - etr_progress_writer
 
 
 #==========================
