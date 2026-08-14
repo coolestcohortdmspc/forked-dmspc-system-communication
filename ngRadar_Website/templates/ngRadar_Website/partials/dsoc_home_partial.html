@@ -13,6 +13,8 @@
         <span class="fs-5">Verifying...</span>
         {% elif latest_etr_event.status == 6 %}
         <span class="fs-5">Transfer Complete. Creating DDM...</span>
+        {% elif latest_etr_event.status == 7 %}
+        <span class="fs-5">Transfer Failed!</span>
         {% elif latest_etr_event.status == 8 %}
         <span class="fs-5">Complete!</span>
         {% elif latest_etr_event.status is None %}

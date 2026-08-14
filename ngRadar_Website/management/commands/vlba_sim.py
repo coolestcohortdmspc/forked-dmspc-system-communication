@@ -27,6 +27,10 @@ Note: I am going to treat this sim as the Hancock VLBA site (Stations.HN) for ha
 
 """
 
+FAILURE_REASONS = {
+      -9: "transfer process was terminated",
+      -6: "destination connection was lost mid-transfer",
+  }
 
 def produce(topic, config, key, value):
     # creates a new producer instance
@@ -156,9 +160,11 @@ def process_msg(msg, producer_topic, producer_config):
             num_bytes=num_bytes,
             filename=frame_path.name,
             message=(
-                "E-transfer failed with return code: "
-                f"{exc.returncode}"
-            ),
+                  f"E-transfer failed: "
+                  f"{FAILURE_REASONS.get(exc.returncode, 'unrecognized failure')} "
+                  f"with uuid: {transfer_uuid} "
+                  f"(return code: {exc.returncode})"
+              ),
         )
         return
     except Exception as exc:
