@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from unittest.mock import patch, MagicMock
 from ngRadar_Website.enums import Stations
+from pathlib import Path
 
 
 # ===============================================
@@ -20,6 +21,8 @@ with patch("pathlib.Path.read_text", return_value=mock_env_data):
         config_func,
         bootstrap,
         consume,
+        create_file,
+        delete_observation_data,
     )
 
 # ==============================================================================
@@ -278,3 +281,34 @@ def test_consume(mock_Consumer):
     mock_Consumer.assert_called_once_with("config")
     mock_consumer.subscribe.assert_called_once_with("topic")
     mock_process_msg.assert_called_once_with(mock_msg, None, None)
+
+
+# ==============================================================================
+# X. create_file Test
+# ==============================================================================
+
+def test_create_file(tmp_path):
+    file_path = tmp_path / "test.bin"
+
+    create_file(file_path, file_mb=1)
+
+    assert file_path.exists()
+    assert file_path.stat().st_size == 1 * 1024 * 1024
+
+
+# ==============================================================================
+# X. delete_observation_data Test
+# ==============================================================================
+
+def test_delete_observation_data(tmp_path):
+    temp_file_name = "sample_data.bin"
+    temp_file = tmp_path / temp_file_name
+    temp_file.write_bytes(b"This is a test file")
+
+    assert temp_file.exists()
+
+    delete_observation_data(temp_file_name, dir=tmp_path)
+
+    assert not temp_file.exists()
+
+    

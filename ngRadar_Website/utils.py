@@ -536,14 +536,17 @@ def send_kafka_message(
 
 
     
-def create_file(file_path):
-    file_mb = 100
+def create_file(file_path, file_mb=100):
     file_size_bytes = file_mb * 1024 * 1024
     num_buffers = 100
 
+    buffer_size = file_size_bytes // num_buffers
+    remainder = file_size_bytes % num_buffers
+
     with open(file_path, "wb") as file:
-        for _ in range(num_buffers):
-            buffer = random.randbytes(int(file_size_bytes / num_buffers))
+        for i in range(num_buffers):
+            size = buffer_size + (1 if i < remainder else 0)
+            buffer = random.randbytes(size)
             file.write(buffer)
 
     print(f"Successfully created a {file_mb}MB random binary file at {file_path}")
@@ -561,8 +564,8 @@ def watch_for_file(file_path):
         time.sleep(1)
 
 
-def delete_observation_data(file_name):
-    file_path = Path("/raw_data") / file_name
+def delete_observation_data(file_name, dir="/raw_data"):
+    file_path = Path(dir) / file_name
     if os.path.exists(file_path):
         os.remove(file_path)
         print(f"Successfully deleted {file_name}")
