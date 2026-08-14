@@ -8,7 +8,8 @@ import numpy as np
 import io
 from ngRadar_Website.models.models import gbtEvent, dsocEvent, ETransferEvent
 from ngRadar_Website.enums import Stations, Status, Message
-from ngRadar_Website.utils import latency_calc, bootstrap, consume, create_s3_client, upload_seaweedfs, write_transfer_progress, send_kafka_message
+# from ngRadar_Website.utils import latency_calc, bootstrap, consume, create_s3_client, upload_seaweedfs, write_transfer_progress, send_kafka_message, get_folder_size
+from ngRadar_Website.utils import *
 from pathlib import Path
 import json
 import uuid
@@ -147,41 +148,6 @@ def verify_incoming_transfer(
         )
 
 
-# Helper function to record the status of the e-transfer in the ETransferEvent table
-def record_transfer_event(
-    *,
-    transfer_uuid,
-    gbt_uuid,
-    station,
-    status,
-    num_bytes=0,
-    latency_ms=0.0,
-    message="",
-):
-    gbt_event = gbtEvent.objects.get(uuid=gbt_uuid)
-
-    return ETransferEvent.objects.create(
-        transfer_uuid=transfer_uuid,
-        gbt_uuid=gbt_uuid,
-        object_id=gbt_event.object_id,
-        target=gbt_event.target,
-        station=station,
-        event_time=datetime.now(timezone.utc),
-        latency_ms=latency_ms,
-        num_bytes=num_bytes,
-        status=status,
-        message=message,
-    )
-
-def get_storage_used(folder_path: Path):
-    if not folder_path.exists():
-        raise FileNotFoundError(folder_path)
-
-    total = sum(p.stat().st_size for p in folder_path.rglob("*") if p.is_file())
-    print(f"Size of folder: {total} bytes")
-    return total
-
-
 def track_etransfer_progress(payload, incoming_file: Path):
     transfer_uuid = payload["transfer_uuid"] # syntax?
     num_bytes = payload["num_bytes"] # make this an int?
@@ -243,7 +209,7 @@ def process_msg(msg, producer_topic, producer_config):
 
         storage_limit = int(os.environ["DSOC_VOLUME_SIZE"]) * 1000000000
         print(f"DSOC has {storage_limit} bytes of storage total.")
-        storage_used = int(get_storage_used(volume_folder))
+        storage_used = int(get_folder_size(volume_folder))
         print(f"DSOC is using {storage_used/1000000000:0.3f}GB of the total {storage_limit/1000000000}GB storage capacity.")
         if storage_used+expected_num_bytes >= storage_limit-1:
             # if the current storage plus the incoming file gets within 1GB of our imposed limit, we decline the e-transfer

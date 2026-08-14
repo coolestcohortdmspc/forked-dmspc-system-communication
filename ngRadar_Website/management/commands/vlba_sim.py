@@ -4,7 +4,7 @@ import uuid
 
 from django.core.management.base import BaseCommand
 from confluent_kafka import Producer
-from ngRadar_Website.utils import bootstrap, consume, etc_send, create_file, watch_for_file, delete_observation_data, send_kafka_message
+from ngRadar_Website.utils import *
 from ngRadar_Website.enums import Stations, Status, Message
 from pathlib import Path
 from django.utils import timezone
@@ -25,33 +25,6 @@ Note: I am going to treat this sim as the Hancock VLBA site (Stations.HN) for ha
     Stations enum: HN  = 91, "Hancock (25-m, VLBA)"
 
 """
-
-
-# Helper function to record the status of the e-transfer in the ETransferEvent table
-def record_transfer_event(
-    *,
-    transfer_uuid,
-    gbt_uuid,
-    station,
-    status,
-    num_bytes=0,
-    latency_ms=0.0,
-    message="",
-):
-    gbt_event = gbtEvent.objects.get(uuid=gbt_uuid)
-
-    return ETransferEvent.objects.create(
-        transfer_uuid=transfer_uuid,
-        gbt_uuid=gbt_uuid,
-        object_id=gbt_event.object_id,
-        target=gbt_event.target,
-        station=station,
-        event_time=datetime.now(timezone.utc),
-        latency_ms=latency_ms,
-        num_bytes=num_bytes,
-        status=status,
-        message=message,
-    )
 
 
 def process_msg(msg, producer_topic, producer_config):
