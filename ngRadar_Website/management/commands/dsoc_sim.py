@@ -173,15 +173,13 @@ def record_transfer_event(
         message=message,
     )
 
-def get_storage_used(folder_path):
-    storage_used = 0
+def get_storage_used(folder_path: Path):
+    if not folder_path.exists():
+        raise FileNotFoundError(folder_path)
 
-    for file in folder_path.rglob("*"):
-        if file.is_file():
-            storage_used += file.stat().st_size
-            print(f"Size of folder: {storage_used} bytes")
-    return storage_used
-
+    total = sum(p.stat().st_size for p in folder_path.rglob("*") if p.is_file())
+    print(f"Size of folder: {total} bytes")
+    return total
 
 
 def track_etransfer_progress(payload, incoming_file: Path):
@@ -245,8 +243,8 @@ def process_msg(msg, producer_topic, producer_config):
 
         storage_limit = int(os.environ["DSOC_VOLUME_SIZE"]) * 1000000000
         print(f"DSOC has {storage_limit} bytes of storage total.")
-        storage_used = int(get_storage_used(volume_path))
-        print(f"DSOC has {storage_used}/{storage_limit} bytes of storage capacity.")
+        storage_used = int(get_storage_used(volume_folder))
+        print(f"DSOC is using {storage_used/1000000000:0.3f}GB of the total {storage_limit/1000000000}GB storage capacity.")
         if storage_used+expected_num_bytes >= storage_limit-1:
             # if the current storage plus the incoming file gets within 1GB of our imposed limit, we decline the e-transfer
             send_kafka_message(
