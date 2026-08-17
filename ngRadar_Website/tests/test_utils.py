@@ -511,7 +511,7 @@ def test_etc_send(mock_parse, mock_os_read, mock_select, mock_os_close, mock_pop
     mock_uuid.assert_called_once()
     mock_os_open.assert_called_once()
     mock_popen.assert_called_once_with(
-        ["etc", str(mock_frame_path), os.environ["ETD_DESTINATION"], "--overwrite",],
+        ["etc", str(mock_frame_path), os.environ["ETD_DESTINATION"],],
         stdin=mock_slave,
         stdout=mock_slave,
         stderr=mock_slave,
