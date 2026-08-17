@@ -603,3 +603,44 @@ def test_record_transfer_event(mock_etr_event, mock_gbt_event):
         status=Status.TRANSFERRED,
         message="Test message")
 
+# ==============================================================================
+# 8. send_kafka_message Test
+# ==============================================================================
+
+@patch("ngRadar_Website.utils.produce")
+@patch("ngRadar_Website.utils.datetime")
+def test_send_kafka_message(mock_datetime, mock_produce):
+    key=1
+    producer_topic="test_topic"
+    producer_config="test_config"
+    transfer_uuid="test_transfer_uuid"
+    gbt_uuid="test_gbt_uuid"
+    status=Status.TRANSFERRING
+    num_bytes=2048
+    filename="mock.filename"
+    message=1
+
+    mock_produce.return_value = None
+
+    fake_datetime = MagicMock()
+    fake_datetime.isoformat.return_value = "2026-08-12T12:34:56+00:00"
+    mock_datetime.now.return_value = fake_datetime
+
+    send_kafka_message(
+        key=key,
+        producer_topic=producer_topic,
+        producer_config=producer_config,
+        transfer_uuid=transfer_uuid,
+        gbt_uuid=gbt_uuid,
+        status=status,
+        num_bytes=num_bytes,
+        filename=filename, 
+        message=message,
+    )
+
+    mock_produce.assert_called_once_with(
+        producer_topic,
+        producer_config,
+        key,
+        '{"transfer_uuid": "test_transfer_uuid", "gbt_uuid": "test_gbt_uuid", "status": 4, "num_bytes": 2048, "filename": "mock.filename", "event_time": "2026-08-12T12:34:56+00:00", "message": 1, "stations": "Hancock (25-m, VLBA)"}',
+    )
