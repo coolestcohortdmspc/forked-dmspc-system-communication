@@ -186,14 +186,23 @@ def bootstrap(sim):
 #     load_dotenv(override=True)
 
 
-def consume(topic, config, process_msg, producer_topic=None, producer_config=None):
+def consume(topic, config, process_msg, producer_topic=None, producer_config=None, manual_commit=False):
     """
     Description: Creates a new consumer instance; subscribes to a Kafka topic and receives messages.
     Inputs: topic = The Kafka topic to receieve messages from.
             config = Server configuration defining the bootstrap, byte and timeout limits, and IDs.
             process_msg = A function which accepts the Kafka message as an input.
+            manual_commit = If True, turns off Kafka's 5-second auto-commit timer and only marks a
+                message as done once process_msg returns True. Work that never finished (for example,
+                the container was killed mid e-transfer) is then redelivered on restart, letting
+                etc_send pick the partial transfer back up via --resume.
+                Callers that opt in MUST have process_msg return True/False.
     Returns: N/A
     """
+
+    if manual_commit:
+        # Copy rather than mutate: bootstrap() hands the same config dict to other callers.
+        config = {**config, "enable.auto.commit": False}
 
     consumer = Consumer(config)
 
@@ -213,7 +222,10 @@ def consume(topic, config, process_msg, producer_topic=None, producer_config=Non
                 continue
 
             #if msg is not None and msg.error() is None:
-            process_msg(msg, producer_topic, producer_config)
+            succeeded = process_msg(msg, producer_topic, producer_config)
+
+            if manual_commit and succeeded:
+                consumer.commit(msg)
     except Exception as e:
         import traceback
         print("An unhandled exception occurred in the consumer loop:")

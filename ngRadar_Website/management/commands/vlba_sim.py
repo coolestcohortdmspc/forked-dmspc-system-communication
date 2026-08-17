@@ -109,7 +109,7 @@ def process_msg(msg, producer_topic, producer_config):
                 filename=frame_path.name,
                 message="Source file does not exist",
             )
-            return
+            return False 
     
     
     elif incoming_key == Message.DSOC_RESPOND_STORAGE.value:
@@ -171,7 +171,7 @@ def process_msg(msg, producer_topic, producer_config):
                 #         f"{exc.returncode}"
                 #     ),
                 # )
-                return
+                return False 
             except Exception as exc:
                 print(f"Unexpected e-transfer failure: {exc}")
                 record_transfer_event(
@@ -192,7 +192,7 @@ def process_msg(msg, producer_topic, producer_config):
                 #     filename=frame_path.name,
                 #     message=f"Unexpected e-transfer failure: {exc}",
                 # )
-                return
+                return False 
 
 
         else:  #TODO Add logic if incomng message is "No"
@@ -207,6 +207,8 @@ def process_msg(msg, producer_topic, producer_config):
     else:
         print("NOT A VALID KAFKA MESSAGE VALUE!")
 
+    return True
+
 
 class Command(BaseCommand):
     help = "Runs the VLBA simulator"
@@ -216,4 +218,11 @@ class Command(BaseCommand):
 
         producer_topic, producer_config, consumer_topic, consumer_config = bootstrap(Stations.HN)
 
-        consume(consumer_topic, consumer_config, process_msg, producer_topic=producer_topic, producer_config=producer_config)
+        consume(
+            consumer_topic,
+            consumer_config,
+            process_msg,
+            producer_topic=producer_topic,
+            producer_config=producer_config,
+            manual_commit=True,
+        )
