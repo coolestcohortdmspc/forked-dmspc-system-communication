@@ -78,7 +78,7 @@ services:
 
 
 
-# a one-shot init service that creates the 3 kafka topics before the broker starts
+# A one-shot init service that creates the Kafka topics after the broker is healthy
   kafka-init:
     image: confluentinc/cp-kafka:7.5.1
     depends_on:
@@ -214,8 +214,8 @@ services:
       - ngradar_website_network
     profiles: ["kafka"]
     environment:
-      BOOTSTRAP_SERVER: ${BOOTSTRAP_SERVER:-kafka-broker:29092}
-      # if we move this to a separate machine, use the below bootsrap server:
+      BOOTSTRAP_SERVER: kafka-broker:29092
+      # if we move this sim to a separate machine, use the below bootstrap server:
       # BOOTSTRAP_SERVER=7.tcp.ngrok.io:26729
     entrypoint:
         - python
@@ -248,8 +248,8 @@ services:
       - ngradar_website_network
     profiles: ["kafka"]
     environment:
-      BOOTSTRAP_SERVER: ${BOOTSTRAP_SERVER:-kafka-broker:29092}
-      # if we move this to a separate machine, use the below bootsrap server:
+      BOOTSTRAP_SERVER: kafka-broker:29092
+      # if we move this sim to a separate machine, use the below bootstrap server:
       # BOOTSTRAP_SERVER=7.tcp.ngrok.io:26729
     entrypoint:
         - python
@@ -282,8 +282,8 @@ services:
     profiles: ["kafka"]
     environment:
       ETD_DESTINATION: "etr_daemon:/dsoc/incoming/"
-      BOOTSTRAP_SERVER: ${BOOTSTRAP_SERVER:-kafka-broker:29092}
-      # if we move this to a separate machine, use the below bootsrap server:
+      BOOTSTRAP_SERVER: kafka-broker:29092
+      # if we move this sim to a separate machine, use the below bootstrap server:
       # BOOTSTRAP_SERVER=7.tcp.ngrok.io:26729
     entrypoint:
       - python
@@ -306,7 +306,7 @@ services:
       WEED_S3_ACCESS_KEY: ${WEED_S3_ACCESS_KEY}
       WEED_S3_SECRET_KEY: ${WEED_S3_SECRET_KEY}
     ports:
-      - "8333:8333" # The S3 gateway, the only port we need to expose to the internet for demo of our cloud-hosted website
+      - "8333:8333" # SeaweedFS S3 gateway (ngrok exposes this during demos for our cloud-hosted website to retrieve images)
       - "8888:8888"
       - "9333:9333"
     volumes:
@@ -393,8 +393,8 @@ services:
       - ngradar_website_network
     profiles: ["kafka"]
     environment:
-      BOOTSTRAP_SERVER: ${BOOTSTRAP_SERVER:-kafka-broker:29092}
-      # if we move this to a separate machine, use the below bootsrap server:
+      BOOTSTRAP_SERVER: kafka-broker:29092
+      # if we move this to a separate machine, use the below bootstrap server:
       # BOOTSTRAP_SERVER=7.tcp.ngrok.io:26729
     entrypoint:
         - python

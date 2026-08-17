@@ -16,14 +16,3 @@ endpoints:
     upstream:
       url: tcp://kafka-broker:9094
 
-# Will need these etransfer endpoints if we move VLBA to a separate machine off the docker network
-# in order for VLBA to etransfer raw data files to DSOC's etd daemon.
-  # - name: etransfer-command
-  #   url: tcp://7.tcp.ngrok.io:26730
-  #   upstream:
-  #     url: tcp://etr_daemon:4004
-
-  # - name: etransfer-data
-  #   url: tcp://7.tcp.ngrok.io:26731
-  #   upstream:
-  #     url: tcp://etr_daemon:8008
