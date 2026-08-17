@@ -3,7 +3,7 @@ import uuid
 # from confluent_kafka.admin import AdminClient, NewTopic, KafkaException, KafkaError
 from dotenv import load_dotenv
 from ngRadar_Website.enums import Stations
-from confluent_kafka import Consumer
+from confluent_kafka import Consumer, Producer
 import boto3
 import os
 import time
@@ -65,20 +65,20 @@ def config_func(sim, bootstrap):
     """
 
     # determine the type of sim being used - each one has unique kafka topics:
-    if sim in [Stations.GBT, Stations.HN]:
+    if sim in [Stations.GBT, Stations.HN, Stations.DSOC]:
         type = "producer and consumer"
         if sim == Stations.GBT:
             # GBT consumes from UI, produces to GBT
-            topic1 = "user_input"
+            topic1 = ["user_input"]
             topic2 = "GBT_data"
-        else:
-            # VLBA consumes from GBT, produces to VLBA
-            topic1 = "GBT_data"
-            topic2 = "VLBA_data"
-    elif sim == Stations.DSOC:
-        # DSOC is now consuming from VLBA
-        type = "consumer"
-        topic = ["VLBA_data"]  #consumes from the GBT's topic
+        elif sim == Stations.HN:
+            # VLBA consumes from GBT and DSOC, produces to DSOC
+            topic1 = ["GBT_data", "DSOC_notif"]
+            topic2 = "VLBA_notif"
+        elif sim == Stations.DSOC:
+            # DSOC is now consuming from and producing to VLBA
+            topic1 = ["VLBA_notif"]  #consumes from the GBT's topic
+            topic2 = "DSOC_notif"
     elif sim == Stations.ETR:
         type = "consumer"
         topic = ["GBT_data"]
@@ -116,7 +116,7 @@ def config_func(sim, bootstrap):
             "client.id": f"{sim.name.lower()}-producer",
         }
 
-        consumer_topic = [topic1]
+        consumer_topic = topic1
         consumer_config = {
             "bootstrap.servers": bootstrap,
             "fetch.max.bytes": MAX_BYTES,
@@ -124,7 +124,7 @@ def config_func(sim, bootstrap):
             "client.id": f"{sim.name.lower()}-consumer",
             "group.id": f"{sim.name.lower()}-consumer-group",
             "auto.offset.reset": "earliest",
-        }
+        }  # TODO make sure this works
         return producer_topic, producer_config, consumer_topic, consumer_config
     elif type == "consumer":
         # config for just consumer
@@ -199,6 +199,7 @@ def consume(topic, config, process_msg, producer_topic=None, producer_config=Non
 
     #subscribes to the specified topic
     consumer.subscribe(topic)
+    # TODO make sure works with multiple topics
     
     try:
         while True:
@@ -487,17 +488,53 @@ def etc_send(frame_path):
             process.args,
         )
 
-    # Ensure progress ends exactly at 100%.
-    # write_transfer_progress(
-    #     received_bytes=expected_num_bytes,
-    #     total_bytes=expected_num_bytes,
-    #     percent=100.0,
-    #     transfer_id=transfer_id,
-    # )
+
+def produce(topic, config, key, value):
+    # creates a new producer instance
+    producer = Producer(config)
+
+    # producing a message to the specified topic 
+    producer.produce(topic, key=key, value=value)
+    print(f"Produced message to topic {topic} with key {key}.")
+
+    # send any outstanding or buffered messages to the Kafka broker
+    producer.flush()
+
+def send_kafka_message(
+    *,
+    key,
+    producer_topic,
+    producer_config,
+    transfer_uuid,
+    gbt_uuid,
+    status,
+    num_bytes,
+    filename,
+    message="",
+    stations=Stations.HN,
+):
+    payload = {
+        "transfer_uuid": str(transfer_uuid),
+        "gbt_uuid": str(gbt_uuid),
+        "status": int(status),
+        "num_bytes": num_bytes,
+        "filename": filename,
+        "event_time": datetime.now(timezone.utc).isoformat(),
+        "message": message,
+        "stations": stations.label,
+    }
+
+    produce(
+        producer_topic,
+        producer_config,
+        key,
+        json.dumps(payload),
+    )
+
 
     
 def create_file(file_path):
-    file_mb = 500
+    file_mb = 100
     file_size_bytes = file_mb * 1024 * 1024
     num_buffers = 100
 
@@ -520,4 +557,11 @@ def watch_for_file(file_path):
 
         time.sleep(1)
 
-    # TODO SET ETRANSFER TO READY AND GIVE IT THIS FILE PATH
+
+def delete_observation_data(file_name):
+    file_path = Path("/raw_data") / file_name
+    if os.path.exists(file_path):
+        os.remove(file_path)
+        print(f"Successfully deleted {file_name}")
+    else:
+        print(f"File {file_name} does not exists")
