@@ -3,6 +3,7 @@ import os
 import pytest
 from unittest.mock import patch, MagicMock
 from ngRadar_Website.enums import Stations
+from pathlib import Path
 from botocore.config import Config
 from botocore.exceptions import (
     EndpointConnectionError,
@@ -27,6 +28,8 @@ with patch("pathlib.Path.read_text", return_value=mock_env_data):
         config_func,
         bootstrap,
         consume,
+        create_file,
+        delete_observation_data,
         create_s3_client,
         ensure_bucket_exists,
         etc_send,
@@ -283,6 +286,42 @@ def test_consume(mock_Consumer):
 
 
 # ==============================================================================
+# X. create_file Test
+# ==============================================================================
+
+def test_create_file(tmp_path):
+    file_path = tmp_path / "test.bin"
+
+    create_file(file_path, file_mb=1)
+
+    assert file_path.exists()
+    assert file_path.stat().st_size == 1 * 1024 * 1024
+
+
+# ==============================================================================
+# X. delete_observation_data Test
+# ==============================================================================
+
+def test_delete_observation_data_exist(tmp_path):
+    temp_file_name = "sample_data.bin"
+    temp_file = tmp_path / temp_file_name
+    temp_file.write_bytes(b"This is a test file")
+
+    assert temp_file.exists()
+
+    delete_observation_data(temp_file_name, dir=tmp_path)
+
+    assert not temp_file.exists()
+
+
+def test_delete_observation_data_not_exist(capsys, tmp_path):
+    temp_file_name = "test_fail.bin"
+
+    delete_observation_data(temp_file_name, dir=tmp_path)
+
+    captured = capsys.readouterr()
+
+    assert captured.out.strip() == f"File {temp_file_name} does not exists"
 # 4. create_s3_client Test
 # ==============================================================================
 
