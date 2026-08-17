@@ -537,7 +537,7 @@ def send_kafka_message(
 
     
 def create_file(file_path):
-    file_mb = 500
+    file_mb = 300
     file_size_bytes = file_mb * 1024 * 1024
     num_buffers = 100
 

@@ -227,7 +227,7 @@ def process_msg(msg, producer_topic, producer_config):
                             station=Stations.HN,
                             status=Status.FAILED,
                             num_bytes=payload["num_bytes"],
-                            message=f"DSOC does not have enough storage to accept the incoming data from {Stations.HN}",
+                            message=f"DSOC does not have enough storage to accept the incoming data from {Stations.HN.label}",
                         )
                     send_kafka_message(
                         key = key, 
@@ -243,6 +243,16 @@ def process_msg(msg, producer_topic, producer_config):
                     print(f"DSOC does not have enough storage to accept the data transfer request. The remaining disk space is {space_remaining:0.2f}GB and the incoming data is {expected_num_bytes/1000000000:0.2f}GB")
 
             else:
+                if payload["message"] != 1:
+                    record_transfer_event(
+                        transfer_uuid=payload["transfer_uuid"],
+                        gbt_uuid=payload["gbt_uuid"],
+                        station=Stations.HN,
+                        status=Status.READY,
+                        num_bytes=payload["num_bytes"],
+                        message=f"DSOC made room to to accept the incoming data from {Stations.HN.label}",
+                    )     
+                    
                 send_kafka_message(
                     key = key, 
                     producer_topic=producer_topic,
