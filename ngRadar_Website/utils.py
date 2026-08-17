@@ -3,6 +3,7 @@ import uuid
 # from confluent_kafka.admin import AdminClient, NewTopic, KafkaException, KafkaError
 from dotenv import load_dotenv
 from ngRadar_Website.enums import Stations
+from ngRadar_Website.models.models import gbtEvent, dsocEvent, ETransferEvent
 from confluent_kafka import Consumer, Producer
 import boto3
 import os
@@ -20,6 +21,7 @@ from botocore.exceptions import (
     ClientError,
 )
 from pathlib import Path
+from confluent_kafka import Producer
 
 # regex patterns to match the progress output of the etc command
 PROGRESS_RE = re.compile(
@@ -35,14 +37,18 @@ SESSION_TIMEOUT_MS = 45000
 MAX_BYTES = 8388608
 
 
-def latency_calc(event_time, sim=None):
+def latency_calc(event_time, sim=None, current_time=None):
     """
     Description: Calculates the latency of the message from the time it was sent to the time it was received
     Inputs: event_time = Time in the past. This is the time when the 'stopwatch' starts on our latency calculation
             sim = the sim file in use (GBT or DSOC)
     Returns: latency_ms = Latency in milliseconds
     """
-    current_time = datetime.now(timezone.utc)
+    if current_time is None:
+        current_time = datetime.now(timezone.utc)
+    else:
+        current_time = current_time
+
     if sim == Stations.GBT:
         if event_time == -1:
                 latency_ms = 0 #NOTE We are currently setting latency = 0 for the very first gbt payload, which is not triggered by a UI event. I want to make this a Null field in the future (will require a migration)
@@ -322,8 +328,6 @@ def upload_seaweedfs(s3, image_key, file_data):
     return image_key
 
 
-
-
 #==========================
 # etransfer util functions
 #=========================
@@ -421,7 +425,6 @@ def etc_send(frame_path):
             "etc",
             str(frame_path),
             os.environ["ETD_DESTINATION"],
-            "--overwrite",
         ],
         stdin=slave_fd,
         stdout=slave_fd,
@@ -503,6 +506,7 @@ def produce(topic, config, key, value):
     # send any outstanding or buffered messages to the Kafka broker
     producer.flush()
 
+    
 def send_kafka_message(
     *,
     key,
@@ -534,16 +538,18 @@ def send_kafka_message(
         json.dumps(payload),
     )
 
-
     
-def create_file(file_path):
-    file_mb = 100
+def create_file(file_path, file_mb=100):
     file_size_bytes = file_mb * 1024 * 1024
     num_buffers = 100
 
+    buffer_size = file_size_bytes // num_buffers
+    remainder = file_size_bytes % num_buffers
+
     with open(file_path, "wb") as file:
-        for _ in range(num_buffers):
-            buffer = random.randbytes(int(file_size_bytes / num_buffers))
+        for i in range(num_buffers):
+            size = buffer_size + (1 if i < remainder else 0)
+            buffer = random.randbytes(size)
             file.write(buffer)
 
     print(f"Successfully created a {file_mb}MB random binary file at {file_path}")
@@ -560,11 +566,61 @@ def watch_for_file(file_path):
 
         time.sleep(1)
 
+    # TODO SET ETRANSFER TO READY AND GIVE IT THIS FILE PATH
 
-def delete_observation_data(file_name):
-    file_path = Path("/raw_data") / file_name
+
+def produce(topic, config, key, value):
+    # creates a new producer instance
+    producer = Producer(config)
+
+    # producing a message to the specified topic 
+    producer.produce(topic, key=key, value=value)
+    print(f"Produced message to topic {topic} with key {key}.")
+
+    # send any outstanding or buffered messages to the Kafka broker
+    producer.flush()
+
+    
+def delete_observation_data(file_name, dir="/raw_data"):
+    file_path = Path(dir) / file_name
     if os.path.exists(file_path):
         os.remove(file_path)
         print(f"Successfully deleted {file_name}")
     else:
         print(f"File {file_name} does not exists")
+
+
+def get_folder_size(folder_path: Path):
+    if not folder_path.exists():
+        raise FileNotFoundError(folder_path)
+
+    total = sum(p.stat().st_size for p in folder_path.rglob("*") if p.is_file())
+    #print(f"Size of folder: {total} bytes")
+    return total
+
+  
+# Helper function to record the status of the e-transfer in the ETransferEvent table
+def record_transfer_event(
+    *,
+    transfer_uuid,
+    gbt_uuid,
+    station,
+    status,
+    num_bytes=0,
+    latency_ms=0.0,
+    message="",
+):
+    gbt_event = gbtEvent.objects.get(uuid=gbt_uuid)
+
+    return ETransferEvent.objects.create(
+        transfer_uuid=transfer_uuid,
+        gbt_uuid=gbt_uuid,
+        object_id=gbt_event.object_id,
+        target=gbt_event.target,
+        station=station,
+        event_time=datetime.now(timezone.utc),
+        latency_ms=latency_ms,
+        num_bytes=num_bytes,
+        status=status,
+        message=message,
+    )
