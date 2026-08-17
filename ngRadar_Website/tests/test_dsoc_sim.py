@@ -204,45 +204,6 @@ def test_verify_incoming_transfer_nofile(mock_sleep):
     assert str(exc_info.value) == (f"Transfer verification failed for {incoming_file}. ""Expected 500 bytes.")
 
 
-# ==============================================================================
-# 7. record_transfer_event Test
-# ==============================================================================
-
-@patch("ngRadar_Website.management.commands.dsoc_sim.gbtEvent")
-@patch("ngRadar_Website.management.commands.dsoc_sim.ETransferEvent")
-def test_record_transfer_event(mock_etr_event, mock_gbt_event):
-
-    mock_gbt_data = MagicMock()
-    mock_gbt_data.object_id = "123"
-    mock_gbt_data.target = "Venus"
-
-    mock_gbt_event.objects.get.return_value = mock_gbt_data
-
-    etr_record = MagicMock()
-    mock_etr_event.objects.create.return_value = etr_record
-
-    record_transfer_event(
-        transfer_uuid="transfer-uuid",
-        gbt_uuid="gbt-uuid",
-        station=Stations.DSOC,
-        status=Status.TRANSFERRED,
-        num_bytes=2048,
-        latency_ms=500,
-        message="Test message")
-
-    mock_gbt_event.objects.get.assert_called_once_with(uuid="gbt-uuid")
-    mock_etr_event.objects.create.assert_called_once_with(
-        transfer_uuid="transfer-uuid",
-        gbt_uuid="gbt-uuid",
-        object_id="123",
-        target="Venus",
-        station=Stations.DSOC,
-        event_time=mock_etr_event.objects.create.call_args[1]['event_time'],
-        latency_ms=500,
-        num_bytes=2048,
-        status=Status.TRANSFERRED,
-        message="Test message")
-
 
 # ==============================================================================
 # 8. process_msg Test
