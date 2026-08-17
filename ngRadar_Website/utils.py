@@ -3,6 +3,7 @@ import uuid
 # from confluent_kafka.admin import AdminClient, NewTopic, KafkaException, KafkaError
 from dotenv import load_dotenv
 from ngRadar_Website.enums import Stations
+from ngRadar_Website.models.models import gbtEvent, dsocEvent, ETransferEvent
 from confluent_kafka import Consumer, Producer
 import boto3
 import os
@@ -421,7 +422,6 @@ def etc_send(frame_path):
             "etc",
             str(frame_path),
             os.environ["ETD_DESTINATION"],
-            "--overwrite",
         ],
         stdin=slave_fd,
         stdout=slave_fd,
@@ -537,7 +537,7 @@ def send_kafka_message(
 
     
 def create_file(file_path):
-    file_mb = 100
+    file_mb = 300
     file_size_bytes = file_mb * 1024 * 1024
     num_buffers = 100
 
@@ -568,3 +568,38 @@ def delete_observation_data(file_name):
         print(f"Successfully deleted {file_name}")
     else:
         print(f"File {file_name} does not exists")
+
+
+def get_folder_size(folder_path: Path):
+    if not folder_path.exists():
+        raise FileNotFoundError(folder_path)
+
+    total = sum(p.stat().st_size for p in folder_path.rglob("*") if p.is_file())
+    #print(f"Size of folder: {total} bytes")
+    return total
+
+# Helper function to record the status of the e-transfer in the ETransferEvent table
+def record_transfer_event(
+    *,
+    transfer_uuid,
+    gbt_uuid,
+    station,
+    status,
+    num_bytes=0,
+    latency_ms=0.0,
+    message="",
+):
+    gbt_event = gbtEvent.objects.get(uuid=gbt_uuid)
+
+    return ETransferEvent.objects.create(
+        transfer_uuid=transfer_uuid,
+        gbt_uuid=gbt_uuid,
+        object_id=gbt_event.object_id,
+        target=gbt_event.target,
+        station=station,
+        event_time=datetime.now(timezone.utc),
+        latency_ms=latency_ms,
+        num_bytes=num_bytes,
+        status=status,
+        message=message,
+    )
