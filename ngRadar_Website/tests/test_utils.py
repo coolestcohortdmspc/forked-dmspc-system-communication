@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 import os
 import pytest
 from unittest.mock import patch, MagicMock
-from ngRadar_Website.enums import Stations
+from ngRadar_Website.enums import Stations, Status
 from pathlib import Path
 from botocore.config import Config
 from botocore.exceptions import (
@@ -10,7 +10,6 @@ from botocore.exceptions import (
     ConnectionError,
     ClientError,
 )
-
 
 # ===============================================
 # Here we can test all of our utility functions
@@ -35,6 +34,9 @@ with patch("pathlib.Path.read_text", return_value=mock_env_data):
         etc_send,
         watch_for_file,
         produce,
+        record_transfer_event,
+        send_kafka_message,
+
     )
 
 # ==============================================================================
@@ -560,3 +562,44 @@ def test_produce(mock_Producer):
     mock_Producer.assert_called_once_with(config)
     mock_producer.produce.assert_called_once_with(topic, key=key, value=value)
     mock_producer.flush.assert_called_once_with()
+
+
+# ==============================================================================
+# 7. record_transfer_event Test
+# ==============================================================================
+
+@patch("ngRadar_Website.utils.gbtEvent")
+@patch("ngRadar_Website.utils.ETransferEvent")
+def test_record_transfer_event(mock_etr_event, mock_gbt_event):
+
+    mock_gbt_data = MagicMock()
+    mock_gbt_data.object_id = "123"
+    mock_gbt_data.target = "Venus"
+
+    mock_gbt_event.objects.get.return_value = mock_gbt_data
+
+    etr_record = MagicMock()
+    mock_etr_event.objects.create.return_value = etr_record
+
+    record_transfer_event(
+        transfer_uuid="transfer-uuid",
+        gbt_uuid="gbt-uuid",
+        station=Stations.DSOC,
+        status=Status.TRANSFERRED,
+        num_bytes=2048,
+        latency_ms=500,
+        message="Test message")
+
+    mock_gbt_event.objects.get.assert_called_once_with(uuid="gbt-uuid")
+    mock_etr_event.objects.create.assert_called_once_with(
+        transfer_uuid="transfer-uuid",
+        gbt_uuid="gbt-uuid",
+        object_id="123",
+        target="Venus",
+        station=Stations.DSOC,
+        event_time=mock_etr_event.objects.create.call_args[1]['event_time'],
+        latency_ms=500,
+        num_bytes=2048,
+        status=Status.TRANSFERRED,
+        message="Test message")
+

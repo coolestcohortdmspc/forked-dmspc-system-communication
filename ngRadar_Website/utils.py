@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 import uuid
 # from confluent_kafka.admin import AdminClient, NewTopic, KafkaException, KafkaError
 from dotenv import load_dotenv
-from ngRadar_Website.enums import Stations
+from ngRadar_Website.enums import Stations, Status
 from ngRadar_Website.models.models import gbtEvent, dsocEvent, ETransferEvent
 from confluent_kafka import Consumer, Producer
 import boto3
