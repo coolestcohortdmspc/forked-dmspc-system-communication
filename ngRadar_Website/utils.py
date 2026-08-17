@@ -85,9 +85,6 @@ def config_func(sim, bootstrap):
             # DSOC is now consuming from and producing to VLBA
             topic1 = ["VLBA_notif"]  #consumes from the GBT's topic
             topic2 = "DSOC_notif"
-    elif sim == Stations.ETR:
-        type = "consumer"
-        topic = ["GBT_data"]
     else:  # sim == Stations.UI:
         # UI produces to UI topic
         type = "producer"

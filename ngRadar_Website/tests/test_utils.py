@@ -142,13 +142,13 @@ def test_config_func_vlba():
 
     producer_topic, producer_config, consumer_topic, consumer_config = config_func(sim, bootstrap)
 
-    assert producer_topic == "VLBA_data"
+    assert producer_topic == "VLBA_notif"
     assert producer_config == {
             "bootstrap.servers": bootstrap,
             "message.max.bytes": 8388608,
             "client.id": f"{sim.name.lower()}-producer"
         }
-    assert consumer_topic == ["GBT_data"]
+    assert consumer_topic == ["GBT_data", "DSOC_notif"]
     assert consumer_config == {
             "bootstrap.servers": bootstrap,
             "fetch.max.bytes": 8388608,
@@ -165,15 +165,22 @@ def test_config_func_DSOC():
     sim = Stations.DSOC
     bootstrap = "12345"
 
-    topic, config = config_func(sim, bootstrap)
+    producer_topic, producer_config, consumer_topic, consumer_config = config_func(sim, bootstrap)
 
-    assert topic == ["VLBA_data"]
-    assert config == {
+
+    assert producer_topic == "DSOC_notif"
+    assert producer_config == {
+            "bootstrap.servers": bootstrap,
+            "message.max.bytes": 8388608,
+            "client.id": f"{sim.name.lower()}-producer"
+        }
+    assert consumer_topic == ["VLBA_notif"]
+    assert consumer_config == {
             "bootstrap.servers": bootstrap,
             "fetch.max.bytes": 8388608,
             "session.timeout.ms": 45000,
-            "client.id": "dsoc-consumer",
-            "group.id": "dsoc-consumer-group",
+            "client.id": f"{sim.name.lower()}-consumer",
+            "group.id": f"{sim.name.lower()}-consumer-group",
             "auto.offset.reset": "earliest",
         }
 
