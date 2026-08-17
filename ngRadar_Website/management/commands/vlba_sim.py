@@ -6,6 +6,7 @@ from django.core.management.base import BaseCommand
 from confluent_kafka import Producer
 from ngRadar_Website.utils import *
 from ngRadar_Website.enums import Stations, Status, Message
+from confluent_kafka import Producer
 from pathlib import Path
 from django.utils import timezone
 from ngRadar_Website.models.models import gbtEvent, ETransferEvent

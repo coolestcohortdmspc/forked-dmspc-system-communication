@@ -21,6 +21,7 @@ from botocore.exceptions import (
     ClientError,
 )
 from pathlib import Path
+from confluent_kafka import Producer
 
 # regex patterns to match the progress output of the etc command
 PROGRESS_RE = re.compile(
@@ -36,14 +37,18 @@ SESSION_TIMEOUT_MS = 45000
 MAX_BYTES = 8388608
 
 
-def latency_calc(event_time, sim=None):
+def latency_calc(event_time, sim=None, current_time=None):
     """
     Description: Calculates the latency of the message from the time it was sent to the time it was received
     Inputs: event_time = Time in the past. This is the time when the 'stopwatch' starts on our latency calculation
             sim = the sim file in use (GBT or DSOC)
     Returns: latency_ms = Latency in milliseconds
     """
-    current_time = datetime.now(timezone.utc)
+    if current_time is None:
+        current_time = datetime.now(timezone.utc)
+    else:
+        current_time = current_time
+
     if sim == Stations.GBT:
         if event_time == -1:
                 latency_ms = 0 #NOTE We are currently setting latency = 0 for the very first gbt payload, which is not triggered by a UI event. I want to make this a Null field in the future (will require a migration)
@@ -560,7 +565,21 @@ def watch_for_file(file_path):
 
         time.sleep(1)
 
+    # TODO SET ETRANSFER TO READY AND GIVE IT THIS FILE PATH
 
+
+def produce(topic, config, key, value):
+    # creates a new producer instance
+    producer = Producer(config)
+
+    # producing a message to the specified topic 
+    producer.produce(topic, key=key, value=value)
+    print(f"Produced message to topic {topic} with key {key}.")
+
+    # send any outstanding or buffered messages to the Kafka broker
+    producer.flush()
+
+    
 def delete_observation_data(file_name):
     file_path = Path("/raw_data") / file_name
     if os.path.exists(file_path):
