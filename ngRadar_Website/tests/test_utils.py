@@ -300,7 +300,7 @@ def test_create_file(tmp_path):
 # X. delete_observation_data Test
 # ==============================================================================
 
-def test_delete_observation_data(tmp_path):
+def test_delete_observation_data_exist(tmp_path):
     temp_file_name = "sample_data.bin"
     temp_file = tmp_path / temp_file_name
     temp_file.write_bytes(b"This is a test file")
@@ -311,4 +311,12 @@ def test_delete_observation_data(tmp_path):
 
     assert not temp_file.exists()
 
-    
+
+def test_delete_observation_data_not_exist(capsys, tmp_path):
+    temp_file_name = "test_fail.bin"
+
+    delete_observation_data(temp_file_name, dir=tmp_path)
+
+    captured = capsys.readouterr()
+
+    assert captured.out.strip() == f"File {temp_file_name} does not exists"
