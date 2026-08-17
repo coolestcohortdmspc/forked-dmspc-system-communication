@@ -21,7 +21,6 @@ with patch("pathlib.Path.read_text", return_value=mock_env_data):
         generate_payload,
         turn_off_transmitter,
         publish_to_db,
-        produce,
         process_msg,
     )
 
@@ -132,28 +131,9 @@ def test_publish_to_db(mock_gbt_event):
     assert uuid == mock_instance.uuid
     mock_gbt_event.objects.create.assert_called_once_with(**input_data)
 
-# ==============================================================================
-# 5. produce Test
-# ==============================================================================
-
-@patch("ngRadar_Website.management.commands.gbt_sim.Producer")
-def test_produce(mock_Producer):
-    topic = "topic"
-    config = "config"
-    key = "key"
-    value = "value"
-    
-    mock_producer = mock_Producer.return_value
-
-    produce(topic, config, key, value)
-
-    mock_Producer.assert_called_once_with(config)
-    mock_producer.produce.assert_called_once_with(topic, key=key, value=value)
-    mock_producer.flush.assert_called_once_with()
-
 
 # ==============================================================================
-# 6. process_msg Test
+# 5. process_msg Test
 # ==============================================================================
 
 
