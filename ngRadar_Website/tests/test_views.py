@@ -30,6 +30,11 @@ with patch("pathlib.Path.read_text", return_value=mock_env_data):
         logout_view,
         latency_graphing,
         home_view,
+        dashboard_view,
+        event_table_partial,
+        status_partial,
+        dsoc_event_partial,
+        gbt_event_partial,
     )
 
 
@@ -323,19 +328,121 @@ def test_logout_view(mock_logout_msg, mock_logout):
 
 # ==============================================================================
 # 7. home_view Test
-
-# WORK IN PROGRESS
 # ==============================================================================
 
-# @patch("ngRadar_Website.views.views.render")
-# @patch("ngRadar_Website.views.views.get_obs_events")
-# def test_home_view(mock_obs_event, mock_render):
-#     request = MagicMock()
+@patch("ngRadar_Website.views.views.render")
+@patch("ngRadar_Website.views.views.get_obs_events")
+def test_home_view(mock_obs_event, mock_render):
+    request = MagicMock()
 
-#     mock_render.return_value = "fake_response"
-#     mock_obs_event.return_value = "fake_obs_events"
+    response = HttpResponse("fake_response")
+    mock_render.return_value = response
+    mock_obs_event.return_value = "fake_obs_events"
 
-#     output = home_view(request)
+    output = home_view(request)
 
-#     assert output == "fake_response"
-#     mock_render.assert_called_once_with(request, "ngRadar_Website/home.html", mock_obs_event())
+    assert output == response
+    mock_obs_event.assert_called_once_with()
+    mock_render.assert_called_once_with(request, "ngRadar_Website/home.html", mock_obs_event())
+
+
+# ==============================================================================
+# 8. dashboard_view Test
+# ==============================================================================
+
+@patch("ngRadar_Website.views.views.render")
+@patch("ngRadar_Website.views.views.get_obs_events")
+def test_dashboard_view(mock_obs_event, mock_render):
+    request = MagicMock()
+
+    response = HttpResponse("fake_response")
+    mock_render.return_value = response
+    mock_obs_event.return_value = "fake_obs_events"
+
+    output = dashboard_view(request)
+
+    assert output == response
+    mock_obs_event.assert_called_once_with()
+    mock_render.assert_called_once_with(request, "ngRadar_Website/dashboard.html", mock_obs_event())
+
+
+# ==============================================================================
+# 9. event_table_partial Test
+# ==============================================================================
+
+@patch("ngRadar_Website.views.views.render")
+@patch("ngRadar_Website.views.views.get_obs_events")
+def test_event_table_partial(mock_obs_event, mock_render):
+    request = MagicMock()
+
+    response = HttpResponse("fake_response")
+    mock_render.return_value = response
+    mock_obs_event.return_value = "fake_obs_events"
+
+    output = event_table_partial(request)
+
+    assert output == response
+    mock_obs_event.assert_called_once_with()
+    mock_render.assert_called_once_with(request, "ngRadar_Website/partials/dashboard_updates.html", mock_obs_event())
+
+
+# ==============================================================================
+# 10. status_partial Test
+# ==============================================================================
+
+@patch("ngRadar_Website.views.views.render")
+@patch("ngRadar_Website.views.views.get_obs_events")
+def test_status_partial(mock_obs_event, mock_render):
+    request = MagicMock()
+    
+    response = HttpResponse("fake_response")
+    mock_render.return_value = response
+    mock_obs_event.return_value = "fake_obs_events"
+
+    output = status_partial(request)
+
+    assert output == response
+    mock_obs_event.assert_called_once_with()
+    mock_render.assert_called_once_with(request, "ngRadar_Website/partials/status_partial.html", mock_obs_event())
+
+
+# ==============================================================================
+# 11. dsoc_event_partial Test
+# ==============================================================================
+
+@patch("ngRadar_Website.views.views.render")
+@patch("ngRadar_Website.views.views.get_obs_events")
+@patch("ngRadar_Website.views.views.get_dsoc_events")
+def test_dsoc_event_partial(mock_dsoc_event, mock_obs_event, mock_render):
+    request = MagicMock()
+        
+    response = HttpResponse("fake_response")
+    mock_render.return_value = response
+    mock_obs_event.return_value = "fake_obs_events"
+    mock_dsoc_event.return_value = "fake_dsoc_events"
+    output = dsoc_event_partial(request)
+
+    assert output == response
+    mock_obs_event.assert_called_once_with()
+    mock_dsoc_event.assert_called_once_with()
+    mock_render.assert_called_once_with(request, "ngRadar_Website/partials/dsoc_home_partial.html", mock_obs_event(), mock_dsoc_event())
+
+
+# ==============================================================================
+# 12. gbt_event_partial Test
+# ==============================================================================
+
+@patch("ngRadar_Website.views.views.render")
+@patch("ngRadar_Website.views.views.get_obs_events")
+def test_gbt_event_partial(mock_obs_event, mock_render):
+    request = MagicMock()
+        
+    response = HttpResponse("fake_response")
+    mock_render.return_value = response
+    mock_obs_event.return_value = "fake_obs_events"
+
+    output = gbt_event_partial(request)
+
+    assert output == response
+    mock_obs_event.assert_called_once_with()
+    mock_render.assert_called_once_with(request, "ngRadar_Website/partials/gbt_home_partial.html", mock_obs_event())
