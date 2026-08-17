@@ -4,7 +4,7 @@ import uuid
 
 from django.core.management.base import BaseCommand
 from confluent_kafka import Producer
-from ngRadar_Website.utils import bootstrap, consume, etc_send, create_file, watch_for_file, delete_observation_data, send_kafka_message
+from ngRadar_Website.utils import *
 from ngRadar_Website.enums import Stations, Status, Message
 from pathlib import Path
 from django.utils import timezone
@@ -30,33 +30,6 @@ FAILURE_REASONS = {
     -9: "transfer process was terminated",
     -6: "destination connection was lost mid-transfer",
 }
-
-
-# Helper function to record the status of the e-transfer in the ETransferEvent table
-def record_transfer_event(
-    *,
-    transfer_uuid,
-    gbt_uuid,
-    station,
-    status,
-    num_bytes=0,
-    latency_ms=0.0,
-    message="",
-):
-    gbt_event = gbtEvent.objects.get(uuid=gbt_uuid)
-
-    return ETransferEvent.objects.create(
-        transfer_uuid=transfer_uuid,
-        gbt_uuid=gbt_uuid,
-        object_id=gbt_event.object_id,
-        target=gbt_event.target,
-        station=station,
-        event_time=datetime.now(timezone.utc),
-        latency_ms=latency_ms,
-        num_bytes=num_bytes,
-        status=status,
-        message=message,
-    )
 
 
 def process_msg(msg, producer_topic, producer_config):
@@ -94,8 +67,9 @@ def process_msg(msg, producer_topic, producer_config):
                 status=Status.READY,
                 num_bytes=num_bytes,
                 filename=frame_path.name,
-                message="U got storage??",
+                message=1,
             )
+            print("VLBA requesting DSOC check storage...")
 
         else:
             send_kafka_message(
@@ -109,13 +83,15 @@ def process_msg(msg, producer_topic, producer_config):
                 filename=frame_path.name,
                 message="Source file does not exist",
             )
-            return False 
+            print("Source file does not exist.")
+            return False
     
     
     elif incoming_key == Message.DSOC_RESPOND_STORAGE.value:
         print("Received DSOC's storage check response!")
         key = f"{Message.VLBA_TRANSFERRING}"
         payload = json.loads(msg.value().decode("utf-8"))
+
         if payload["message"] == "Yes":
 
             try:
@@ -140,9 +116,9 @@ def process_msg(msg, producer_topic, producer_config):
                     message="Hancock VLBA has started to send the data file to DSOC via e-transfer",
                 )
                 frame_path = raw_data_path / f"{payload['transfer_uuid']}.bin"
-                etc_send(frame_path)
 
-            #NOTE: Figure out how dsoc will handle the exceptions below. It will have already received a message saying Transferring, and it will receive a second message saying Failed if the excptions below are triggered.
+                print("DSOC responded affirmative to storage check. Initiating e-transfer...")
+                etc_send(frame_path)
 
             except subprocess.CalledProcessError as exc:
                 print(f"E-transfer failed with return code: {exc.returncode}")
@@ -158,20 +134,8 @@ def process_msg(msg, producer_topic, producer_config):
                         f"(return code: {exc.returncode})"
                     ),
                 )
-                # send_kafka_message(
-                #     producer_topic=producer_topic,
-                #     producer_config=producer_config,
-                #     transfer_uuid=transfer_uuid,
-                #     gbt_uuid=gbt_uuid,
-                #     status=Status.FAILED,
-                #     num_bytes=num_bytes,
-                #     filename=frame_path.name,
-                #     message=(
-                #         "E-transfer failed with return code: "
-                #         f"{exc.returncode}"
-                #     ),
-                # )
-                return False 
+                return False
+
             except Exception as exc:
                 print(f"Unexpected e-transfer failure: {exc}")
                 record_transfer_event(
@@ -182,22 +146,23 @@ def process_msg(msg, producer_topic, producer_config):
                     num_bytes=payload["num_bytes"],
                     message=f"Unexpected e-transfer failure: {exc}",
                 )
-                # send_kafka_message(
-                #     producer_topic=producer_topic,
-                #     producer_config=producer_config,
-                #     transfer_uuid=transfer_uuid,
-                #     gbt_uuid=gbt_uuid,
-                #     status=Status.FAILED,
-                #     num_bytes=num_bytes,
-                #     filename=frame_path.name,
-                #     message=f"Unexpected e-transfer failure: {exc}",
-                # )
-                return False 
+                return False
 
-
-        else:  #TODO Add logic if incomng message is "No"
-            #Loop back to storage check message?
-            pass
+        # If DSOC does NOT have storage, VLBA will sleep and ask again.
+        else: 
+            print(f"DSOC responded negative to storage check. Will ask again in 5 seconds...")
+            time.sleep(5)
+            send_kafka_message(
+                key = f"{Message.VLBA_REQUEST_STORAGE}",
+                producer_topic=producer_topic,
+                producer_config=producer_config,
+                transfer_uuid=payload["transfer_uuid"],
+                gbt_uuid=payload["gbt_uuid"],
+                status=Status.READY,
+                num_bytes=payload["num_bytes"],
+                filename=payload["filename"],
+                message=payload["message"],
+            )
 
     elif incoming_key == Message.VLBA_DELETE.value:
         payload = json.loads(msg.value().decode("utf-8"))
