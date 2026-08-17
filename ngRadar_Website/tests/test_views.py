@@ -28,6 +28,13 @@ with patch("pathlib.Path.read_text", return_value=mock_env_data):
         submit_waveform,
         login_view,
         logout_view,
+        latency_graphing,
+        home_view,
+        dashboard_view,
+        event_table_partial,
+        status_partial,
+        dsoc_event_partial,
+        gbt_event_partial,
     )
 
 
@@ -103,47 +110,34 @@ with patch("pathlib.Path.read_text", return_value=mock_env_data):
 @patch.dict(
     "os.environ",
     {
-        "WEED_S3_INTERNAL_DOMAIN": "seaweedfs.fake.com",
-        "WEED_S3_ACCESS_KEY": "fake_access_key",
-        "WEED_S3_SECRET_KEY": "fake_key",
-        "WEED_S3_BUCKET": "fake_bucket",
-        "WEED_S3_PUBLIC_DOMAIN": "fake_domain"
+        "WEED_S3_BUCKET": "fake_bucket"
     },
 )
 @patch("ngRadar_Website.views.views.get_object_or_404")
-@patch("ngRadar_Website.views.views.boto3")
-@patch("ngRadar_Website.views.views.Config")
-def test_serve_image(mock_Config, mock_boto3, mock_get_obj):
+@patch("ngRadar_Website.views.views.create_s3_client")
+def test_serve_image(mock_create, mock_get_obj):
 
     mock_event = MagicMock()
     mock_event.image_key = "images/test.png"
     mock_get_obj.return_value = mock_event
 
-    mock_config = MagicMock()
-    mock_Config.return_value = mock_config
-
-    #creating the fake boto3.client:
     mock_s3 = MagicMock()
-    mock_boto3.client.return_value = mock_s3
-
-    #set the internal url using our fake WEED_S3_INTERNAL_DOMAIN:
-    internal_url = (
-        "http://seaweedfs.fake.com/fake_bucket/images/test.png"
-    )
-    mock_s3.generate_presigned_url.return_value = internal_url
+    mock_create.return_value = mock_s3
+    mock_s3.get_object.return_value = {
+        "Body": MagicMock(
+            read=MagicMock(return_value=b"fake_image_data")
+        ),
+        "ContentType": "image/png",
+    }
 
     #call the function:
     output = serve_image(request = "request", uuid = "uuid")
 
-    #assert that the WEED_S3_PUBLIC_DOMAIN variable was used to update the url:
-    assert output.url == "http://fake_domain/fake_bucket/images/test.png"
-    mock_boto3.client.assert_called_once_with(
-            "s3",
-            endpoint_url="seaweedfs.fake.com",
-            aws_access_key_id="fake_access_key",
-            aws_secret_access_key="fake_key",
-            config = mock_config
-        ) #checking that an S3 client was created
+    mock_get_obj.assert_called_once_with(ObservatoryEvent, uuid="uuid")
+    mock_create.assert_called_once()
+    mock_s3.get_object.assert_called_once_with(
+        Bucket="fake_bucket", Key="images/test.png"
+    )
 
 
 # ==============================================================================
@@ -234,3 +228,221 @@ def test_login_view_post_invalid(mock_logout, mock_msg_error, mock_render, mock_
     mock_msg_error.assert_called_once_with(request, "Invalid username or password.")
     mock_render.assert_called_once_with(request, 'registration/login.html')
     mock_logout.assert_not_called()
+
+
+# ==============================================================================
+# 4. latency_graphing Test
+# ==============================================================================
+
+@patch("ngRadar_Website.views.views.StreamingHttpResponse")
+@patch("ngRadar_Website.views.views.get_Message_Latency")
+def test_latency_graphing(mock_get_msg, mock_streaming):
+    response = MagicMock()
+    mock_streaming.return_value = response
+
+    output = latency_graphing("request")
+
+    assert output == response
+    mock_streaming.assert_called_once_with(mock_get_msg(), content_type="text/event-stream; charset=utf-8")
+
+
+# ==============================================================================
+# 5. lock_status Test
+# ==============================================================================
+
+@patch("ngRadar_Website.views.views.cache.get")
+@patch("ngRadar_Website.views.views.JsonResponse")
+def test_lock_status_none(mock_json, mock_cache_get):
+    """Scenario 1: lock time is None"""
+    mock_cache_get.return_value = None
+
+    mock_json.return_value = "fake_json_response"
+
+    output = lock_status("request")
+
+    assert output == "fake_json_response"
+    mock_cache_get.assert_called_once_with('submit_locked', None)
+    mock_json.assert_called_once_with({'locked':False})
+
+
+@patch("ngRadar_Website.views.views.cache.get")
+@patch("ngRadar_Website.views.views.dsocEvent")
+@patch("ngRadar_Website.views.views.cache.delete")
+@patch("ngRadar_Website.views.views.JsonResponse")
+def test_lock_matching_event_time(mock_json, mock_cache_delete, mock_dsocEvent, mock_cache_get):
+    """Scenario 2: lock time matches the event time"""
+    mock_cache_get.return_value = "fake_time"
+
+    mock_dsocEvent.objects.filter.return_value.exists.return_value = True
+
+    mock_cache_delete.return_value = None
+
+    mock_json.return_value = "fake_json_response"
+
+    output = lock_status("request")
+
+    assert output == "fake_json_response"
+    mock_cache_get.assert_called_once_with('submit_locked', None)
+    mock_dsocEvent.objects.filter.assert_called_once_with(event_time__gt="fake_time")
+    mock_cache_delete.assert_called_once_with('submit_locked')
+    mock_json.assert_called_once_with({'locked':False})
+
+
+@patch("ngRadar_Website.views.views.cache.get")
+@patch("ngRadar_Website.views.views.dsocEvent")
+@patch("ngRadar_Website.views.views.JsonResponse")
+def test_lock_true(mock_json, mock_dsocEvent, mock_cache_get):
+    """Scenario 3: lock status is True"""
+    mock_cache_get.return_value = "fake_time"
+
+    mock_dsocEvent.objects.filter.return_value.exists.return_value = False
+
+    mock_json.return_value = "fake_json_response"
+
+    output = lock_status("request")
+
+    assert output == "fake_json_response"
+    mock_cache_get.assert_called_once_with('submit_locked', None)
+    mock_dsocEvent.objects.filter.assert_called_once_with(event_time__gt="fake_time")
+    mock_json.assert_called_once_with({'locked':True})
+
+
+# ==============================================================================
+# 6. logout_view Test
+# ==============================================================================
+
+@patch("ngRadar_Website.views.views.logout")
+@patch("ngRadar_Website.views.views.logging_out_message")
+def test_logout_view(mock_logout_msg, mock_logout):
+    request = MagicMock()
+    mock_logout.return_value = None
+
+    mock_logout_msg.return_value = "response"
+
+    output = logout_view(request)
+
+    assert output == "response"
+    mock_logout.assert_called_once_with(request)
+    mock_logout_msg.assert_called_once_with(request)
+
+
+# ==============================================================================
+# 7. home_view Test
+# ==============================================================================
+
+@patch("ngRadar_Website.views.views.render")
+@patch("ngRadar_Website.views.views.get_obs_events")
+def test_home_view(mock_obs_event, mock_render):
+    request = MagicMock()
+
+    response = HttpResponse("fake_response")
+    mock_render.return_value = response
+    mock_obs_event.return_value = "fake_obs_events"
+
+    output = home_view(request)
+
+    assert output == response
+    mock_obs_event.assert_called_once_with()
+    mock_render.assert_called_once_with(request, "ngRadar_Website/home.html", mock_obs_event())
+
+
+# ==============================================================================
+# 8. dashboard_view Test
+# ==============================================================================
+
+@patch("ngRadar_Website.views.views.render")
+@patch("ngRadar_Website.views.views.get_obs_events")
+def test_dashboard_view(mock_obs_event, mock_render):
+    request = MagicMock()
+
+    response = HttpResponse("fake_response")
+    mock_render.return_value = response
+    mock_obs_event.return_value = "fake_obs_events"
+
+    output = dashboard_view(request)
+
+    assert output == response
+    mock_obs_event.assert_called_once_with()
+    mock_render.assert_called_once_with(request, "ngRadar_Website/dashboard.html", mock_obs_event())
+
+
+# ==============================================================================
+# 9. event_table_partial Test
+# ==============================================================================
+
+@patch("ngRadar_Website.views.views.render")
+@patch("ngRadar_Website.views.views.get_obs_events")
+def test_event_table_partial(mock_obs_event, mock_render):
+    request = MagicMock()
+
+    response = HttpResponse("fake_response")
+    mock_render.return_value = response
+    mock_obs_event.return_value = "fake_obs_events"
+
+    output = event_table_partial(request)
+
+    assert output == response
+    mock_obs_event.assert_called_once_with()
+    mock_render.assert_called_once_with(request, "ngRadar_Website/partials/dashboard_updates.html", mock_obs_event())
+
+
+# ==============================================================================
+# 10. status_partial Test
+# ==============================================================================
+
+@patch("ngRadar_Website.views.views.render")
+@patch("ngRadar_Website.views.views.get_obs_events")
+def test_status_partial(mock_obs_event, mock_render):
+    request = MagicMock()
+    
+    response = HttpResponse("fake_response")
+    mock_render.return_value = response
+    mock_obs_event.return_value = "fake_obs_events"
+
+    output = status_partial(request)
+
+    assert output == response
+    mock_obs_event.assert_called_once_with()
+    mock_render.assert_called_once_with(request, "ngRadar_Website/partials/status_partial.html", mock_obs_event())
+
+
+# ==============================================================================
+# 11. dsoc_event_partial Test
+# ==============================================================================
+
+@patch("ngRadar_Website.views.views.render")
+@patch("ngRadar_Website.views.views.get_obs_events")
+@patch("ngRadar_Website.views.views.get_dsoc_events")
+def test_dsoc_event_partial(mock_dsoc_event, mock_obs_event, mock_render):
+    request = MagicMock()
+        
+    response = HttpResponse("fake_response")
+    mock_render.return_value = response
+    mock_obs_event.return_value = "fake_obs_events"
+    mock_dsoc_event.return_value = "fake_dsoc_events"
+    output = dsoc_event_partial(request)
+
+    assert output == response
+    mock_obs_event.assert_called_once_with()
+    mock_dsoc_event.assert_called_once_with()
+    mock_render.assert_called_once_with(request, "ngRadar_Website/partials/dsoc_home_partial.html", mock_obs_event(), mock_dsoc_event())
+
+
+# ==============================================================================
+# 12. gbt_event_partial Test
+# ==============================================================================
+
+@patch("ngRadar_Website.views.views.render")
+@patch("ngRadar_Website.views.views.get_obs_events")
+def test_gbt_event_partial(mock_obs_event, mock_render):
+    request = MagicMock()
+        
+    response = HttpResponse("fake_response")
+    mock_render.return_value = response
+    mock_obs_event.return_value = "fake_obs_events"
+
+    output = gbt_event_partial(request)
+
+    assert output == response
+    mock_obs_event.assert_called_once_with()
+    mock_render.assert_called_once_with(request, "ngRadar_Website/partials/gbt_home_partial.html", mock_obs_event())

@@ -186,7 +186,7 @@ def latency_graphing(request):
 def serve_image(request, uuid):
     event = get_object_or_404(ObservatoryEvent, uuid=uuid)
 
-    bucket = bucket = os.environ["WEED_S3_BUCKET"]
+    bucket = os.environ["WEED_S3_BUCKET"]
 
     s3 = create_s3_client()
 
@@ -213,7 +213,7 @@ def lock_status(request):
     lock_time = cache.get('submit_locked', None)
     if lock_time is None:
         return JsonResponse({"locked": False})
-    elif dsocEvent.objects.filter(event_time__gt=lock_time):
+    elif dsocEvent.objects.filter(event_time__gt=lock_time).exists():
         cache.delete('submit_locked')
         return JsonResponse({'locked':False})
     return JsonResponse({'locked':True})
