@@ -29,6 +29,7 @@ with patch("pathlib.Path.read_text", return_value=mock_env_data):
         login_view,
         logout_view,
         latency_graphing,
+        home_view,
     )
 
 
@@ -318,3 +319,23 @@ def test_logout_view(mock_logout_msg, mock_logout):
     assert output == "response"
     mock_logout.assert_called_once_with(request)
     mock_logout_msg.assert_called_once_with(request)
+
+
+# ==============================================================================
+# 7. home_view Test
+
+# WORK IN PROGRESS
+# ==============================================================================
+
+# @patch("ngRadar_Website.views.views.render")
+# @patch("ngRadar_Website.views.views.get_obs_events")
+# def test_home_view(mock_obs_event, mock_render):
+#     request = MagicMock()
+
+#     mock_render.return_value = "fake_response"
+#     mock_obs_event.return_value = "fake_obs_events"
+
+#     output = home_view(request)
+
+#     assert output == "fake_response"
+#     mock_render.assert_called_once_with(request, "ngRadar_Website/home.html", mock_obs_event())
