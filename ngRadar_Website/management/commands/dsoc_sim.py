@@ -158,7 +158,7 @@ def track_etransfer_progress(payload, incoming_file: Path):
         percent=0,
         transfer_id=0,
     )
-
+    print("Transfer in progress...")
     while ETransferEvent.objects.filter(transfer_uuid=transfer_uuid).order_by("-event_time").values_list("status", flat=True).first() == Status.TRANSFERRING:
         # while loop will break prematurely if status in DB ever changes - ex. if it changes to FAILED mid e-transfer.
         if incoming_file.exists():
@@ -176,14 +176,14 @@ def track_etransfer_progress(payload, incoming_file: Path):
             time.sleep(0.5)
 
         if received_bytes >= num_bytes:
-            print(f"Progress for {transfer_uuid}.bin is done being written.")
+            print(f"Transfer of <{transfer_uuid}.bin> COMPLETE.")
             break
 
     if ETransferEvent.objects.filter(transfer_uuid=transfer_uuid).order_by("-event_time").values_list("status", flat=True).first() == Status.FAILED:
-        raise ValueError("E-Transfer client reported a FAILED status.")
+        raise ValueError("E-Transfer client reported a FAILED status mid-transfer.")
 
     if received_bytes != num_bytes:
-        raise ValueError("Progress stopped writing but not all bytes have been transferred. Has the e-transfer been interrupted?")
+        raise ValueError("Transfer progress has halted. Not all bytes have been received!!")
 
  
 def process_msg(msg, producer_topic, producer_config):
@@ -193,50 +193,68 @@ def process_msg(msg, producer_topic, producer_config):
     
     if incoming_key == Message.VLBA_REQUEST_STORAGE.value:
         # storage check logic
-        transfer_uuid = uuid.UUID(payload["transfer_uuid"])
-        gbt_uuid = uuid.UUID(payload["gbt_uuid"])
-        status = Status(payload["status"])
-        filename = payload["filename"]
         expected_num_bytes = int(payload["num_bytes"])
 
         key = f"{Message.DSOC_RESPOND_STORAGE}" #produced message will have this key no matter what the result of the below logic is
-        
-        if payload["status"] == Status.FAILED: #NOTE is this correct syntax?
-            #TODO: Handle FAILED status Kafka message just in case.
-            pass
-
-        volume_path = volume_folder / filename
-
-        storage_limit = int(os.environ["DSOC_VOLUME_SIZE"]) * 1000000000
-        print(f"DSOC has {storage_limit} bytes of storage total.")
-        storage_used = int(get_folder_size(volume_folder))
-        print(f"DSOC is using {storage_used/1000000000:0.3f}GB of the total {storage_limit/1000000000}GB storage capacity.")
-        if storage_used+expected_num_bytes >= storage_limit-1:
-            # if the current storage plus the incoming file gets within 1GB of our imposed limit, we decline the e-transfer
-            send_kafka_message(
-                key = key, 
-                producer_topic=producer_topic,
-                producer_config=producer_config, 
-                transfer_uuid=transfer_uuid,
-                gbt_uuid=gbt_uuid,
-                status=payload["status"],
-                num_bytes=expected_num_bytes,
-                filename=filename,
-                message="No",
+        if payload["status"] == Status.FAILED:
+            record_transfer_event(
+                transfer_uuid=payload["transfer_uuid"],
+                gbt_uuid=payload["gbt_uuid"],
+                station=Stations.HN,
+                status=Status.FAILED,
+                num_bytes=payload["num_bytes"],
+                message=payload["message"],
             )
+            print("The raw data file does not exist.")
 
         else:
-            send_kafka_message(
-                key = key, 
-                producer_topic=producer_topic,
-                producer_config=producer_config, 
-                transfer_uuid=transfer_uuid,
-                gbt_uuid=gbt_uuid,
-                status=payload["status"],
-                num_bytes=expected_num_bytes,
-                filename=filename,
-                message="Yes",
-            )
+            storage_limit = int(os.environ["DSOC_VOLUME_SIZE"]) * 1000000000
+            print(f"DSOC has {storage_limit/1000000000:0.2f}GB of storage total.")
+            storage_used = int(get_folder_size(volume_folder))
+            space_remaining = (storage_limit/1000000000)-(storage_used/1000000000)
+            print(f"DSOC has {space_remaining:0.2f}GB of storage remaining.")
+            if storage_used+expected_num_bytes >= storage_limit:
+                # if the current storage plus the incoming file exceeds our imposed limit, we decline the e-transfer
+                if payload["message"] == 15:
+                    print("DSOC failed to clear storage in 15 tries. Try again manually later.")
+
+                else: 
+                    if payload["message"] == 1:
+                        # The FAILED record only gets saved to the DB the first time. The payload message for any storage check retries will contain message=2 
+                        record_transfer_event(
+                            transfer_uuid=payload["transfer_uuid"],
+                            gbt_uuid=payload["gbt_uuid"],
+                            station=Stations.HN,
+                            status=Status.FAILED,
+                            num_bytes=payload["num_bytes"],
+                            message=f"DSOC does not have enough storage to accept the incoming data from {Stations.HN}",
+                        )
+                    send_kafka_message(
+                        key = key, 
+                        producer_topic=producer_topic,
+                        producer_config=producer_config, 
+                        transfer_uuid=payload["transfer_uuid"],
+                        gbt_uuid=payload["gbt_uuid"],
+                        status=payload["status"],
+                        num_bytes=payload["num_bytes"],
+                        filename=payload["filename"],
+                        message=payload["message"]+1,
+                    )
+                    print(f"DSOC does not have enough storage to accept the data transfer request. The remaining disk space is {space_remaining:0.2f}GB and the incoming data is {expected_num_bytes/1000000000:0.2f}GB")
+
+            else:
+                send_kafka_message(
+                    key = key, 
+                    producer_topic=producer_topic,
+                    producer_config=producer_config, 
+                    transfer_uuid=payload["transfer_uuid"],
+                    gbt_uuid=payload["gbt_uuid"],
+                    status=payload["status"],
+                    num_bytes=payload["num_bytes"],
+                    filename=payload["filename"],
+                    message="Yes",
+                )
+                print("DSOC has enough storage to accept the incoming data. Awaiting e-transfer...")
 
 
     elif incoming_key == Message.VLBA_TRANSFERRING.value:
@@ -244,171 +262,110 @@ def process_msg(msg, producer_topic, producer_config):
         key = f"{Message.VLBA_DELETE}"
         incoming_file = volume_folder / f"{payload['transfer_uuid']}.bin"
 
-        if payload["status"] == Status.FAILED:
-            #TODO Handle receiving a FAILED transfer later.
-            pass
-        else:
-            try:
-                track_etransfer_progress(payload, incoming_file)
-
-                record_transfer_event(
-                    transfer_uuid=payload["transfer_uuid"],
-                    gbt_uuid=payload["gbt_uuid"],
-                    station=Stations.HN,
-                    status=Status.TRANSFERRED,
-                    num_bytes=payload["num_bytes"],
-                    message="Hancock VLBA e-transfer in progress",
-                )
-                record_transfer_event(
-                    transfer_uuid=payload["transfer_uuid"],
-                    gbt_uuid=payload["gbt_uuid"],
-                    station=Stations.DSOC,
-                    status=Status.VERIFYING,
-                    num_bytes=payload["num_bytes"],
-                    message=f"Verifying {payload['filename']}",
-                )
-
-            except Exception as exc:
-                print(f"Incoming data progress interrupted: {exc}")
-                return
-
-
-            try:
-                actual_num_bytes = verify_incoming_transfer( 
-                    incoming_file=incoming_file,
-                    expected_num_bytes=payload["num_bytes"],
-                )
-            except Exception as exc:
-                record_transfer_event(
-                    transfer_uuid=payload["transfer_uuid"],
-                    gbt_uuid=payload["gbt_uuid"],
-                    station=Stations.DSOC,
-                    status=Status.FAILED,
-                    num_bytes=0,
-                    message=str(exc),
-                )
-                return
-
-            try:
-                gbt_data = DB_import(payload["gbt_uuid"])
-                dsoc_latency = latency_calc(gbt_data[3])
-
-                data = DB_columns(gbt_data)
-                data["latency_ms"] = dsoc_latency
-
-                object_id, target, tx_waveform, event_time = gbt_data
-                image_file, image_num_bytes = create_img(tx_waveform)
-                dsoc_uuid = str(uuid.uuid4())
-
-                image_key = save_image_to_seaweedfs(
-                    target,
-                    image_file,
-                    dsoc_uuid,
-                )
-
-                data["uuid"] = dsoc_uuid
-
-                publish_DB(
-                    image_key=image_key,
-                    num_bytes=image_num_bytes,
-                    data=data,
-                    xmit_station=Stations.GBT,
-                    rcvr_station=Stations.HN,
-                    transfer_uuid=payload["transfer_uuid"],
-                )
-
-            except Exception as exc:
-                record_transfer_event(
-                    transfer_uuid=payload["transfer_uuid"],
-                    gbt_uuid=payload["gbt_uuid"],
-                    station=Stations.DSOC,
-                    status=Status.FAILED,
-                    num_bytes=payload["num_bytes"],
-                    message=f"DSOC image processing failed: {exc}",
-                )
-                return
+        try:
+            track_etransfer_progress(payload, incoming_file)
 
             record_transfer_event(
                 transfer_uuid=payload["transfer_uuid"],
                 gbt_uuid=payload["gbt_uuid"],
-                station=Stations.DSOC,
-                status=Status.COMPLETED,
-                num_bytes=actual_num_bytes,
-                latency_ms=dsoc_latency,
-                message="DSOC has verified etransfer, image generated, and image stored.",
+                station=Stations.HN,
+                status=Status.TRANSFERRED,
+                num_bytes=payload["num_bytes"],
+                message="Hancock VLBA e-transfer complete",
             )
-
-            send_kafka_message(
-                key = key, 
-                producer_topic=producer_topic,
-                producer_config=producer_config, 
+            record_transfer_event(
                 transfer_uuid=payload["transfer_uuid"],
                 gbt_uuid=payload["gbt_uuid"],
-                status=payload["status"],
+                station=Stations.DSOC,
+                status=Status.VERIFYING,
                 num_bytes=payload["num_bytes"],
-                filename=payload["filename"],
-                message="Processing complete. Delete your raw data.",
+                message=f"Verifying {payload['filename']}",
             )
+
+        except Exception as exc:
+            print(f"Incoming data progress interrupted: {exc}")
+            return
+
+
+        try:
+            actual_num_bytes = verify_incoming_transfer( 
+                incoming_file=incoming_file,
+                expected_num_bytes=payload["num_bytes"],
+            )
+        except Exception as exc:
+            record_transfer_event(
+                transfer_uuid=payload["transfer_uuid"],
+                gbt_uuid=payload["gbt_uuid"],
+                station=Stations.DSOC,
+                status=Status.FAILED,
+                num_bytes=0,
+                message=str(exc),
+            )
+            return
+
+        try:
+            gbt_data = DB_import(payload["gbt_uuid"])
+            dsoc_latency = latency_calc(gbt_data[3])
+
+            data = DB_columns(gbt_data)
+            data["latency_ms"] = dsoc_latency
+
+            object_id, target, tx_waveform, event_time = gbt_data
+            image_file, image_num_bytes = create_img(tx_waveform)
+            dsoc_uuid = str(uuid.uuid4())
+
+            image_key = save_image_to_seaweedfs(
+                target,
+                image_file,
+                dsoc_uuid,
+            )
+
+            data["uuid"] = dsoc_uuid
+
+            publish_DB(
+                image_key=image_key,
+                num_bytes=image_num_bytes,
+                data=data,
+                xmit_station=Stations.GBT,
+                rcvr_station=Stations.HN,
+                transfer_uuid=payload["transfer_uuid"],
+            )
+
+        except Exception as exc:
+            record_transfer_event(
+                transfer_uuid=payload["transfer_uuid"],
+                gbt_uuid=payload["gbt_uuid"],
+                station=Stations.DSOC,
+                status=Status.FAILED,
+                num_bytes=payload["num_bytes"],
+                message=f"DSOC image processing failed: {exc}",
+            )
+            return
+
+        record_transfer_event(
+            transfer_uuid=payload["transfer_uuid"],
+            gbt_uuid=payload["gbt_uuid"],
+            station=Stations.DSOC,
+            status=Status.COMPLETED,
+            num_bytes=actual_num_bytes,
+            latency_ms=dsoc_latency,
+            message="DSOC has verified etransfer, image generated, and image stored.",
+        )
+
+        send_kafka_message(
+            key = key, 
+            producer_topic=producer_topic,
+            producer_config=producer_config, 
+            transfer_uuid=payload["transfer_uuid"],
+            gbt_uuid=payload["gbt_uuid"],
+            status=payload["status"],
+            num_bytes=payload["num_bytes"],
+            filename=payload["filename"],
+            message="Processing complete. Delete your raw data.",
+        )
         
     else:
         print("Invalid Kafka Message Key!")
-    # payload = json.loads(msg.value().decode("utf-8"))
-
-    # transfer_uuid = uuid.UUID(payload["transfer_uuid"])
-    # gbt_uuid = uuid.UUID(payload["gbt_uuid"])
-    # status = Status(payload["status"])
-    # filename = payload.get("filename")
-    # expected_num_bytes = payload.get("num_bytes", 0)
-    # message = payload.get("message", "")
-    # incoming_file = Path("/dsoc/incoming") / filename
-
-    # record_transfer_event(
-    #     transfer_uuid=transfer_uuid,
-    #     gbt_uuid=gbt_uuid,
-    #     station=Stations.HN,
-    #     status=status,
-    #     num_bytes=expected_num_bytes,
-    #     message=message,
-    # )
-
-# NOTE Figure out where to put the safegaurds below
-    # if status == Status.FAILED:
-    #     return
-
-    # if status != Status.TRANSFERRED:
-    #     return
-
-    # already_completed = ETransferEvent.objects.filter(
-    #     transfer_uuid=transfer_uuid,
-    #     station=Stations.DSOC,
-    #     status=Status.COMPLETED,
-    # ).exists()
-
-    # if already_completed:
-    #     print(f"This transfer {transfer_uuid} has already been processed. Skipping.")
-    #     return
-
-    # already_processing = ETransferEvent.objects.filter(
-    #     transfer_uuid=transfer_uuid,
-    #     station=Stations.DSOC,
-    #     status__in=[Status.VERIFYING],
-    #     ).exists()
-
-    # if already_processing:
-    #     print(f"Transfer {transfer_uuid} is already being processed currently.")
-    #     return
-
-    # if not filename:
-    #     record_transfer_event(
-    #         transfer_uuid=transfer_uuid,
-    #         station=Stations.DSOC,
-    #         status=Status.FAILED,
-    #         num_bytes=expected_num_bytes,
-    #         message="Kafka transfer message did not contain a filename",
-    #     )
-    #     return
-
-
 
 
 class Command(BaseCommand):

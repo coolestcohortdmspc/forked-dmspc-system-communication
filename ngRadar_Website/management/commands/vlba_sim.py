@@ -62,8 +62,9 @@ def process_msg(msg, producer_topic, producer_config):
                 status=Status.READY,
                 num_bytes=num_bytes,
                 filename=frame_path.name,
-                message="U got storage??",
+                message=1,
             )
+            print("VLBA requesting DSOC check storage...")
 
         else:
             send_kafka_message(
@@ -77,6 +78,7 @@ def process_msg(msg, producer_topic, producer_config):
                 filename=frame_path.name,
                 message="Source file does not exist",
             )
+            print("Source file does not exist.")
             return
     
     
@@ -84,6 +86,7 @@ def process_msg(msg, producer_topic, producer_config):
         print("Received DSOC's storage check response!")
         key = f"{Message.VLBA_TRANSFERRING}"
         payload = json.loads(msg.value().decode("utf-8"))
+
         if payload["message"] == "Yes":
 
             try:
@@ -108,9 +111,9 @@ def process_msg(msg, producer_topic, producer_config):
                     message="Hancock VLBA has started to send the data file to DSOC via e-transfer",
                 )
                 frame_path = raw_data_path / f"{payload['transfer_uuid']}.bin"
-                etc_send(frame_path)
 
-            #NOTE: Figure out how dsoc will handle the exceptions below. It will have already received a message saying Transferring, and it will receive a second message saying Failed if the excptions below are triggered.
+                print("DSOC responded affirmative to storage check. Initiating e-transfer...")
+                etc_send(frame_path)
 
             except subprocess.CalledProcessError as exc:
                 print(f"E-transfer failed with return code: {exc.returncode}")
@@ -122,21 +125,8 @@ def process_msg(msg, producer_topic, producer_config):
                     num_bytes=payload["num_bytes"],
                     message=(f"E-transfer failed with return code: {exc.returncode}")
                 )
-                
-                # send_kafka_message(
-                #     producer_topic=producer_topic,
-                #     producer_config=producer_config,
-                #     transfer_uuid=transfer_uuid,
-                #     gbt_uuid=gbt_uuid,
-                #     status=Status.FAILED,
-                #     num_bytes=num_bytes,
-                #     filename=frame_path.name,
-                #     message=(
-                #         "E-transfer failed with return code: "
-                #         f"{exc.returncode}"
-                #     ),
-                # )
                 return
+            
             except Exception as exc:
                 print(f"Unexpected e-transfer failure: {exc}")
                 record_transfer_event(
@@ -147,22 +137,23 @@ def process_msg(msg, producer_topic, producer_config):
                     num_bytes=payload["num_bytes"],
                     message=(f"Unexpected e-transfer failure: {exc}")
                 )
-                # send_kafka_message(
-                #     producer_topic=producer_topic,
-                #     producer_config=producer_config,
-                #     transfer_uuid=transfer_uuid,
-                #     gbt_uuid=gbt_uuid,
-                #     status=Status.FAILED,
-                #     num_bytes=num_bytes,
-                #     filename=frame_path.name,
-                #     message=f"Unexpected e-transfer failure: {exc}",
-                # )
                 return
 
-
-        else:  #TODO Add logic if incomng message is "No"
-            #Loop back to storage check message?
-            pass
+        # If DSOC does NOT have storage, VLBA will sleep and ask again.
+        else: 
+            print(f"DSOC responded negative to storage check. Will ask again in 5 seconds...")
+            time.sleep(5)
+            send_kafka_message(
+                key = f"{Message.VLBA_REQUEST_STORAGE}",
+                producer_topic=producer_topic,
+                producer_config=producer_config,
+                transfer_uuid=payload["transfer_uuid"],
+                gbt_uuid=payload["gbt_uuid"],
+                status=Status.READY,
+                num_bytes=payload["num_bytes"],
+                filename=payload["filename"],
+                message=payload["message"],
+            )
 
     elif incoming_key == Message.VLBA_DELETE.value:
         payload = json.loads(msg.value().decode("utf-8"))

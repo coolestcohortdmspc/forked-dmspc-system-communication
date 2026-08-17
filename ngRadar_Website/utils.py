@@ -575,7 +575,7 @@ def get_folder_size(folder_path: Path):
         raise FileNotFoundError(folder_path)
 
     total = sum(p.stat().st_size for p in folder_path.rglob("*") if p.is_file())
-    print(f"Size of folder: {total} bytes")
+    #print(f"Size of folder: {total} bytes")
     return total
 
 # Helper function to record the status of the e-transfer in the ETransferEvent table
