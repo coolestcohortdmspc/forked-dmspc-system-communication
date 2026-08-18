@@ -24,7 +24,7 @@ with patch("pathlib.Path.read_text", return_value=mock_env_data):
         create_img,
         save_image_to_seaweedfs,
         verify_incoming_transfer,
-        record_transfer_event,
+        track_etransfer_progress,
         process_msg,
     )
 
@@ -406,3 +406,160 @@ def test_process_msg_fail_else(
 
 
 #NOTE: We still need more scenarios here 
+
+# ==============================================================================
+# 9. track_etransfer_progress Test
+# ==============================================================================
+
+"""Scenario 1: Clean run, no fails"""
+#===================================================================
+
+@patch("ngRadar_Website.management.commands.dsoc_sim.time.sleep", return_value=None)
+@patch("ngRadar_Website.management.commands.dsoc_sim.write_transfer_progress")
+@patch("ngRadar_Website.management.commands.dsoc_sim.ETransferEvent")
+def test_track_etransfer_progress_clean_run_transferring_until_complete(
+    mock_etransfer_event,
+    mock_write_transfer_progress,
+    mock_sleep
+):
+    payload = {
+        "transfer_uuid": "11111111-1111-1111-1111-111111111111",
+        "num_bytes": 1000,
+    }
+
+    incoming_file = MagicMock()
+    incoming_file.exists.return_value = True
+    incoming_file.stat.return_value.st_size = 1000
+
+    # Build the full ORM chain:
+    # objects.filter(...).order_by(...).values_list(...).first()
+    mock_values_list = MagicMock()
+    mock_values_list.first.return_value = Status.TRANSFERRING
+
+    mock_order_by = MagicMock()
+    mock_order_by.values_list.return_value = mock_values_list
+
+    mock_filter = MagicMock()
+    mock_filter.order_by.return_value = mock_order_by
+
+    mock_etransfer_event.objects.filter.return_value = mock_filter
+
+    track_etransfer_progress(payload, incoming_file=incoming_file)
+
+    mock_write_transfer_progress.assert_any_call(
+        received_bytes=0,
+        total_bytes=0,
+        percent=0,
+        transfer_id=0,
+    )
+
+    # Assert that it wrote completion progress (received_bytes == num_bytes)
+    mock_write_transfer_progress.assert_any_call(
+        received_bytes=1000,
+        total_bytes=1000,
+        percent="100.0",
+        transfer_id=payload["transfer_uuid"],
+    )
+
+    # Assert: while condition had status TRANSFERRING at least once
+    assert mock_etransfer_event.objects.filter.call_count >= 1
+    incoming_file.exists.assert_called()
+
+
+#===================================================================
+"""Scenario 2: Status changed to FAILED mid-etransfer. Failed run"""
+#===================================================================
+
+from unittest.mock import MagicMock, patch
+
+from ngRadar_Website.management.commands.dsoc_sim import track_etransfer_progress, Status
+
+
+@patch("ngRadar_Website.management.commands.dsoc_sim.time.sleep", return_value=None)
+@patch("ngRadar_Website.management.commands.dsoc_sim.write_transfer_progress")
+@patch("ngRadar_Website.management.commands.dsoc_sim.ETransferEvent")
+def test_track_etransfer_progress_status_FAILED(
+    mock_etransfer_event,
+    mock_write_transfer_progress,
+    mock_sleep,
+):
+    payload = {
+        "transfer_uuid": "11111111-1111-1111-1111-111111111111",
+        "num_bytes": 1000,
+    }
+
+    incoming_file = MagicMock()
+    incoming_file.exists.return_value = True
+
+    incoming_file.stat.return_value.st_size = 200 # less than num_bytes so while loop can't complete on its own, status change must trigger exit.
+
+    mock_values_list = MagicMock()
+    mock_values_list.first.side_effect = [
+        Status.TRANSFERRING,  # while condition enters loop
+        Status.FAILED,       # while condition fails next iteration, exits loop
+        Status.FAILED,       # post-loop FAILED check => raise
+    ]
+
+    mock_order_by = MagicMock()
+    mock_order_by.values_list.return_value = mock_values_list
+
+    mock_filter = MagicMock()
+    mock_filter.order_by.return_value = mock_order_by
+
+    mock_etransfer_event.objects.filter.return_value = mock_filter
+
+    with pytest.raises(ValueError, match="FAILED"):
+        track_etransfer_progress(payload, incoming_file=incoming_file)
+
+
+#===================================================================
+"""Scenario 3: Status changed to something else mid e-transfer. Failed run """
+#===================================================================
+
+@patch("ngRadar_Website.management.commands.dsoc_sim.time.sleep", return_value=None)
+@patch("ngRadar_Website.management.commands.dsoc_sim.write_transfer_progress")
+@patch("ngRadar_Website.management.commands.dsoc_sim.ETransferEvent")
+def test_track_etransfer_progress_raises_when_progress_halted_status_not_transferring(
+    mock_etransfer_event,
+    mock_write_transfer_progress,
+    mock_sleep,
+):
+    payload = {
+        "transfer_uuid": "11111111-1111-1111-1111-111111111111",
+        "num_bytes": 1000,
+    }
+
+    incoming_file = MagicMock()
+    incoming_file.exists.return_value = True
+    incoming_file.stat.return_value.st_size = 200  # != num_bytes should raise at end
+
+    # Use a status that is "something else" (not TRANSFERRING and not FAILED).
+    other_status = MagicMock(name="other_status")
+    other_status != Status.TRANSFERRING
+    other_status != Status.FAILED
+
+    mock_values_list = MagicMock()
+    mock_values_list.first.side_effect = [
+        Status.TRANSFERRING,  # iteration 1 while check: enter loop
+        other_status,         # iteration 2 while check: exit loop
+        other_status,         # post-loop FAILED check: not FAILED
+    ]
+
+    mock_order_by = MagicMock()
+    mock_order_by.values_list.return_value = mock_values_list
+
+    mock_filter = MagicMock()
+    mock_filter.order_by.return_value = mock_order_by
+
+    mock_etransfer_event.objects.filter.return_value = mock_filter
+
+    with pytest.raises(ValueError, match="progress has halted"):
+        track_etransfer_progress(payload, incoming_file=incoming_file)
+
+    # confirm we wrote at least one non-reset progress update before exiting
+    mock_write_transfer_progress.assert_any_call(
+        received_bytes=200,
+        total_bytes=1000,
+        percent="20.0", 
+        transfer_id=payload["transfer_uuid"],
+    )
