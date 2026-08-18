@@ -20,6 +20,19 @@
         {% elif latest_etr_event.status is None %}
         <span class="fs-5">Waiting for signal...</span>
         {% endif %}
+
+        {# transfer_resumed is set in views.get_obs_events(): more than one #}
+        {# TRANSFERRING row for this transfer means it was interrupted and picked #}
+        {# back up. Kept short and inline so the status box does not change size. #}
+        {% if transfer_resumed %}
+        <span
+            class="text-muted small"
+            data-bs-toggle="tooltip"
+            data-bs-trigger="hover"
+            data-bs-delay='{"show":100,"hide":50}'
+            title="This transfer was interrupted and resumed where it left off. The data already delivered was not re-sent."
+        >(resumed)</span>
+        {% endif %}
     </div>
 
     <div class="col-4"></div>

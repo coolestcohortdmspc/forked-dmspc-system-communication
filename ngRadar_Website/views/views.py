@@ -11,7 +11,7 @@ from django.http import StreamingHttpResponse, JsonResponse, HttpResponse, HttpR
 
 # serve_image imports
 from ngRadar_Website.utils import create_s3_client, bootstrap, write_transfer_progress # , get_presigned_url
-from ngRadar_Website.enums import Stations, Message
+from ngRadar_Website.enums import Stations, Message, Status
 
 #libraries used for lock status
 from django.core.cache import cache
@@ -67,6 +67,10 @@ def get_obs_events():
     current_transfer_uuid = latest_events.first().transfer_uuid if latest_events.exists() else None
     latest_etr_event = ETransferEvent.objects.filter(transfer_uuid=current_transfer_uuid).order_by("-event_time").first()
 
+    # More than one TRANSFERRING row for the same transfer means Kafka redelivered
+    # the message after an interruption, so etc picked the transfer back up.
+    transferring_count = ETransferEvent.objects.filter(transfer_uuid=current_transfer_uuid,status=Status.TRANSFERRING).count()
+
     return {
         'latest_events': latest_events,
         'latest_event': ObservatoryEvent.objects.order_by("-event_time").first() if latest_events else None,
@@ -76,6 +80,7 @@ def get_obs_events():
         'avg_latency': round(avg_latency, 2),
         'current_waveform': current_waveform,
         'latest_etr_events': latest_etr_events,
+        'transfer_resumed': transferring_count > 1,
         'latest_etr_event': latest_etr_event,
         'latest_image_event': latest_image_event,
     }
