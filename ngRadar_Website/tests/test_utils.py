@@ -37,6 +37,7 @@ with patch("pathlib.Path.read_text", return_value=mock_env_data):
         record_transfer_event,
         send_kafka_message,
         get_folder_size,
+        write_transfer_progress,
 
     )
 
@@ -710,6 +711,51 @@ def test_get_folder_size_FileNotFoundError(tmp_path):
 # 10. write_transfer_progress Test
 # ==============================================================================
 
-def test_write_transfer_progress():
-    pass
+@patch("ngRadar_Website.utils.open")
+@patch("ngRadar_Website.utils.json.dump")
+@patch("ngRadar_Website.utils.os.replace")
+def test_write_transfer_progress(
+    mock_os_replace,
+    mock_json,
+    mock_open
+    ):
 
+    received_bytes = 100
+    total_bytes = 200
+    percent = "50.0"
+    transfer_id = "11111111-1111-1111-1111-111111111111"
+
+    mock_file = MagicMock()
+
+    mock_open.return_value.__enter__.return_value = mock_file
+
+    write_transfer_progress(
+        received_bytes=received_bytes,
+        total_bytes=total_bytes,
+        percent=percent,
+        transfer_id=transfer_id
+    )
+
+
+    mock_open.assert_called_once_with(
+        "/service/mock_assets/progress.json.tmp",
+        "w",
+        encoding="utf-8",
+    )
+
+    expected = {
+        "received_bytes": 100,
+        "total_bytes": 200,
+        "percent": "50.0",
+        "transfer_id": "11111111-1111-1111-1111-111111111111",
+    }
+
+    mock_json.assert_called_once_with(
+        expected,
+        mock_file
+    )
+
+    mock_os_replace.assert_called_once_with(
+        "/service/mock_assets/progress.json.tmp",
+        "/service/mock_assets/progress.json"
+    )
