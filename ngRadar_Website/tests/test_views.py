@@ -139,9 +139,76 @@ def test_serve_image(mock_create, mock_get_obj):
         Bucket="fake_bucket", Key="images/test.png"
     )
 
+# ===============================================================================
+# 3. Submit waveform test
+# ===============================================================================
+@patch("ngRadar_Website.views.views.uuid.uuid4")
+@patch("ngRadar_Website.views.views.datetime")
+@patch("ngRadar_Website.views.views.waveform_producer")
+@patch("ngRadar_Website.views.views.cache")
+@patch("ngRadar_Website.views.views.write_transfer_progress")
+@patch("ngRadar_Website.views.views.ngrok_endpoint.objects.last")
+@patch("ngRadar_Website.views.views.uiEvent.objects.create")
+def test_submit_waveform(Mock_UI_EVENT, Mock_bootstrap, Mock_ProgressBar, Mock_Cache, Mock_Producer, Mock_datetime, Test_uuid):
+    #create simulated data
+    mock_uuid = uuid.UUID('12345678-1234-5678-1234-567812345678')
+    test_timestamp = datetime(2026, 8, 17, 12, 30, 45, tzinfo=timezone.utc)
+    test_waveform = '45'
+    mock_endpoint = "test123endpoint"
+
+    #create fixed return values for UUID and date time
+    Test_uuid.return_value = mock_uuid
+    Mock_datetime.now.return_value=Mock_datetime
+
+    #generate a mock post request
+    factory = RequestFactory()
+    myRequest = factory.post('home/submit-waveform/', data={'waveform':test_waveform})
+
+    #mock the bootsrap value
+    mock_ngrok = MagicMock()
+    mock_ngrok.bootstrap = mock_endpoint
+    Mock_bootstrap.return_value = mock_ngrok
+
+    #mock a UI Event
+    Mock_EVENT = MagicMock()
+    Mock_EVENT.uuid = mock_uuid
+    Mock_EVENT.selected_waveform = test_waveform
+    Mock_EVENT.event_time = test_timestamp
+    Mock_UI_EVENT.return_value = Mock_EVENT
+
+    result = submit_waveform(myRequest)
+    
+    # Assert MockUiEvent was called
+    Mock_UI_EVENT.assert_called_once()
+
+    # Assert waveform_producer was called
+    Mock_Producer.assert_called_once()
+    
+    #get the parameters from the Mock_producer
+    waveform_producer_topic = Mock_Producer.call_args[0][0]
+    waveform_producer_config = Mock_Producer.call_args[0][1]
+    waveform_producer_uuid = Mock_Producer.call_args[0][2]
+    waveform_producer_value = Mock_Producer.call_args[0][3]
+
+    #test that data sent in the fake message matches the simulated data
+    assert waveform_producer_topic == "user_input"
+
+    assert waveform_producer_config['bootstrap.servers'] == mock_endpoint
+    assert waveform_producer_config['client.id'] == 'ui-producer'
+
+    #assert the UUID and convert to hexadecimal
+    assert waveform_producer_uuid == mock_uuid.hex
+
+    assert json.loads(waveform_producer_value.decode('utf-8')) == "User input a new waveform."
+
+    # Assert cache was set
+    Mock_Cache.set.assert_called_once()
+
+    #assert call to reset progress bar was made
+    Mock_ProgressBar.assert_called_once()
 
 # ==============================================================================
-# 3. login_view Test
+# 4. login_view Test
 # ==============================================================================
 
 
@@ -231,7 +298,7 @@ def test_login_view_post_invalid(mock_logout, mock_msg_error, mock_render, mock_
 
 
 # ==============================================================================
-# 4. latency_graphing Test
+# 5. latency_graphing Test
 # ==============================================================================
 
 @patch("ngRadar_Website.views.views.StreamingHttpResponse")
@@ -247,7 +314,7 @@ def test_latency_graphing(mock_get_msg, mock_streaming):
 
 
 # ==============================================================================
-# 5. lock_status Test
+# 6. lock_status Test
 # ==============================================================================
 
 @patch("ngRadar_Website.views.views.cache.get")
@@ -308,7 +375,7 @@ def test_lock_true(mock_json, mock_dsocEvent, mock_cache_get):
 
 
 # ==============================================================================
-# 6. logout_view Test
+# 7. logout_view Test
 # ==============================================================================
 
 @patch("ngRadar_Website.views.views.logout")
@@ -327,7 +394,7 @@ def test_logout_view(mock_logout_msg, mock_logout):
 
 
 # ==============================================================================
-# 7. home_view Test
+# 8. home_view Test
 # ==============================================================================
 
 @patch("ngRadar_Website.views.views.render")
@@ -347,7 +414,7 @@ def test_home_view(mock_obs_event, mock_render):
 
 
 # ==============================================================================
-# 8. dashboard_view Test
+# 9. dashboard_view Test
 # ==============================================================================
 
 @patch("ngRadar_Website.views.views.render")
@@ -367,7 +434,7 @@ def test_dashboard_view(mock_obs_event, mock_render):
 
 
 # ==============================================================================
-# 9. event_table_partial Test
+# 10. event_table_partial Test
 # ==============================================================================
 
 @patch("ngRadar_Website.views.views.render")
@@ -387,7 +454,7 @@ def test_event_table_partial(mock_obs_event, mock_render):
 
 
 # ==============================================================================
-# 10. status_partial Test
+# 11. status_partial Test
 # ==============================================================================
 
 @patch("ngRadar_Website.views.views.render")
@@ -407,7 +474,7 @@ def test_status_partial(mock_obs_event, mock_render):
 
 
 # ==============================================================================
-# 11. dsoc_event_partial Test
+# 12. dsoc_event_partial Test
 # ==============================================================================
 
 @patch("ngRadar_Website.views.views.render")
@@ -429,7 +496,7 @@ def test_dsoc_event_partial(mock_dsoc_event, mock_obs_event, mock_render):
 
 
 # ==============================================================================
-# 12. gbt_event_partial Test
+# 13. gbt_event_partial Test
 # ==============================================================================
 
 @patch("ngRadar_Website.views.views.render")
