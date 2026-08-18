@@ -404,7 +404,34 @@ def parse_etc_progress(line, *, expected_num_bytes, transfer_id):
     # )
 
 
-# etransfer command to send data from client -> daemon 
+ETD_MAX_CONN_RETRY = 90     # 90 retries x 10s = waits up to 15 minutes
+ETD_RETRY_CONN_DELAY = 10
+
+
+def wait_for_etd():
+    """
+    Blocks until the e-transfer daemon at ETD_DESTINATION answers again.
+
+    etc's --list mode is used as the detector: it exits 0 when the daemon replies
+    and non-zero when it cannot be reached, so we never need to know etd's port
+    number. etc's own connection-retry flags do the waiting.
+
+    Output: True if the daemon came back, False if it never did.
+    """
+    result = subprocess.run(
+        [
+            "etc",
+            "--list",
+            os.environ["ETD_DESTINATION"],
+            "--max-conn-retry", str(ETD_MAX_CONN_RETRY),
+            "--retry-conn-delay", str(ETD_RETRY_CONN_DELAY),
+        ],
+        capture_output=True,
+    )
+    return result.returncode == 0
+
+
+# etransfer command to send data from client -> daemon
 def etc_send(frame_path):
     """
     Sends data from the client to the daemon using e-transfer.

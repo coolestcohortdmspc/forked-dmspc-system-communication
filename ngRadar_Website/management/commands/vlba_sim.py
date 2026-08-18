@@ -32,6 +32,12 @@ FAILURE_REASONS = {
     -6: "destination connection was lost mid-transfer",
 }
 
+# A daemon outage only ever costs one attempt, because the waiting happens
+# inside wait_for_etd(). This cap is for the other case: etc failing for a
+# reason the daemon being up cannot fix (missing source file, full destination
+# disk), which would otherwise retry at full speed forever.
+MAX_RESUME_ATTEMPTS = 5
+
 
 def process_msg(msg, producer_topic, producer_config):
     incoming_key = int(msg.key().decode("utf-8"))
@@ -95,59 +101,76 @@ def process_msg(msg, producer_topic, producer_config):
 
         if payload["message"] == "Yes":
 
-            try:
-                record_transfer_event(
-                    transfer_uuid=payload["transfer_uuid"],
-                    gbt_uuid=payload["gbt_uuid"],
-                    station=Stations.HN,
-                    status=Status.TRANSFERRING,
-                    num_bytes=payload["num_bytes"],
-                    message="Hancock VLBA e-transfer in progress",
-                )
-        
-                send_kafka_message(
-                    key = key,
-                    producer_topic=producer_topic,
-                    producer_config=producer_config,
-                    transfer_uuid=payload["transfer_uuid"],
-                    gbt_uuid=payload["gbt_uuid"],
-                    status=Status.TRANSFERRING,
-                    num_bytes=payload["num_bytes"],
-                    filename=payload["filename"],
-                    message="Hancock VLBA has started to send the data file to DSOC via e-transfer",
-                )
-                frame_path = raw_data_path / f"{payload['transfer_uuid']}.bin"
+            attempts = 0
 
-                print("DSOC responded affirmative to storage check. Initiating e-transfer...")
-                etc_send(frame_path)
+            # If etr_daemon dies mid-transfer, etc exits non-zero and we record
+            # FAILED as before. We then wait for the daemon to answer again and
+            # let this loop re-run the whole block.
+            while True:
 
-            except subprocess.CalledProcessError as exc:
-                print(f"E-transfer failed with return code: {exc.returncode}")
-                record_transfer_event(
-                    transfer_uuid=payload["transfer_uuid"],
-                    gbt_uuid=payload["gbt_uuid"],
-                    station=Stations.HN,
-                    status=Status.FAILED,
-                    num_bytes=payload["num_bytes"],
-                    message=(
-                        f"E-transfer failed: "
-                        f"{FAILURE_REASONS.get(exc.returncode, 'unrecognized failure')} "
-                        f"(return code: {exc.returncode})"
-                    ),
-                )
-                return False
+                try:
+                    record_transfer_event(
+                        transfer_uuid=payload["transfer_uuid"],
+                        gbt_uuid=payload["gbt_uuid"],
+                        station=Stations.HN,
+                        status=Status.TRANSFERRING,
+                        num_bytes=payload["num_bytes"],
+                        message="Hancock VLBA e-transfer in progress",
+                    )
 
-            except Exception as exc:
-                print(f"Unexpected e-transfer failure: {exc}")
-                record_transfer_event(
-                    transfer_uuid=payload["transfer_uuid"],
-                    gbt_uuid=payload["gbt_uuid"],
-                    station=Stations.HN,
-                    status=Status.FAILED,
-                    num_bytes=payload["num_bytes"],
-                    message=f"Unexpected e-transfer failure: {exc}",
-                )
-                return False
+                    send_kafka_message(
+                        key = key,
+                        producer_topic=producer_topic,
+                        producer_config=producer_config,
+                        transfer_uuid=payload["transfer_uuid"],
+                        gbt_uuid=payload["gbt_uuid"],
+                        status=Status.TRANSFERRING,
+                        num_bytes=payload["num_bytes"],
+                        filename=payload["filename"],
+                        message="Hancock VLBA has started to send the data file to DSOC via e-transfer",
+                    )
+                    frame_path = raw_data_path / f"{payload['transfer_uuid']}.bin"
+
+                    print("DSOC responded affirmative to storage check. Initiating e-transfer...")
+                    etc_send(frame_path)
+                    break
+
+                except subprocess.CalledProcessError as exc:
+                    print(f"E-transfer failed with return code: {exc.returncode}")
+                    record_transfer_event(
+                        transfer_uuid=payload["transfer_uuid"],
+                        gbt_uuid=payload["gbt_uuid"],
+                        station=Stations.HN,
+                        status=Status.FAILED,
+                        num_bytes=payload["num_bytes"],
+                        message=(
+                            f"E-transfer failed: "
+                            f"{FAILURE_REASONS.get(exc.returncode, 'unrecognized failure')} "
+                            f"(return code: {exc.returncode})"
+                        ),
+                    )
+                    attempts += 1
+                    if attempts >= MAX_RESUME_ATTEMPTS:
+                        print(f"E-transfer failed {attempts} times. Giving up.")
+                        return False
+
+                    print("Waiting for the e-transfer daemon to come back...")
+                    if not wait_for_etd():
+                        print("E-transfer daemon never came back. Giving up.")
+                        return False
+                    print("E-transfer daemon is back. Resuming the transfer...")
+
+                except Exception as exc:
+                    print(f"Unexpected e-transfer failure: {exc}")
+                    record_transfer_event(
+                        transfer_uuid=payload["transfer_uuid"],
+                        gbt_uuid=payload["gbt_uuid"],
+                        station=Stations.HN,
+                        status=Status.FAILED,
+                        num_bytes=payload["num_bytes"],
+                        message=f"Unexpected e-transfer failure: {exc}",
+                    )
+                    return False
 
         # If DSOC does NOT have storage, VLBA will sleep and ask again.
         else: 
@@ -183,6 +206,11 @@ class Command(BaseCommand):
         print("Starting VLBA simulator")
 
         producer_topic, producer_config, consumer_topic, consumer_config = bootstrap(Stations.HN)
+
+        # process_msg blocks while wait_for_etd() waits for etr_daemon to come back 
+        consumer_config["max.poll.interval.ms"] = (
+            (ETD_MAX_CONN_RETRY * ETD_RETRY_CONN_DELAY) + 300
+        ) * 1000
 
         consume(
             consumer_topic,
