@@ -3,7 +3,7 @@ import uuid
 # from confluent_kafka.admin import AdminClient, NewTopic, KafkaException, KafkaError
 from dotenv import load_dotenv
 from ngRadar_Website.enums import Stations
-from ngRadar_Website.models.models import gbtEvent, dsocEvent, ETransferEvent
+from ngRadar_Website.models.models import gbtEvent, dsocEvent, ETransferEvent, ObservatoryEvent
 from confluent_kafka import Consumer, Producer
 import boto3
 import os
@@ -612,3 +612,23 @@ def record_transfer_event(
         status=status,
         message=message,
     )
+
+def send_failure(status, msg):
+    """
+    Function to be used by all sims to publish failure status and message to the ObservatoryEvent database table.
+    """
+
+    data = {
+        "event_time": datetime.now(timezone.utc),
+        "latency_ms": 0.00,
+        "status": status,
+        "message": msg,
+    }
+
+    try:
+        # Create and capture the instantiated record model
+        record = ObservatoryEvent.objects.create(**data)
+        print("Payload saved to database successfully.")
+    
+    except Exception as e:
+        print(f"Database error: {e}")
