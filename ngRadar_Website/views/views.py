@@ -20,10 +20,9 @@ from ngRadar_Website.models.models import ObservatoryEvent, uiEvent, gbtEvent, d
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout, logout
 from django.db.models import Avg
-from confluent_kafka import Producer
 from datetime import datetime, timezone
 
-from ngRadar_Website.utils import produce as waveform_producer
+from ngRadar_Website.utils import produce
 
 import json, uuid, os, time
 
@@ -255,7 +254,7 @@ def submit_waveform(request):
         def main():
             key = str(Message.UI_EVENT)
             value = uuid_input.hex  # Use the UUID as the value for the Kafka message
-            waveform_producer(topic, config, key, value)
+            produce(topic, config, key, value)
             write_transfer_progress(received_bytes=0, total_bytes=0, percent=0.0, transfer_id=0)  # Reset the progress bar after sending the message
         main()
         
