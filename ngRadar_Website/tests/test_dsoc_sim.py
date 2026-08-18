@@ -519,7 +519,7 @@ def test_track_etransfer_progress_status_FAILED(
 @patch("ngRadar_Website.management.commands.dsoc_sim.time.sleep", return_value=None)
 @patch("ngRadar_Website.management.commands.dsoc_sim.write_transfer_progress")
 @patch("ngRadar_Website.management.commands.dsoc_sim.ETransferEvent")
-def test_track_etransfer_progress_raises_when_progress_halted_status_not_transferring(
+def test_track_etransfer_progress_status_OTHER(
     mock_etransfer_event,
     mock_write_transfer_progress,
     mock_sleep,
