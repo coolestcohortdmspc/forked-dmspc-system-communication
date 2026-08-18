@@ -141,7 +141,7 @@ def test_serve_image(mock_create, mock_get_obj):
 # ===============================================================================
 @patch("ngRadar_Website.views.views.uuid.uuid4")
 @patch("ngRadar_Website.views.views.datetime")
-@patch("ngRadar_Website.views.views.waveform_producer")
+@patch("ngRadar_Website.views.views.produce")
 @patch("ngRadar_Website.views.views.cache")
 @patch("ngRadar_Website.views.views.write_transfer_progress")
 @patch("ngRadar_Website.views.views.uiEvent.objects.create")
