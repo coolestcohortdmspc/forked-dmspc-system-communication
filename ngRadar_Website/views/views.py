@@ -10,7 +10,7 @@ import json
 from django.http import StreamingHttpResponse, JsonResponse, HttpResponse, HttpResponseNotFound
 
 # serve_image imports
-from ngRadar_Website.utils import create_s3_client, bootstrap, write_transfer_progress # , get_presigned_url
+from ngRadar_Website.utils import create_s3_client, bootstrap, write_transfer_progress, produce # , get_presigned_url
 from ngRadar_Website.enums import Stations, Message
 
 #libraries used for lock status
@@ -206,12 +206,6 @@ def submit_waveform(request):
         #     "message.max.bytes": 8388608,
         #     "client.id": "ui-producer"}
         # message = "User input a new waveform."
-
-        def produce(topic, config, key, value):
-            producer = Producer(config)
-            producer.produce(topic, key=key, value=value)
-            
-            producer.flush()
 
         def main():
             key = str(Message.UI_EVENT)

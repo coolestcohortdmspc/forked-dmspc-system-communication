@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 import uuid
 # from confluent_kafka.admin import AdminClient, NewTopic, KafkaException, KafkaError
 from dotenv import load_dotenv
-from ngRadar_Website.enums import Stations
+from ngRadar_Website.enums import Stations, Status
 from ngRadar_Website.models.models import gbtEvent, dsocEvent, ETransferEvent, ObservatoryEvent
 from confluent_kafka import Consumer, Producer
 import boto3
@@ -33,7 +33,7 @@ PROGRESS_RE = re.compile(
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 
 #Program constants
-SESSION_TIMEOUT_MS = 45000
+SESSION_TIMEOUT_MS = 3000
 MAX_BYTES = 8388608
 
 
@@ -200,14 +200,13 @@ def consume(topic, config, process_msg, producer_topic=None, producer_config=Non
             process_msg = A function which accepts the Kafka message as an input.
     Returns: N/A
     """
-
-    consumer = Consumer(config)
-
-    #subscribes to the specified topic
-    consumer.subscribe(topic)
-    # TODO make sure works with multiple topics
-    
     try:
+        consumer = Consumer(config)
+
+        #subscribes to the specified topic
+        consumer.subscribe(topic)
+        # TODO make sure works with multiple topics
+    
         while True:
             #consumer polls the topic and prints any incoming messages
             msg = consumer.poll(1.0) #polls for messages for 1 second
@@ -215,15 +214,23 @@ def consume(topic, config, process_msg, producer_topic=None, producer_config=Non
             if msg is None:
                 continue
             if msg.error() is not None:
-                print("Consumer error:", msg.error())
-                continue
+                error = msg.error()
+                print("Consumer error:", error)
+
+                send_failure(
+                    status=Status.FAILED,
+                    msg="Failed to connect to Kafka.",
+                )
+
+                break
 
             #if msg is not None and msg.error() is None:
             process_msg(msg, producer_topic, producer_config)
     except Exception as e:
-        import traceback
-        print("An unhandled exception occurred in the consumer loop:")
-        traceback.print_exc()
+        send_failure(
+            status=Status.FAILED,
+            msg="Failed to connect to Kafka.",
+        )
         raise
 
 
@@ -496,15 +503,46 @@ def etc_send(frame_path):
 
 
 def produce(topic, config, key, value):
-    # creates a new producer instance
-    producer = Producer(config)
+    delivery_error = None
 
-    # producing a message to the specified topic 
-    producer.produce(topic, key=key, value=value)
-    print(f"Produced message to topic {topic} with key {key}.")
+    def delivery_report(err, msg):
+        nonlocal delivery_error
 
-    # send any outstanding or buffered messages to the Kafka broker
-    producer.flush()
+        if err is not None:
+            delivery_error = err
+
+    try:
+        # creates a new producer instance
+        producer = Producer(config)
+
+        # producing a message to the specified topic 
+        producer.produce(topic, key=key, value=value, callback=delivery_report)
+
+        # Give Kafka a limited amount of time to deliver the message
+        remaining = producer.flush(2)
+
+        if delivery_error is not None:
+            send_failure(
+                status=Status.FAILED,
+                msg=f"{delivery_error}",
+            )
+            return False
+
+        if remaining > 0:
+            send_failure(
+                status=Status.FAILED,
+                msg="Kafka broker did not respond.",
+            )
+            return False
+
+        print(f"Produced message to topic {topic} with key {key}.")
+
+    except Exception as e:
+        send_failure(
+            status=Status.FAILED,
+            msg=f"Failed to send Kafka message: {e}",
+        )
+        raise
 
     
 def send_kafka_message(
@@ -539,7 +577,7 @@ def send_kafka_message(
     )
 
     
-def create_file(file_path, file_mb=100):
+def create_file(file_path, file_mb=30):
     file_size_bytes = file_mb * 1024 * 1024
     num_buffers = 100
 
