@@ -6,32 +6,29 @@ from django.views.decorators.cache import cache_control
 from django.views.decorators.http import require_POST, require_GET
 
 #libraries used for data streaming
-import json
 from django.http import StreamingHttpResponse, JsonResponse, HttpResponse, HttpResponseNotFound
 
 # serve_image imports
-from ngRadar_Website.utils import create_s3_client, bootstrap, write_transfer_progress # , get_presigned_url
+from ngRadar_Website.utils import create_s3_client, bootstrap, write_transfer_progress #get_presigned_url
 from ngRadar_Website.enums import Stations, Message
 
 #libraries used for lock status
 from django.core.cache import cache
 
-from ngRadar_Website.models.models import ObservatoryEvent, uiEvent, gbtEvent, dsocEvent, ETransferEvent  # , ngrok_endpoint
-from ngRadar_Website.models.models import ObservatoryEvent, uiEvent, gbtEvent, dsocEvent, ETransferEvent  # , ngrok_endpoint
+from ngRadar_Website.models.models import ObservatoryEvent, uiEvent, gbtEvent, dsocEvent, ETransferEvent
+from ngRadar_Website.models.models import ObservatoryEvent, uiEvent, gbtEvent, dsocEvent, ETransferEvent
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout, logout
 from django.db.models import Avg
 from confluent_kafka import Producer
-import uuid
-import os
-import time
-from datetime import datetime, timezone 
-# from ngRadar_Website.utils import views_bootstrap
+from datetime import datetime, timezone
 
-# views_bootstrap()
+from ngRadar_Website.utils import produce as waveform_producer
+
+import json, uuid, os, time
+
 
 #program constants
-
 RECORDS_TO_DISPLAY=20
 LAST_RECORDS = 5
 EXPIRE_TIME_SECONDS = 3600
@@ -265,12 +262,6 @@ def submit_waveform(request):
         # add a cache for submit time
         cache.set('submit_locked', datetime.now(timezone.utc))
     return redirect('home')
-    
-def waveform_producer(topic, config, key, value):
-            producer = Producer(config)
-            producer.produce(topic, key=key, value=value)
-            
-            producer.flush()
 
 #====================================================
 # Render the templates
