@@ -255,23 +255,22 @@ def submit_waveform(request):
         #     "client.id": "ui-producer"}
         # message = "User input a new waveform."
 
-        def produce(topic, config, key, value):
-            producer = Producer(config)
-            producer.produce(topic, key=key, value=value)
-            
-            producer.flush()
-
         def main():
             key = str(Message.UI_EVENT)
             value = uuid_input.hex  # Use the UUID as the value for the Kafka message
-            produce(topic, config, key, value)
+            waveform_producer(topic, config, key, value)
             write_transfer_progress(received_bytes=0, total_bytes=0, percent=0.0, transfer_id=0)  # Reset the progress bar after sending the message
         main()
         
         # add a cache for submit time
         cache.set('submit_locked', datetime.now(timezone.utc))
     return redirect('home')
-
+    
+def waveform_producer(topic, config, key, value):
+            producer = Producer(config)
+            producer.produce(topic, key=key, value=value)
+            
+            producer.flush()
 
 #====================================================
 # Render the templates

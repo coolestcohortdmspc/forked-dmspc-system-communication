@@ -1,19 +1,16 @@
 from pathlib import Path
-
-from dotenv import load_dotenv
 from unittest.mock import patch, MagicMock
 
 from ngRadar_Website.views.views import get_obs_events
-from ngRadar_Website.enums import Stations
-from datetime import datetime, timezone, timedelta
-import pytest
-from ngRadar_Website.enums import Stations
+from ngRadar_Website.enums import Stations, Message
+from datetime import datetime, timezone
 from ngRadar_Website.models.models import gbtEvent, dsocEvent, ObservatoryEvent, uiEvent
-#from ngRadar_Website.views.views import get_obs_events
 from django.test import RequestFactory
 from django.http import HttpResponse, HttpResponseRedirect
 
-import random,string
+import json
+import uuid
+
 
 # ==============================================================================
 # IMPORTANT:
@@ -147,27 +144,25 @@ def test_serve_image(mock_create, mock_get_obj):
 @patch("ngRadar_Website.views.views.waveform_producer")
 @patch("ngRadar_Website.views.views.cache")
 @patch("ngRadar_Website.views.views.write_transfer_progress")
-@patch("ngRadar_Website.views.views.ngrok_endpoint.objects.last")
 @patch("ngRadar_Website.views.views.uiEvent.objects.create")
-def test_submit_waveform(Mock_UI_EVENT, Mock_bootstrap, Mock_ProgressBar, Mock_Cache, Mock_Producer, Mock_datetime, Test_uuid):
+def test_submit_waveform(Mock_UI_EVENT, Mock_ProgressBar, Mock_Cache, Mock_Producer, mock_datetime, test_uuid):
     #create simulated data
     mock_uuid = uuid.UUID('12345678-1234-5678-1234-567812345678')
     test_timestamp = datetime(2026, 8, 17, 12, 30, 45, tzinfo=timezone.utc)
     test_waveform = '45'
-    mock_endpoint = "test123endpoint"
 
     #create fixed return values for UUID and date time
-    Test_uuid.return_value = mock_uuid
-    Mock_datetime.now.return_value=Mock_datetime
+    test_uuid.return_value = mock_uuid
+    mock_datetime.now.return_value=test_timestamp
 
     #generate a mock post request
     factory = RequestFactory()
     myRequest = factory.post('home/submit-waveform/', data={'waveform':test_waveform})
 
-    #mock the bootsrap value
-    mock_ngrok = MagicMock()
-    mock_ngrok.bootstrap = mock_endpoint
-    Mock_bootstrap.return_value = mock_ngrok
+    # #mock the bootsrap value
+    # mock_ngrok = MagicMock()
+    # mock_ngrok.bootstrap = mock_endpoint
+    # Mock_bootstrap.return_value = mock_ngrok
 
     #mock a UI Event
     Mock_EVENT = MagicMock()
@@ -176,7 +171,7 @@ def test_submit_waveform(Mock_UI_EVENT, Mock_bootstrap, Mock_ProgressBar, Mock_C
     Mock_EVENT.event_time = test_timestamp
     Mock_UI_EVENT.return_value = Mock_EVENT
 
-    result = submit_waveform(myRequest)
+    data = submit_waveform(myRequest)
     
     # Assert MockUiEvent was called
     Mock_UI_EVENT.assert_called_once()
@@ -187,19 +182,22 @@ def test_submit_waveform(Mock_UI_EVENT, Mock_bootstrap, Mock_ProgressBar, Mock_C
     #get the parameters from the Mock_producer
     waveform_producer_topic = Mock_Producer.call_args[0][0]
     waveform_producer_config = Mock_Producer.call_args[0][1]
-    waveform_producer_uuid = Mock_Producer.call_args[0][2]
-    waveform_producer_value = Mock_Producer.call_args[0][3]
+    waveform_producer_messageKey = Mock_Producer.call_args[0][2]
+    waveform_producer_uuid = Mock_Producer.call_args[0][3]
 
     #test that data sent in the fake message matches the simulated data
     assert waveform_producer_topic == "user_input"
 
-    assert waveform_producer_config['bootstrap.servers'] == mock_endpoint
+    # assert waveform_producer_config['bootstrap.servers'] == mock_endpoint
     assert waveform_producer_config['client.id'] == 'ui-producer'
+
+    assert waveform_producer_messageKey == str(Message.UI_EVENT)
+
 
     #assert the UUID and convert to hexadecimal
     assert waveform_producer_uuid == mock_uuid.hex
 
-    assert json.loads(waveform_producer_value.decode('utf-8')) == "User input a new waveform."
+    #assert json.loads(waveform_producer_value.decode('utf-8')) == "User input a new waveform."
 
     # Assert cache was set
     Mock_Cache.set.assert_called_once()
