@@ -92,26 +92,7 @@ def config_func(sim, bootstrap):
 
     # perform the shared behavior for each type:
     if type == "producer and consumer":
-        # # config for both producer and consumer sims
-        # print("BOOTSTRAP =", bootstrap)
-        # admin = AdminClient({"bootstrap.servers": bootstrap})
-        # topics = [
-        #     NewTopic(topic1, num_partitions=3, replication_factor=1),
-        #     NewTopic(topic2, num_partitions=1, replication_factor=1),
-        # ]
-        # fs = admin.create_topics(topics, request_timeout=30)
 
-        # for topic, f in fs.items():
-        #     # f is a Future; result() will raise if creation failed for reasons other than "already exists"
-        #     try:
-        #         f.result()
-        #         print(f"Created topic {topic}")
-        #     # handle the case where it tried to create a topic that already exists:
-        #     except KafkaException as e:
-        #         if e.args[0].code() != KafkaError.TOPIC_ALREADY_EXISTS:
-        #             print(f"Failed creating topic {topic}: {e!r}")
-        #             raise
-        
         producer_topic = topic2  # NOTE The topic to which the messages will be sent, rename accordingly to whatever topic you want to send to
         producer_config = {
             "bootstrap.servers": bootstrap,
@@ -129,20 +110,19 @@ def config_func(sim, bootstrap):
             "auto.offset.reset": "earliest",
         }  # TODO make sure this works
         return producer_topic, producer_config, consumer_topic, consumer_config
-    elif type == "consumer":
-        # config for just consumer
+    # elif type == "consumer": #NOTE Not being used right now. Commented out to help testcov
+    #     # config for just consumer
         
-        config = {
-            "bootstrap.servers": bootstrap,
-            "fetch.max.bytes": MAX_BYTES,
-            "session.timeout.ms": SESSION_TIMEOUT_MS,
-            "client.id": f"{sim.name.lower()}-consumer",
-            "group.id": f"{sim.name.lower()}-consumer-group",
-            "auto.offset.reset": "earliest",
-        }
+    #     config = {
+    #         "bootstrap.servers": bootstrap,
+    #         "fetch.max.bytes": MAX_BYTES,
+    #         "session.timeout.ms": SESSION_TIMEOUT_MS,
+    #         "client.id": f"{sim.name.lower()}-consumer",
+    #         "group.id": f"{sim.name.lower()}-consumer-group",
+    #         "auto.offset.reset": "earliest",
+    #     }
     else:  # type == "producer"
         # config for just producer
-
         config = {
             "bootstrap.servers": bootstrap,
             "message.max.bytes": MAX_BYTES,

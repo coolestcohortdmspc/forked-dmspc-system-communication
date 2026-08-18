@@ -36,6 +36,7 @@ with patch("pathlib.Path.read_text", return_value=mock_env_data):
         produce,
         record_transfer_event,
         send_kafka_message,
+        get_folder_size,
 
     )
 
@@ -135,7 +136,7 @@ def test_config_func_GBT():
 #         (Stations.FD)
 #     ])
 # NOTE: I want to make the code dynamically accept all VLBA stations, but that is a future project
-def test_config_func_vlba():
+def test_config_func_VLBA():
     """Scenario 2: sim is a VLBA site"""
     sim = Stations.HN
     bootstrap = "12345"
@@ -183,6 +184,23 @@ def test_config_func_DSOC():
             "group.id": f"{sim.name.lower()}-consumer-group",
             "auto.offset.reset": "earliest",
         }
+
+    
+def test_config_func_UI():
+    """Scenario 4: kafka client is the UI. Producer only"""
+
+    sim = Stations.UI
+    bootstrap = "12345"
+
+    topic, config = config_func(sim, bootstrap)
+
+    assert topic == "user_input"
+    assert config == {
+            "bootstrap.servers": bootstrap,
+            "message.max.bytes": 8388608,
+            "client.id": f"{sim.name.lower()}-producer",
+        }
+
 
 # ==============================================================================
 # 3. bootstrap Test
@@ -568,7 +586,7 @@ def test_produce(mock_Producer):
 
     mock_Producer.assert_called_once_with(config)
     mock_producer.produce.assert_called_once_with(topic, key=key, value=value)
-    mock_producer.flush.assert_called_once_with()
+    mock_producer.flush.assert_called_once()
 
 
 # ==============================================================================
@@ -651,3 +669,47 @@ def test_send_kafka_message(mock_datetime, mock_produce):
         key,
         '{"transfer_uuid": "test_transfer_uuid", "gbt_uuid": "test_gbt_uuid", "status": 4, "num_bytes": 2048, "filename": "mock.filename", "event_time": "2026-08-12T12:34:56+00:00", "message": 1, "stations": "Hancock (25-m, VLBA)"}',
     )
+
+
+# ==============================================================================
+# 9. get_folder_size Test
+# ==============================================================================
+
+def test_get_folder_size(tmp_path):
+    root = tmp_path / "root"
+    root.mkdir()
+
+    # root/a.txt = 3 bytes
+    (root / "a.txt").write_bytes(b"abc")
+
+    # root/sub/b.bin = 5 bytes
+    sub = root / "sub"
+    sub.mkdir()
+    (sub / "b.bin").write_bytes(b"12345")
+
+    # root/sub2/c.dat = 0 bytes
+    sub2 = root / "sub2"
+    sub2.mkdir()
+    (sub2 / "c.dat").write_bytes(b"")
+
+    expected = 3 + 5 + 0
+    assert get_folder_size(root) == expected
+
+
+def test_get_folder_size_FileNotFoundError(tmp_path):
+    missing = tmp_path / "does_not_exist"
+
+    with pytest.raises(FileNotFoundError) as excinfo:
+        get_folder_size(missing)
+
+    # Optional: ensure it carries the same path object/message
+    assert excinfo.value.args[0] == missing
+
+
+# ==============================================================================
+# 10. write_transfer_progress Test
+# ==============================================================================
+
+def test_write_transfer_progress():
+    pass
+
