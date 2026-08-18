@@ -373,34 +373,6 @@ services:
       - srt://:8008
 
 
-  etr_progress_writer:
-    build:
-      context: .
-      target: base
-    env_file:
-      - .env
-    depends_on:
-      postgres:
-        condition: service_healthy
-      kafka-broker:
-        condition: service_healthy
-      kafka-init:
-        condition: service_completed_successfully
-    volumes:
-      - .:/service
-      - dsoc_transfer:/dsoc/incoming
-    networks:
-      - ngradar_website_network
-    profiles: ["kafka"]
-    environment:
-      BOOTSTRAP_SERVER: kafka-broker:29092
-      # if we move this to a separate machine, use the below bootstrap server:
-      # BOOTSTRAP_SERVER=7.tcp.ngrok.io:26729
-    entrypoint:
-        - python
-        - manage.py
-        - etr_progress_writer
-
 
 #==========================
 # end of containers
