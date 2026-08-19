@@ -90,8 +90,10 @@ def process_msg(msg, producer_topic, producer_config):
                 message="Source file does not exist",
             )
             print("Source file does not exist.")
-            return False
-    
+            # Nothing will ever make this file appear, so mark the message done
+            # instead of leaving it uncommitted for a replay that must fail again.
+            return True
+
     
     elif incoming_key == Message.DSOC_RESPOND_STORAGE.value:
         print("Received DSOC's storage check response!")

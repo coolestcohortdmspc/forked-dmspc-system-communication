@@ -30,8 +30,8 @@ This code will:
 
 # How long the file may sit at the same size before DSOC asks the broker whether
 # vlba is alive. Only a trigger for that question, never a verdict: quiet bytes
-# mean a slow transfer as often as a dead sender. Must exceed SESSION_TIMEOUT_MS,
-# or we ask before the broker has dropped a dead consumer and get a stale answer.
+# mean a slow transfer as often as a dead sender. Shorter than SESSION_TIMEOUT_MS
+# only delays the FAILED row by a round, since the clock re-arms and asks again.
 STALL_TIMEOUT_SECONDS = 15
 
 

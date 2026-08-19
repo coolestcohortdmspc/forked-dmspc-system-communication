@@ -120,7 +120,7 @@ def test_config_func_GBT():
     assert consumer_config == {
             "bootstrap.servers": bootstrap,
             "fetch.max.bytes": 8388608,
-            "session.timeout.ms": 45000,
+            "session.timeout.ms": 10000,
             "client.id": "gbt-consumer",
             "group.id": "gbt-consumer-group",
             "auto.offset.reset": "earliest",
@@ -150,7 +150,7 @@ def test_config_func_vlba():
     assert consumer_config == {
             "bootstrap.servers": bootstrap,
             "fetch.max.bytes": 8388608,
-            "session.timeout.ms": 45000,
+            "session.timeout.ms": 10000,
             "client.id": f"{sim.name.lower()}-consumer",
             "group.id": f"{sim.name.lower()}-consumer-group",
             "auto.offset.reset": "earliest",
@@ -169,7 +169,7 @@ def test_config_func_DSOC():
     assert config == {
             "bootstrap.servers": bootstrap,
             "fetch.max.bytes": 8388608,
-            "session.timeout.ms": 45000,
+            "session.timeout.ms": 10000,
             "client.id": "dsoc-consumer",
             "group.id": "dsoc-consumer-group",
             "auto.offset.reset": "earliest",
@@ -502,7 +502,7 @@ def test_etc_send(mock_parse, mock_os_read, mock_select, mock_os_close, mock_pop
     mock_uuid.assert_called_once()
     mock_os_open.assert_called_once()
     mock_popen.assert_called_once_with(
-        ["etc", str(mock_frame_path), os.environ["ETD_DESTINATION"], "--overwrite",],
+        ["etc", str(mock_frame_path), os.environ["ETD_DESTINATION"], "--resume",],
         stdin=mock_slave,
         stdout=mock_slave,
         stderr=mock_slave,
