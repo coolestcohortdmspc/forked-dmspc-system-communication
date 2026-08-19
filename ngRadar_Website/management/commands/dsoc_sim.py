@@ -314,6 +314,7 @@ def process_msg(msg, producer_topic, producer_config):
             return
 
         try:
+            num_bytes = actual_num_bytes
             gbt_data = DB_import(payload["gbt_uuid"])
             dsoc_latency = latency_calc(gbt_data[3])
 
@@ -357,7 +358,7 @@ def process_msg(msg, producer_topic, producer_config):
             gbt_uuid=payload["gbt_uuid"],
             station=Stations.DSOC,
             status=Status.COMPLETED,
-            num_bytes=actual_num_bytes,
+            num_bytes=num_bytes,
             latency_ms=dsoc_latency,
             message="DSOC has verified etransfer, image generated, and image stored.",
         )
