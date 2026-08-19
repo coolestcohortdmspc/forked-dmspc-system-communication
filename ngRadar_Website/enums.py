@@ -26,6 +26,7 @@ class Status(models.IntegerChoices):
     TRANSFERRED = 6, "Transferred"      # This status would be used when the e-transfer has completed from etc -> etd successfully, will be the status sent by kafka to DSOC to begin DSOC workflow.
     FAILED = 7, "Failed"        
     COMPLETED = 8, "Completed"          # This status would be used when the e-transfer has completed successfully and the data has been verified, processed, and stored appropriately.
+    POLLING = 9, "Polling SeaweedFS"    # Used during failure testing for transparency
 
 
 class Message(models.IntegerChoices):

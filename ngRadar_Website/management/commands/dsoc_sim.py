@@ -110,19 +110,24 @@ def create_img(tx_waveform):
 def save_image_to_seaweedfs(target, image_file, dsoc_uuid):
     # Saves the image to SeaweedFS using S3 API
 
-    image_key = f"ddm/{target}/{dsoc_uuid}.png"
+    try:
+        image_key = f"ddm/{target}/{dsoc_uuid}.png"
 
-    s3 = create_s3_client()
-    
-    file_data = image_file
+        s3 = create_s3_client()
+        
+        file_data = image_file
 
-    image_key = upload_seaweedfs(s3, image_key, file_data)
+        image_key = upload_seaweedfs(s3, image_key, file_data)
 
-    print(f"Success: Image saved to SeaweedFS at {image_key}")
+        print(f"Success: Image saved to SeaweedFS at {image_key}")
 
-    return image_key
-
-
+        return image_key
+    except:
+        send_failure(
+            status=Status.FAILED,
+            msg="Failed to connect to SeaweedFS.",
+        )
+        return False
 
 
 # Verifies that the incoming file exists and has the expected number of bytes that VLBA sent in the kafka message.
@@ -329,17 +334,19 @@ def process_msg(msg, producer_topic, producer_config):
                 image_file,
                 dsoc_uuid,
             )
+            if image_key == False:
+                return
+            else:
+                data["uuid"] = dsoc_uuid
 
-            data["uuid"] = dsoc_uuid
-
-            publish_DB(
-                image_key=image_key,
-                num_bytes=image_num_bytes,
-                data=data,
-                xmit_station=Stations.GBT,
-                rcvr_station=Stations.HN,
-                transfer_uuid=payload["transfer_uuid"],
-            )
+                publish_DB(
+                    image_key=image_key,
+                    num_bytes=image_num_bytes,
+                    data=data,
+                    xmit_station=Stations.GBT,
+                    rcvr_station=Stations.HN,
+                    transfer_uuid=payload["transfer_uuid"],
+                )
 
         except Exception as exc:
             record_transfer_event(

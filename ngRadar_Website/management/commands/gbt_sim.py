@@ -84,7 +84,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         print("Starting GBT simulator")
-        time.sleep(10)
+        #time.sleep(10)
         producer_topic, producer_config, consumer_topic, consumer_config = bootstrap(Stations.GBT)
 
         # generate a dummy data payload, publish this data to the db, produce a message with this payload, then start consuming

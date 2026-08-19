@@ -260,15 +260,16 @@ def create_s3_client():
         ),
     )
 
-    for attempt in range(30):
+    for attempt in range(5):
         try:
             s3.list_buckets()
             print("SeaweedFS S3 is ready.")
             break
 
         except (EndpointConnectionError, ConnectionError):
-            print(f"Waiting for SeaweedFS... ({attempt + 1}/30)")
-            time.sleep(2)
+            send_failure(status=Status.POLLING, msg=f"Waiting for SeaweedFS... ({attempt + 1}/5)")
+            print(f"Waiting for SeaweedFS... ({attempt + 1}/5)")
+            time.sleep(1)
 
         except ClientError as e:
             # The S3 API is responding, so we're ready.
@@ -674,7 +675,7 @@ def send_failure(status, msg):
     try:
         # Create and capture the instantiated record model
         record = ObservatoryEvent.objects.create(**data)
-        print("Payload saved to database successfully.")
+        print("Status saved to database successfully.")
     
     except Exception as e:
         print(f"Database error: {e}")
