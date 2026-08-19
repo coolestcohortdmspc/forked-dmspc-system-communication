@@ -21,10 +21,8 @@
         <span class="fs-5">Waiting for signal...</span>
         {% endif %}
 
-        {# transfer_resumed is set in views.get_obs_events(): more than one #}
-        {# TRANSFERRING row for this transfer means it was interrupted and picked #}
-        {# back up. Kept short and inline so the status box does not change size. #}
-        {% if transfer_resumed %}
+        {# Only while transferring: once it has failed or completed, the tag is noise. #}
+        {% if transfer_resumed and latest_etr_event.status == 4 %}
         <span
             class="text-muted small"
             data-bs-toggle="tooltip"

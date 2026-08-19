@@ -28,13 +28,12 @@ Note: I am going to treat this sim as the Hancock VLBA site (Stations.HN) for ha
 """
 
 FAILURE_REASONS = {
-    -9: "transfer process was terminated",
-    -6: "destination connection was lost mid-transfer",
+    -9: "The e-transfer process was terminated",
+    -6: "The connection to the e-transfer daemon was lost",
 }
 
-# A daemon outage only ever costs one attempt, because the waiting happens
-# inside wait_for_etd(). This cap is for the other case: etc failing for a
-# reason the daemon being up cannot fix (missing source file, full destination
+# A daemon outage costs one attempt, since wait_for_etd() does the waiting. This
+# cap is for failures the daemon being up cannot fix (missing source file, full
 # disk), which would otherwise retry at full speed forever.
 MAX_RESUME_ATTEMPTS = 5
 
@@ -103,9 +102,8 @@ def process_msg(msg, producer_topic, producer_config):
 
             attempts = 0
 
-            # If etr_daemon dies mid-transfer, etc exits non-zero and we record
-            # FAILED as before. We then wait for the daemon to answer again and
-            # let this loop re-run the whole block.
+            # If etr_daemon dies, etc exits non-zero and we record FAILED, wait for
+            # the daemon to answer again, then let this loop replay the whole block.
             while True:
 
                 try:
@@ -144,8 +142,8 @@ def process_msg(msg, producer_topic, producer_config):
                         status=Status.FAILED,
                         num_bytes=payload["num_bytes"],
                         message=(
-                            f"E-transfer failed: "
-                            f"{FAILURE_REASONS.get(exc.returncode, 'unrecognized failure')} "
+                            f"{FAILURE_REASONS.get(exc.returncode, 'The e-transfer failed')} "
+                            f"mid-transfer. Transfer interrupted. "
                             f"(return code: {exc.returncode})"
                         ),
                     )
@@ -168,7 +166,7 @@ def process_msg(msg, producer_topic, producer_config):
                         station=Stations.HN,
                         status=Status.FAILED,
                         num_bytes=payload["num_bytes"],
-                        message=f"Unexpected e-transfer failure: {exc}",
+                        message=f"The e-transfer failed unexpectedly mid-transfer. Transfer interrupted. ({exc})",
                     )
                     return False
 
@@ -207,7 +205,7 @@ class Command(BaseCommand):
 
         producer_topic, producer_config, consumer_topic, consumer_config = bootstrap(Stations.HN)
 
-        # process_msg blocks while wait_for_etd() waits for etr_daemon to come back 
+        # process_msg blocks while wait_for_etd() waits for etr_daemon to come back
         consumer_config["max.poll.interval.ms"] = (
             (ETD_MAX_CONN_RETRY * ETD_RETRY_CONN_DELAY) + 300
         ) * 1000

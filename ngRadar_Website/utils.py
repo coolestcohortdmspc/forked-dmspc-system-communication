@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 import uuid
-# from confluent_kafka.admin import AdminClient, NewTopic, KafkaException, KafkaError
+from confluent_kafka.admin import AdminClient
 from dotenv import load_dotenv
 from ngRadar_Website.enums import Stations
 from ngRadar_Website.models.models import gbtEvent, dsocEvent, ETransferEvent
@@ -33,7 +33,7 @@ PROGRESS_RE = re.compile(
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 
 #Program constants
-SESSION_TIMEOUT_MS = 45000
+SESSION_TIMEOUT_MS = 10000
 MAX_BYTES = 8388608
 
 
@@ -198,11 +198,9 @@ def consume(topic, config, process_msg, producer_topic=None, producer_config=Non
     Inputs: topic = The Kafka topic to receieve messages from.
             config = Server configuration defining the bootstrap, byte and timeout limits, and IDs.
             process_msg = A function which accepts the Kafka message as an input.
-            manual_commit = If True, turns off Kafka's 5-second auto-commit timer and only marks a
-                message as done once process_msg returns True. Work that never finished (for example,
-                the container was killed mid e-transfer) is then redelivered on restart, letting
-                etc_send pick the partial transfer back up via --resume.
-                Callers that opt in MUST have process_msg return True/False.
+            manual_commit = If True, a message is only marked done once process_msg returns True,
+                so work killed mid e-transfer is redelivered on restart and etc --resume picks up
+                the partial file. Callers that opt in MUST have process_msg return True/False.
     Returns: N/A
     """
 
@@ -408,13 +406,28 @@ ETD_MAX_CONN_RETRY = 90     # 90 retries x 10s = waits up to 15 minutes
 ETD_RETRY_CONN_DELAY = 10
 
 
+def consumer_group_has_members(group_id):
+    """
+    Asks the Kafka broker whether anyone is still a member of group_id.
+
+    The broker drops a consumer that stops heartbeating after SESSION_TIMEOUT_MS,
+    so it is the only component that knows whether a sim is alive. A slow transfer
+    and a dead sim look identical from the outside, but not to the broker.
+
+    Inputs: group_id = the consumer group to look up, e.g. "hn-consumer-group"
+    Output: True if at least one member is in the group, False otherwise.
+    """
+    admin = AdminClient({"bootstrap.servers": os.environ["BOOTSTRAP_SERVER"]})
+    group = admin.describe_consumer_groups([group_id])[group_id].result()
+    return len(group.members) > 0
+
+
 def wait_for_etd():
     """
     Blocks until the e-transfer daemon at ETD_DESTINATION answers again.
 
-    etc's --list mode is used as the detector: it exits 0 when the daemon replies
-    and non-zero when it cannot be reached, so we never need to know etd's port
-    number. etc's own connection-retry flags do the waiting.
+    etc --list is the detector: it exits 0 when the daemon replies, so we never
+    need etd's port number. etc's own retry flags do the waiting.
 
     Output: True if the daemon came back, False if it never did.
     """
@@ -441,7 +454,9 @@ def etc_send(frame_path):
     Input: 
         frame_path = Path to the file that we want to send to the daemon. On the client machine.
     Output: 
-        Command line output of the etc command, which will show the progress of the transfer and any errors that may occur. Uses --resume: frame_path is always a brand-new file per Kafka message (see process_msg), so --resume behaves identically to --overwrite for fresh transfers, and correctly picks up partial transfers when the same path is manually re-invoked after an interruption.
+        Command line output of the etc command, showing transfer progress and any errors.
+        Uses --resume. Each Kafka message gets a brand-new frame_path, so on a fresh transfer
+        --resume behaves like --overwrite; after an interruption it sends only the missing bytes.
     """
 
     expected_num_bytes = frame_path.stat().st_size

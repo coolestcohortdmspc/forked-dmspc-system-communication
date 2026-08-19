@@ -28,6 +28,12 @@ This code will:
 - load the image key + the uuid into the DB
 """
 
+# How long the file may sit at the same size before DSOC asks the broker whether
+# vlba is alive. Only a trigger for that question, never a verdict: quiet bytes
+# mean a slow transfer as often as a dead sender. Must exceed SESSION_TIMEOUT_MS,
+# or we ask before the broker has dropped a dead consumer and get a stale answer.
+STALL_TIMEOUT_SECONDS = 15
+
 
 def DB_import(uuid):
     
@@ -159,10 +165,14 @@ def track_etransfer_progress(payload, incoming_file: Path):
         transfer_id=0,
     )
     print("Transfer in progress...")
+    last_progress_at = time.monotonic()
     while ETransferEvent.objects.filter(transfer_uuid=transfer_uuid).order_by("-event_time").values_list("status", flat=True).first() == Status.TRANSFERRING:
         # while loop will break prematurely if status in DB ever changes - ex. if it changes to FAILED mid e-transfer.
         if incoming_file.exists():
-            received_bytes = incoming_file.stat().st_size
+            current_bytes = incoming_file.stat().st_size
+            if current_bytes > received_bytes:
+                last_progress_at = time.monotonic()
+            received_bytes = current_bytes
             percent = (received_bytes / num_bytes * 100)
 
             write_transfer_progress(
@@ -178,6 +188,21 @@ def track_etransfer_progress(payload, incoming_file: Path):
         if received_bytes >= num_bytes:
             print(f"Transfer of <{transfer_uuid}.bin> COMPLETE.")
             break
+
+        if time.monotonic() - last_progress_at > STALL_TIMEOUT_SECONDS:
+            if consumer_group_has_members(f"{Stations.HN.name.lower()}-consumer-group"):
+                # vlba is alive, the transfer is just slow. Start the clock over.
+                last_progress_at = time.monotonic()
+            else:
+                record_transfer_event(
+                    transfer_uuid=transfer_uuid,
+                    gbt_uuid=payload["gbt_uuid"],
+                    station=Stations.DSOC,
+                    status=Status.FAILED,
+                    num_bytes=num_bytes,
+                    message="Hancock VLBA went offline mid-transfer. Transfer interrupted.",
+                )
+                break
 
     if ETransferEvent.objects.filter(transfer_uuid=transfer_uuid).order_by("-event_time").values_list("status", flat=True).first() == Status.FAILED:
         raise ValueError("E-Transfer client reported a FAILED status mid-transfer.")

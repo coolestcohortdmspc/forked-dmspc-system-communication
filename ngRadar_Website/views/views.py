@@ -55,9 +55,10 @@ def get_obs_events():
             .first()
         )
 
-    # More than one TRANSFERRING row for the same transfer means Kafka redelivered
-    # the message after an interruption, so etc picked the transfer back up.
-    transferring_count = ETransferEvent.objects.filter(transfer_uuid=current_transfer_uuid,status=Status.TRANSFERRING).count()
+    # More than one TRANSFERRING row for a transfer means it was interrupted and resumed.
+    transferring_count = ETransferEvent.objects.filter(
+        transfer_uuid=current_transfer_uuid, status=Status.TRANSFERRING
+    ).count()
 
     return {
         'latest_events': latest_events,
