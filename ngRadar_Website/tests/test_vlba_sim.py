@@ -315,7 +315,94 @@ def test_process_msg_DSOC_RESPOND_STORAGE_OSError(
 #=====================================================================
 
 
-"""message "No"""
+"""Scenario 6: DSOC_RESPOND_STORAGE incoming message. DSOC responded No, VLBA asks again."""
+#=====================================================================
+
+@patch("ngRadar_Website.management.commands.vlba_sim.etc_send")
+@patch("ngRadar_Website.management.commands.vlba_sim.send_kafka_message")
+@patch("ngRadar_Website.management.commands.vlba_sim.time.sleep")
+@patch("ngRadar_Website.management.commands.vlba_sim.record_transfer_event")
+@patch("ngRadar_Website.management.commands.vlba_sim.json.loads")
+def test_process_msg_DSOC_RESPOND_STORAGE_No(
+        mock_json,
+        mock_record_transfer_event,
+        mock_sleep,
+        mock_send_kafka_message,
+        mock_etc_send,
+):
+    msg = MagicMock()
+    msg.value.return_value = b'{"value"}'
+    msg.key.return_value = b'2'
+
+    producer_topic = MagicMock()
+    producer_config = MagicMock()
+
+    #giving fake uuid's in the correct format so that 'uuid.UUID()' works on it in the function:
+    transfer_uuid = uuid.UUID("11111111-1111-1111-1111-111111111111")
+    gbt_uuid = uuid.UUID("22222222-2222-2222-2222-222222222222")
+
+    #The fake output of the json.loads() function:
+    mock_payload = {
+        "transfer_uuid": str(transfer_uuid),
+        "gbt_uuid": str(gbt_uuid),
+        "status": 1,
+        "status_label": "READY",
+        "num_bytes": 2048,
+        "filename": str("fake_filename.png"),
+        "event_time": datetime(2026, 7, 15, 12, 0, 0, tzinfo=timezone.utc),
+        "message": 1, # Same as message being "No"
+        "stations": str("fake_station"),
+    }
+
+    mock_json.return_value = mock_payload
+    mock_sleep.return_value = None # we don't want 5 seconds of sleep in test
+
+    process_msg(msg, producer_topic, producer_config)
+
+    assert mock_json.call_count == 1
+    assert mock_record_transfer_event.call_count == 0
+    assert mock_sleep.call_count == 1
+    assert mock_send_kafka_message.call_count == 1
+    assert mock_etc_send.call_count == 0
+
+#=====================================================================
 
 
-"""incoming key VLBA_DELETE"""
+"""Scenario 7: VLBA_DELETE incoming message. VLBA deletes raw data."""
+#=====================================================================
+
+@patch("ngRadar_Website.management.commands.vlba_sim.delete_observation_data")
+@patch("ngRadar_Website.management.commands.vlba_sim.etc_send")
+@patch("ngRadar_Website.management.commands.vlba_sim.send_kafka_message")
+@patch("ngRadar_Website.management.commands.vlba_sim.record_transfer_event")
+@patch("ngRadar_Website.management.commands.vlba_sim.json.loads")
+def test_process_msg_VLBA_DELETE(
+        mock_json,
+        mock_record_transfer_event,
+        mock_send_kafka_message,
+        mock_etc_send,
+        mock_delete_observation_data,
+):
+    msg = MagicMock()
+    msg.value.return_value = b'{"value"}'
+    msg.key.return_value = b'4'
+
+    producer_topic = MagicMock()
+    producer_config = MagicMock()
+
+    #The fake output of the json.loads() function:
+    mock_payload = {
+        "filename": str("fake_filename.png"),
+    }
+
+    mock_json.return_value = mock_payload
+
+    process_msg(msg, producer_topic, producer_config)
+
+    assert mock_json.call_count == 1
+    assert mock_record_transfer_event.call_count == 0 # making sure this never gets hit during logic.
+    assert mock_send_kafka_message.call_count == 0
+    assert mock_etc_send.call_count == 0
+    mock_delete_observation_data.assert_called_once_with("fake_filename.png")
+
+#=====================================================================
