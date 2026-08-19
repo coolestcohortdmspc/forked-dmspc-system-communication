@@ -4,7 +4,7 @@ import uuid
 from dotenv import load_dotenv
 from ngRadar_Website.enums import Stations, Status
 from ngRadar_Website.models.models import gbtEvent, dsocEvent, ETransferEvent, ObservatoryEvent
-from confluent_kafka import Consumer, Producer
+from confluent_kafka import Consumer, Producer, KafkaError
 import boto3
 import os
 import time
@@ -33,7 +33,7 @@ PROGRESS_RE = re.compile(
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 
 #Program constants
-SESSION_TIMEOUT_MS = 3000
+SESSION_TIMEOUT_MS = 45000
 MAX_BYTES = 8388608
 
 
@@ -119,6 +119,7 @@ def config_func(sim, bootstrap):
         producer_config = {
             "bootstrap.servers": bootstrap,
             "message.max.bytes": MAX_BYTES,# NOTE can make this constant
+            "message.timeout.ms": 2000,
             "client.id": f"{sim.name.lower()}-producer",
         }
 
@@ -149,6 +150,7 @@ def config_func(sim, bootstrap):
         config = {
             "bootstrap.servers": bootstrap,
             "message.max.bytes": MAX_BYTES,
+            "message.timeout.ms": 2000,
             "client.id": f"{sim.name.lower()}-producer",
         }
 
@@ -213,8 +215,13 @@ def consume(topic, config, process_msg, producer_topic=None, producer_config=Non
             
             if msg is None:
                 continue
-            if msg.error() is not None:
+            if msg.error():
                 error = msg.error()
+
+                if error.code() == KafkaError._PARTITION_EOF:
+                    print("Consumer reached partition EOF")
+                    continue
+
                 print("Consumer error:", error)
 
                 send_failure(
@@ -536,13 +543,14 @@ def produce(topic, config, key, value):
             return False
 
         print(f"Produced message to topic {topic} with key {key}.")
+        return True
 
     except Exception as e:
         send_failure(
             status=Status.FAILED,
             msg=f"Failed to send Kafka message: {e}",
         )
-        raise
+        return False
 
     
 def send_kafka_message(
