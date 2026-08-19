@@ -427,7 +427,7 @@ def test_process_msg_VLBA_REQUEST_STORAGE_1(
 """Scenario 5: VLBA_TRANSFERRING incoming message. Clean run, no failure cases. Finish <verify and complete> logic."""
 #=====================================================================
 
-@patch("ngRadar_Website.management.commands.dsoc_sim.uuid")
+@patch("ngRadar_Website.management.commands.dsoc_sim.uuid.uuid4")
 @patch("ngRadar_Website.management.commands.dsoc_sim.publish_DB")
 @patch("ngRadar_Website.management.commands.dsoc_sim.save_image_to_seaweedfs")
 @patch("ngRadar_Website.management.commands.dsoc_sim.create_img")
@@ -512,6 +512,7 @@ def test_process_msg_VLBA_TRANSFERRING(
     mock_latency_calc.assert_called_once_with(mock_gbt_data[3])
     mock_DB_columns.assert_called_once_with(mock_gbt_data)
     assert mock_create_img.call_count == 1
+    assert mock_uuid.call_count == 1
     assert mock_save_image_to_seaweedfs.call_count == 1
     assert mock_publish_DB.call_count == 1
 
