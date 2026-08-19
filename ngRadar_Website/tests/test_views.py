@@ -6,6 +6,7 @@ from ngRadar_Website.enums import Stations, Message
 from datetime import datetime, timezone
 from ngRadar_Website.models.models import gbtEvent, dsocEvent, ObservatoryEvent, uiEvent
 from django.test import RequestFactory
+from django.urls import reverse
 from django.http import HttpResponse, HttpResponseRedirect
 
 import json
@@ -218,15 +219,18 @@ def test_login_view_auth(mock_redirect):
     factory = RequestFactory()
     request = factory.get("/login/")
 
-    #the following authentication is True to satisfy the if statement:
     request.user = MagicMock()
     request.user.is_authenticated = True
 
-    #Call the function:
-    login_view(request)
+    # Make redirect() return a real response object Django can set headers on
+    expected_url = reverse("home")  # adjust if different
+    mock_redirect.return_value = HttpResponseRedirect(expected_url)
+
+    response = login_view(request)
 
     mock_redirect.assert_called_once_with("home")
-
+    assert response.status_code == 302
+    assert response.url == expected_url
 
 @patch("ngRadar_Website.views.views.authenticate")
 @patch("ngRadar_Website.views.views.login")
