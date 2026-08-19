@@ -210,8 +210,8 @@ def test_submit_waveform(Mock_UI_EVENT, Mock_ProgressBar, Mock_Cache, Mock_Produ
 # ==============================================================================
 
 
-@patch("ngRadar_Website.views.views.logout_view")
-def test_login_view_auth(mock_logout):
+@patch("ngRadar_Website.views.views.redirect")
+def test_login_view_auth(mock_redirect):
     """Scenario 1: user is authenticated"""
 
     #We need this django function to generate a fake http request for us:
@@ -222,15 +222,10 @@ def test_login_view_auth(mock_logout):
     request.user = MagicMock()
     request.user.is_authenticated = True
 
-    #We need the formatting to be in HttpResponse to satisfy the cache_control decorator:
-    mock_response = HttpResponse("logged out")
-    mock_logout.return_value = mock_response
-
     #Call the function:
-    output = login_view(request)
+    login_view(request)
 
-    assert output == mock_response
-    mock_logout.assert_called_once_with(request)
+    mock_redirect.assert_called_once_with("home")
 
 
 @patch("ngRadar_Website.views.views.authenticate")
@@ -375,20 +370,17 @@ def test_lock_true(mock_json, mock_dsocEvent, mock_cache_get):
 # ==============================================================================
 # 7. logout_view Test
 # ==============================================================================
-
+@patch("ngRadar_Website.views.views.redirect")
 @patch("ngRadar_Website.views.views.logout")
-@patch("ngRadar_Website.views.views.logging_out_message")
-def test_logout_view(mock_logout_msg, mock_logout):
-    request = MagicMock()
-    mock_logout.return_value = None
+def test_logout_view(mock_logout, mock_redirect):
+    #We need this django function to generate a fake http request for us:
+    factory = RequestFactory()
+    request = factory.post("/logout/")
 
-    mock_logout_msg.return_value = "response"
+    logout_view(request)
 
-    output = logout_view(request)
-
-    assert output == "response"
     mock_logout.assert_called_once_with(request)
-    mock_logout_msg.assert_called_once_with(request)
+    mock_redirect.assert_called_once_with("login")
 
 
 # ==============================================================================
@@ -477,20 +469,17 @@ def test_status_partial(mock_obs_event, mock_render):
 
 @patch("ngRadar_Website.views.views.render")
 @patch("ngRadar_Website.views.views.get_obs_events")
-@patch("ngRadar_Website.views.views.get_dsoc_events")
-def test_dsoc_event_partial(mock_dsoc_event, mock_obs_event, mock_render):
+def test_dsoc_event_partial(mock_obs_event, mock_render):
     request = MagicMock()
         
     response = HttpResponse("fake_response")
     mock_render.return_value = response
     mock_obs_event.return_value = "fake_obs_events"
-    mock_dsoc_event.return_value = "fake_dsoc_events"
     output = dsoc_event_partial(request)
 
     assert output == response
     mock_obs_event.assert_called_once_with()
-    mock_dsoc_event.assert_called_once_with()
-    mock_render.assert_called_once_with(request, "ngRadar_Website/partials/dsoc_home_partial.html", mock_obs_event(), mock_dsoc_event())
+    mock_render.assert_called_once_with(request, "ngRadar_Website/partials/dsoc_home_partial.html", mock_obs_event())
 
 
 # ==============================================================================
