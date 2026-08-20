@@ -1,13 +1,9 @@
 from datetime import datetime, timezone
-import os, time
+import time
 from django.core.management.base import BaseCommand
-from confluent_kafka import Producer
-from confluent_kafka import Consumer
 from ngRadar_Website.enums import Stations, Message
 from ngRadar_Website.models.models import uiEvent
 from ngRadar_Website.models.models import gbtEvent
-# from dotenv import find_dotenv
-from pathlib import Path
 from ngRadar_Website.utils import latency_calc, bootstrap, consume, produce
 
 

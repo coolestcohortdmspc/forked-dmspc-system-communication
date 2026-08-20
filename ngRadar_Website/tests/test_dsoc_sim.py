@@ -1,10 +1,8 @@
 from datetime import datetime, timezone
 from unittest.mock import patch, MagicMock
-from ngRadar_Website.enums import Stations, Status
+from ngRadar_Website.enums import Status
 import uuid
-from pathlib import Path
 import pytest
-
 
 # =============================================
 # TEST THE STANDALONE FUNCTIONS FROM DSOC_SIM
