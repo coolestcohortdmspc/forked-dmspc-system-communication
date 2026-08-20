@@ -9,8 +9,8 @@ from django.views.decorators.http import require_POST, require_GET
 from django.http import StreamingHttpResponse, JsonResponse, HttpResponse, HttpResponseNotFound
 
 # serve_image imports
-from ngRadar_Website.utils import create_s3_client, bootstrap, write_transfer_progress, produce # , get_presigned_url
-from ngRadar_Website.enums import Stations, Message
+from ngRadar_Website.utils import create_s3_client, bootstrap, write_transfer_progress, produce, publish_status_obsEvents # , get_presigned_url
+from ngRadar_Website.enums import Stations, Message, Status
 
 #libraries used for lock status
 from django.core.cache import cache
@@ -132,24 +132,30 @@ def latency_graphing(request):
 
 
 def serve_image(request, uuid):
-    event = get_object_or_404(ObservatoryEvent, uuid=uuid)
+    try:
+        event = get_object_or_404(ObservatoryEvent, uuid=uuid)
 
-    bucket = os.environ["WEED_S3_BUCKET"]
+        bucket = os.environ["WEED_S3_BUCKET"]
 
-    s3 = create_s3_client()
+        s3 = create_s3_client()
 
-    # presigned_url = get_presigned_url(s3, event)
-    # return redirect(presigned_url)
+        # presigned_url = get_presigned_url(s3, event)
+        # return redirect(presigned_url)
 
-    obj = s3.get_object(
-    Bucket=bucket,
-    Key=event.image_key,
-    )
+        obj = s3.get_object(
+        Bucket=bucket,
+        Key=event.image_key,
+        )
 
-    return HttpResponse(
-        obj["Body"].read(),
-        content_type=obj["ContentType"],
-    )
+        return HttpResponse(
+            obj["Body"].read(),
+            content_type=obj["ContentType"],
+        )
+    except:
+        publish_status_obsEvents(
+            status=Status.FAILED,
+            msg="Failed to connect to SeaweedFS.",
+        )
 
 
 
