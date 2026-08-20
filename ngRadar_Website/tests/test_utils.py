@@ -38,6 +38,8 @@ with patch("pathlib.Path.read_text", return_value=mock_env_data):
         send_kafka_message,
         get_folder_size,
         write_transfer_progress,
+        publish_status_obsEvents,
+        upload_seaweedfs,
 
     )
 
@@ -676,6 +678,48 @@ def test_produce_delivery_error(mock_publish, mock_Producer):
     mock_producer.flush.assert_called_once_with(2)
     mock_publish.assert_called_once_with(status=Status.FAILED, msg="Delivery failed")
 
+@patch("ngRadar_Website.utils.Producer")
+@patch("ngRadar_Website.utils.publish_status_obsEvents")
+def test_produce_delivery_flush_error(mock_publish, mock_Producer):
+    """Scenario 3: Flush error"""
+    topic = "topic"
+    config = "config"
+    key = "key"
+    value = "value"
+    
+    mock_producer = mock_Producer.return_value
+    mock_producer.flush.return_value = 1
+
+    result = produce(topic, config, key, value)
+
+    assert result == False
+    mock_Producer.assert_called_once_with(config)
+    mock_producer.produce.assert_called_once_with(topic, key=key, value=value, callback=mock_producer.produce.call_args.kwargs["callback"])
+    mock_producer.flush.assert_called_once_with(2)
+    mock_publish.assert_called_once_with(status=Status.FAILED, msg="Kafka broker did not respond.")
+
+@patch("ngRadar_Website.utils.Producer")
+@patch("ngRadar_Website.utils.publish_status_obsEvents")
+def test_produce_delivery_exception(mock_publish, mock_Producer):
+    """Scenario 4: Exception raised"""
+    topic = "topic"
+    config = "config"
+    key = "key"
+    value = "value"
+    
+    mock_producer = mock_Producer.return_value
+    mock_producer.flush.return_value = 1
+
+    mock_producer.produce.side_effect = Exception("Kafka Exception")
+
+    result = produce(topic, config, key, value)
+
+    assert result == False
+    mock_Producer.assert_called_once_with(config)
+    mock_producer.produce.assert_called_once_with(topic, key=key, value=value, callback=mock_producer.produce.call_args.kwargs["callback"])
+    mock_producer.flush.assert_not_called()
+    mock_publish.assert_called_once_with(status=Status.FAILED, msg="Failed to send Kafka message: Kafka Exception")
+
 
 # ==============================================================================
 # 7. record_transfer_event Test
@@ -846,3 +890,43 @@ def test_write_transfer_progress(
         "/service/mock_assets/progress.json.tmp",
         "/service/mock_assets/progress.json"
     )
+
+
+# ==============================================================================
+# 11. publish_status_obsEvents Test
+# ==============================================================================
+
+@patch("ngRadar_Website.utils.datetime")
+@patch("ngRadar_Website.utils.ObservatoryEvent")
+def test_publish_status_obsEvents(mock_obs_event, mock_datetime):
+    """Scenario 1: no errors"""
+    status="fake_status"
+    msg="fake_msg"
+
+    fake_datetime = MagicMock()
+    mock_datetime.now.return_value = fake_datetime
+
+    publish_status_obsEvents(status, msg)
+
+    mock_datetime.now.assert_called_once_with(timezone.utc)
+    mock_obs_event.objects.create.assert_called_once_with(event_time=fake_datetime, latency_ms=0.00, status=status, message=msg)
+
+@patch("ngRadar_Website.utils.datetime")
+@patch("ngRadar_Website.utils.ObservatoryEvent")
+def test_publish_status_obsEvents_error(mock_obs_event, mock_datetime, capsys):
+    """Scenario 2: database error"""
+    status="fake_status"
+    msg="fake_msg"
+
+    fake_datetime = MagicMock()
+    mock_datetime.now.return_value = fake_datetime
+
+    mock_obs_event.objects.create.side_effect = Exception("Database error")
+
+    publish_status_obsEvents(status, msg)
+
+    captured=capsys.readouterr()
+
+    mock_datetime.now.assert_called_once_with(timezone.utc)
+    mock_obs_event.objects.create.assert_called_once_with(event_time=fake_datetime, latency_ms=0.00, status=status, message=msg)
+    assert captured.out.strip() == "Database error: Database error"
