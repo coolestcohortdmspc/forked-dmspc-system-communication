@@ -249,7 +249,6 @@ def create_s3_client():
             time.sleep(1)
 
         except ClientError as e:
-            # The S3 API is responding, so we're ready.
             print(f"SeaweedFS responded: {e.response['Error']['Code']}")
             break
     else:

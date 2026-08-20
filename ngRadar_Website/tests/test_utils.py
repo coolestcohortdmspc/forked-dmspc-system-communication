@@ -118,6 +118,7 @@ def test_config_func_GBT():
     assert producer_config == {
             "bootstrap.servers": bootstrap,
             "message.max.bytes": 8388608,
+            "message.timeout.ms": 2000,
             "client.id": "gbt-producer"
         }
     assert consumer_topic == ["user_input"]
@@ -148,6 +149,7 @@ def test_config_func_VLBA():
     assert producer_config == {
             "bootstrap.servers": bootstrap,
             "message.max.bytes": 8388608,
+            "message.timeout.ms": 2000,
             "client.id": f"{sim.name.lower()}-producer"
         }
     assert consumer_topic == ["GBT_data", "DSOC_notif"]
@@ -174,6 +176,7 @@ def test_config_func_DSOC():
     assert producer_config == {
             "bootstrap.servers": bootstrap,
             "message.max.bytes": 8388608,
+            "message.timeout.ms": 2000,
             "client.id": f"{sim.name.lower()}-producer"
         }
     assert consumer_topic == ["VLBA_notif"]
@@ -199,6 +202,7 @@ def test_config_func_UI():
     assert config == {
             "bootstrap.servers": bootstrap,
             "message.max.bytes": 8388608,
+            "message.timeout.ms": 2000,
             "client.id": f"{sim.name.lower()}-producer",
         }
 
@@ -401,7 +405,8 @@ def test_create_s3_client_success(mock_Config, mock_ensure_bucket, mock_boto3):
 @patch("ngRadar_Website.utils.time.sleep")
 @patch("ngRadar_Website.utils.ensure_bucket_exists")
 @patch("ngRadar_Website.utils.Config")
-def test_create_s3_client_connection_error(mock_Config, mock_ensure_bucket, mock_sleep, mock_boto3):
+@patch("ngRadar_Website.utils.publish_status_obsEvents")
+def test_create_s3_client_connection_error(mock_publish, mock_Config, mock_ensure_bucket, mock_sleep, mock_boto3):
     """Scenario 2: connection error"""
     mock_s3 = MagicMock()
     mock_boto3.return_value = mock_s3
@@ -412,12 +417,14 @@ def test_create_s3_client_connection_error(mock_Config, mock_ensure_bucket, mock
     config_value = "fake_config"
     mock_Config.return_value = config_value
 
+    mock_publish.return_value = None
+
     mock_sleep.return_value = None
 
     with pytest.raises(RuntimeError) as exc_info:
         s3_client = create_s3_client()
 
-    assert mock_sleep.call_count == 30
+    assert mock_sleep.call_count == 5
     mock_boto3.assert_called_once_with(
         "s3",
         endpoint_url="fake_endpoint",
@@ -427,9 +434,60 @@ def test_create_s3_client_connection_error(mock_Config, mock_ensure_bucket, mock
                 config=config_value
     )
     mock_ensure_bucket.assert_not_called()
-    assert mock_s3.list_buckets.call_count == 30
+    assert mock_s3.list_buckets.call_count == 5
 
-#NOTE: needs one more scenario for client error
+    #just testing the first two calls:
+    first = mock_publish.call_args_list[0]
+    second = mock_publish.call_args_list[1]
+    assert mock_publish.call_count == 5
+    assert first.kwargs == {
+        "status": Status.POLLING,
+        "msg": f"Waiting for SeaweedFS... ({0 + 1}/5)",
+    }
+    assert second.kwargs == {
+            "status": Status.POLLING,
+            "msg": f"Waiting for SeaweedFS... ({1 + 1}/5)",
+        }
+
+
+@patch.dict(
+    "os.environ",
+    {
+        "WEED_S3_ENDPOINT": "fake_endpoint",
+        "WEED_S3_ACCESS_KEY": "fake_key",
+        "WEED_S3_SECRET_KEY": "fake_secret"
+    },
+)
+@patch("ngRadar_Website.utils.boto3.client")
+@patch("ngRadar_Website.utils.ensure_bucket_exists")
+@patch("ngRadar_Website.utils.Config")
+def test_create_s3_client_client_error(mock_Config, mock_ensure_bucket, mock_boto3):
+    """Scenario 3: client error"""
+    mock_s3 = MagicMock()
+    mock_boto3.return_value = mock_s3
+    mock_error = MagicMock()
+    mock_name = MagicMock()
+    mock_s3.list_buckets.side_effect = ClientError(error_response=mock_error, operation_name=mock_name)
+
+    mock_ensure_bucket.return_value = None
+
+    config_value = "fake_config"
+    mock_Config.return_value = config_value
+
+   
+    s3_client = create_s3_client()
+
+    assert s3_client == mock_s3
+    mock_boto3.assert_called_once_with(
+        "s3",
+        endpoint_url="fake_endpoint",
+        aws_access_key_id="fake_key",
+        aws_secret_access_key="fake_secret",
+        region_name="us-east-1",
+                config=config_value
+    )
+    mock_ensure_bucket.assert_called_once_with(mock_s3)
+    assert mock_s3.list_buckets.call_count == 1
 
 
 # ==============================================================================
@@ -576,18 +634,47 @@ def test_watch_for_file(mock_sleep, mock_subprocess):
 
 @patch("ngRadar_Website.utils.Producer")
 def test_produce(mock_Producer):
+    """Scenario 1: No errors"""
     topic = "topic"
     config = "config"
     key = "key"
     value = "value"
     
     mock_producer = mock_Producer.return_value
+    mock_producer.flush.return_value = 0
 
-    produce(topic, config, key, value)
+    result = produce(topic, config, key, value)
 
+    assert result == True
     mock_Producer.assert_called_once_with(config)
-    mock_producer.produce.assert_called_once_with(topic, key=key, value=value)
-    mock_producer.flush.assert_called_once()
+    mock_producer.produce.assert_called_once_with(topic, key=key, value=value, callback=mock_producer.produce.call_args.kwargs["callback"])
+    mock_producer.flush.assert_called_once_with(2)
+
+@patch("ngRadar_Website.utils.Producer")
+@patch("ngRadar_Website.utils.publish_status_obsEvents")
+def test_produce_delivery_error(mock_publish, mock_Producer):
+    """Scenario 2: Delivery error"""
+    topic = "topic"
+    config = "config"
+    key = "key"
+    value = "value"
+    
+    mock_producer = mock_Producer.return_value
+    mock_producer.flush.return_value = 0
+
+    #defining this inside a function to handle the nonlocal command:
+    def produce_side_effect(topic, key, value, callback):
+        callback("Delivery failed", None)
+
+    mock_producer.produce.side_effect = produce_side_effect
+
+    result = produce(topic, config, key, value)
+
+    assert result == False
+    mock_Producer.assert_called_once_with(config)
+    mock_producer.produce.assert_called_once_with(topic, key=key, value=value, callback=mock_producer.produce.call_args.kwargs["callback"])
+    mock_producer.flush.assert_called_once_with(2)
+    mock_publish.assert_called_once_with(status=Status.FAILED, msg="Delivery failed")
 
 
 # ==============================================================================
