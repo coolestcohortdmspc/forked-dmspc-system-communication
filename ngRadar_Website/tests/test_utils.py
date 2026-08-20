@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 import os
 import pytest
 from unittest.mock import patch, MagicMock
-from ngRadar_Website.enums import Stations
+from ngRadar_Website.enums import Stations, Status
 from pathlib import Path
 from botocore.config import Config
 from botocore.exceptions import (
@@ -10,7 +10,6 @@ from botocore.exceptions import (
     ConnectionError,
     ClientError,
 )
-
 
 # ===============================================
 # Here we can test all of our utility functions
@@ -35,6 +34,11 @@ with patch("pathlib.Path.read_text", return_value=mock_env_data):
         etc_send,
         watch_for_file,
         produce,
+        record_transfer_event,
+        send_kafka_message,
+        get_folder_size,
+        write_transfer_progress,
+
     )
 
 # ==============================================================================
@@ -133,20 +137,20 @@ def test_config_func_GBT():
 #         (Stations.FD)
 #     ])
 # NOTE: I want to make the code dynamically accept all VLBA stations, but that is a future project
-def test_config_func_vlba():
+def test_config_func_VLBA():
     """Scenario 2: sim is a VLBA site"""
     sim = Stations.HN
     bootstrap = "12345"
 
     producer_topic, producer_config, consumer_topic, consumer_config = config_func(sim, bootstrap)
 
-    assert producer_topic == "VLBA_data"
+    assert producer_topic == "VLBA_notif"
     assert producer_config == {
             "bootstrap.servers": bootstrap,
             "message.max.bytes": 8388608,
             "client.id": f"{sim.name.lower()}-producer"
         }
-    assert consumer_topic == ["GBT_data"]
+    assert consumer_topic == ["GBT_data", "DSOC_notif"]
     assert consumer_config == {
             "bootstrap.servers": bootstrap,
             "fetch.max.bytes": 8388608,
@@ -163,17 +167,41 @@ def test_config_func_DSOC():
     sim = Stations.DSOC
     bootstrap = "12345"
 
-    topic, config = config_func(sim, bootstrap)
+    producer_topic, producer_config, consumer_topic, consumer_config = config_func(sim, bootstrap)
 
-    assert topic == ["VLBA_data"]
-    assert config == {
+
+    assert producer_topic == "DSOC_notif"
+    assert producer_config == {
+            "bootstrap.servers": bootstrap,
+            "message.max.bytes": 8388608,
+            "client.id": f"{sim.name.lower()}-producer"
+        }
+    assert consumer_topic == ["VLBA_notif"]
+    assert consumer_config == {
             "bootstrap.servers": bootstrap,
             "fetch.max.bytes": 8388608,
             "session.timeout.ms": 45000,
-            "client.id": "dsoc-consumer",
-            "group.id": "dsoc-consumer-group",
+            "client.id": f"{sim.name.lower()}-consumer",
+            "group.id": f"{sim.name.lower()}-consumer-group",
             "auto.offset.reset": "earliest",
         }
+
+    
+def test_config_func_UI():
+    """Scenario 4: kafka client is the UI. Producer only"""
+
+    sim = Stations.UI
+    bootstrap = "12345"
+
+    topic, config = config_func(sim, bootstrap)
+
+    assert topic == "user_input"
+    assert config == {
+            "bootstrap.servers": bootstrap,
+            "message.max.bytes": 8388608,
+            "client.id": f"{sim.name.lower()}-producer",
+        }
+
 
 # ==============================================================================
 # 3. bootstrap Test
@@ -502,7 +530,7 @@ def test_etc_send(mock_parse, mock_os_read, mock_select, mock_os_close, mock_pop
     mock_uuid.assert_called_once()
     mock_os_open.assert_called_once()
     mock_popen.assert_called_once_with(
-        ["etc", str(mock_frame_path), os.environ["ETD_DESTINATION"], "--overwrite",],
+        ["etc", str(mock_frame_path), os.environ["ETD_DESTINATION"],],
         stdin=mock_slave,
         stdout=mock_slave,
         stderr=mock_slave,
@@ -559,4 +587,175 @@ def test_produce(mock_Producer):
 
     mock_Producer.assert_called_once_with(config)
     mock_producer.produce.assert_called_once_with(topic, key=key, value=value)
-    mock_producer.flush.assert_called_once_with()
+    mock_producer.flush.assert_called_once()
+
+
+# ==============================================================================
+# 7. record_transfer_event Test
+# ==============================================================================
+
+@patch("ngRadar_Website.utils.gbtEvent")
+@patch("ngRadar_Website.utils.ETransferEvent")
+def test_record_transfer_event(mock_etr_event, mock_gbt_event):
+
+    mock_gbt_data = MagicMock()
+    mock_gbt_data.object_id = "123"
+    mock_gbt_data.target = "Venus"
+
+    mock_gbt_event.objects.get.return_value = mock_gbt_data
+
+    etr_record = MagicMock()
+    mock_etr_event.objects.create.return_value = etr_record
+
+    record_transfer_event(
+        transfer_uuid="transfer-uuid",
+        gbt_uuid="gbt-uuid",
+        station=Stations.DSOC,
+        status=Status.TRANSFERRED,
+        num_bytes=2048,
+        latency_ms=500,
+        message="Test message")
+
+    mock_gbt_event.objects.get.assert_called_once_with(uuid="gbt-uuid")
+    mock_etr_event.objects.create.assert_called_once_with(
+        transfer_uuid="transfer-uuid",
+        gbt_uuid="gbt-uuid",
+        object_id="123",
+        target="Venus",
+        station=Stations.DSOC,
+        event_time=mock_etr_event.objects.create.call_args[1]['event_time'],
+        latency_ms=500,
+        num_bytes=2048,
+        status=Status.TRANSFERRED,
+        message="Test message")
+
+# ==============================================================================
+# 8. send_kafka_message Test
+# ==============================================================================
+
+@patch("ngRadar_Website.utils.produce")
+@patch("ngRadar_Website.utils.datetime")
+def test_send_kafka_message(mock_datetime, mock_produce):
+    key=1
+    producer_topic="test_topic"
+    producer_config="test_config"
+    transfer_uuid="test_transfer_uuid"
+    gbt_uuid="test_gbt_uuid"
+    status=Status.TRANSFERRING
+    num_bytes=2048
+    filename="mock.filename"
+    message=1
+
+    mock_produce.return_value = None
+
+    fake_datetime = MagicMock()
+    fake_datetime.isoformat.return_value = "2026-08-12T12:34:56+00:00"
+    mock_datetime.now.return_value = fake_datetime
+
+    send_kafka_message(
+        key=key,
+        producer_topic=producer_topic,
+        producer_config=producer_config,
+        transfer_uuid=transfer_uuid,
+        gbt_uuid=gbt_uuid,
+        status=status,
+        num_bytes=num_bytes,
+        filename=filename, 
+        message=message,
+    )
+
+    mock_produce.assert_called_once_with(
+        producer_topic,
+        producer_config,
+        key,
+        '{"transfer_uuid": "test_transfer_uuid", "gbt_uuid": "test_gbt_uuid", "status": 4, "num_bytes": 2048, "filename": "mock.filename", "event_time": "2026-08-12T12:34:56+00:00", "message": 1, "stations": "Hancock (25-m, VLBA)"}',
+    )
+
+
+# ==============================================================================
+# 9. get_folder_size Test
+# ==============================================================================
+
+def test_get_folder_size(tmp_path):
+    root = tmp_path / "root"
+    root.mkdir()
+
+    # root/a.txt = 3 bytes
+    (root / "a.txt").write_bytes(b"abc")
+
+    # root/sub/b.bin = 5 bytes
+    sub = root / "sub"
+    sub.mkdir()
+    (sub / "b.bin").write_bytes(b"12345")
+
+    # root/sub2/c.dat = 0 bytes
+    sub2 = root / "sub2"
+    sub2.mkdir()
+    (sub2 / "c.dat").write_bytes(b"")
+
+    expected = 3 + 5 + 0
+    assert get_folder_size(root) == expected
+
+
+def test_get_folder_size_FileNotFoundError(tmp_path):
+    missing = tmp_path / "does_not_exist"
+
+    with pytest.raises(FileNotFoundError) as excinfo:
+        get_folder_size(missing)
+
+    # Optional: ensure it carries the same path object/message
+    assert excinfo.value.args[0] == missing
+
+
+# ==============================================================================
+# 10. write_transfer_progress Test
+# ==============================================================================
+
+@patch("ngRadar_Website.utils.open")
+@patch("ngRadar_Website.utils.json.dump")
+@patch("ngRadar_Website.utils.os.replace")
+def test_write_transfer_progress(
+    mock_os_replace,
+    mock_json,
+    mock_open
+    ):
+
+    received_bytes = 100
+    total_bytes = 200
+    percent = "50.0"
+    transfer_id = "11111111-1111-1111-1111-111111111111"
+
+    mock_file = MagicMock()
+
+    mock_open.return_value.__enter__.return_value = mock_file
+
+    write_transfer_progress(
+        received_bytes=received_bytes,
+        total_bytes=total_bytes,
+        percent=percent,
+        transfer_id=transfer_id
+    )
+
+
+    mock_open.assert_called_once_with(
+        "/service/mock_assets/progress.json.tmp",
+        "w",
+        encoding="utf-8",
+    )
+
+    expected = {
+        "received_bytes": 100,
+        "total_bytes": 200,
+        "percent": "50.0",
+        "transfer_id": "11111111-1111-1111-1111-111111111111",
+    }
+
+    mock_json.assert_called_once_with(
+        expected,
+        mock_file
+    )
+
+    mock_os_replace.assert_called_once_with(
+        "/service/mock_assets/progress.json.tmp",
+        "/service/mock_assets/progress.json"
+    )

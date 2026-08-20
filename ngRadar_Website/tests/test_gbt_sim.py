@@ -1,7 +1,7 @@
 from unittest.mock import patch, MagicMock
 from datetime import datetime, timezone
 from unittest.mock import ANY
-from ngRadar_Website.enums import Stations
+from ngRadar_Website.enums import Stations, Message
 from uuid import uuid4
 
 
@@ -143,7 +143,7 @@ def test_publish_to_db(mock_gbt_event):
 @patch("ngRadar_Website.management.commands.gbt_sim.produce")
 def test_process_msg(mock_produce, mock_publish_DB, mock_gen_payload, mock_transmitter):
     mock_msg = MagicMock()
-    mock_msg.key.return_value = b"12345"
+    mock_msg.value.return_value = b"12345"
 
     producer_topic = "topic"
     producer_config = "config"
@@ -165,4 +165,4 @@ def test_process_msg(mock_produce, mock_publish_DB, mock_gen_payload, mock_trans
     mock_transmitter.assert_called_once()
     mock_gen_payload.assert_called_once_with("12345")
     mock_publish_DB.assert_called_once_with(payload)
-    mock_produce.assert_called_once_with("topic", "config", "gbt_uuid", "GBT transmitting")
+    mock_produce.assert_called_once_with("topic", "config", f"{Message.GBT_TX}", "gbt_uuid")
