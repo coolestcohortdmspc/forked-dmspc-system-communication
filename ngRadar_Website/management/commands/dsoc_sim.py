@@ -47,7 +47,7 @@ def DB_columns(gbt_data):
 
 
 
-def publish_DB(
+def publish_dsocEvents(
     *,
     image_key,
     num_bytes,
@@ -123,7 +123,7 @@ def save_image_to_seaweedfs(target, image_file, dsoc_uuid):
 
         return image_key
     except:
-        send_failure(
+        publish_status_obsEvents(
             status=Status.FAILED,
             msg="Failed to connect to SeaweedFS.",
         )
@@ -339,7 +339,7 @@ def process_msg(msg, producer_topic, producer_config):
             else:
                 data["uuid"] = dsoc_uuid
 
-                publish_DB(
+                publish_dsocEvents(
                     image_key=image_key,
                     num_bytes=image_num_bytes,
                     data=data,

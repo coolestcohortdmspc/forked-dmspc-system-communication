@@ -224,7 +224,7 @@ def consume(topic, config, process_msg, producer_topic=None, producer_config=Non
 
                 print("Consumer error:", error)
 
-                send_failure(
+                publish_status_obsEvents(
                     status=Status.FAILED,
                     msg="Failed to connect to Kafka.",
                 )
@@ -234,7 +234,7 @@ def consume(topic, config, process_msg, producer_topic=None, producer_config=Non
             #if msg is not None and msg.error() is None:
             process_msg(msg, producer_topic, producer_config)
     except Exception as e:
-        send_failure(
+        publish_status_obsEvents(
             status=Status.FAILED,
             msg="Failed to connect to Kafka.",
         )
@@ -267,7 +267,7 @@ def create_s3_client():
             break
 
         except (EndpointConnectionError, ConnectionError):
-            send_failure(status=Status.POLLING, msg=f"Waiting for SeaweedFS... ({attempt + 1}/5)")
+            publish_status_obsEvents(status=Status.POLLING, msg=f"Waiting for SeaweedFS... ({attempt + 1}/5)")
             print(f"Waiting for SeaweedFS... ({attempt + 1}/5)")
             time.sleep(1)
 
@@ -530,14 +530,14 @@ def produce(topic, config, key, value):
         remaining = producer.flush(2)
 
         if delivery_error is not None:
-            send_failure(
+            publish_status_obsEvents(
                 status=Status.FAILED,
                 msg=f"{delivery_error}",
             )
             return False
 
         if remaining > 0:
-            send_failure(
+            publish_status_obsEvents(
                 status=Status.FAILED,
                 msg="Kafka broker did not respond.",
             )
@@ -547,7 +547,7 @@ def produce(topic, config, key, value):
         return True
 
     except Exception as e:
-        send_failure(
+        publish_status_obsEvents(
             status=Status.FAILED,
             msg=f"Failed to send Kafka message: {e}",
         )
@@ -660,7 +660,7 @@ def record_transfer_event(
         message=message,
     )
 
-def send_failure(status, msg):
+def publish_status_obsEvents(status, msg):
     """
     Function to be used by all sims to publish failure status and message to the ObservatoryEvent database table.
     """
