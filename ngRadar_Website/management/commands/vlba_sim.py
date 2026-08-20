@@ -41,6 +41,7 @@ MAX_RESUME_ATTEMPTS = 5
 def process_msg(msg, producer_topic, producer_config):
     incoming_key = int(msg.key().decode("utf-8"))
     raw_data_path = Path("/raw_data")
+    
     if incoming_key == Message.GBT_TX.value:
         print("Received Kafka message from GBT.")
         key = f"{Message.VLBA_REQUEST_STORAGE}"
