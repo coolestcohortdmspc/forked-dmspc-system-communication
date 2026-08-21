@@ -26,6 +26,7 @@ class Status(models.IntegerChoices):
     FAILED = 7, "Failed"        
     COMPLETED = 8, "Completed"          # This status would be used when the e-transfer has completed successfully and the data has been verified, processed, and stored appropriately.
     POLLING = 9, "Polling SeaweedFS"    # Used during failure testing for transparency
+    RETRYING = 10, "Retrying storage check" # Used the first time DSOC has to retry a storage check
 
 
 class Message(models.IntegerChoices):

@@ -221,6 +221,14 @@ def process_msg(msg, producer_topic, producer_config):
             if storage_used+expected_num_bytes >= storage_limit:
                 # if the current storage plus the incoming file exceeds our imposed limit, we decline the e-transfer
                 if payload["message"] == 15:
+                    record_transfer_event(
+                        transfer_uuid=payload["transfer_uuid"],
+                        gbt_uuid=payload["gbt_uuid"],
+                        station=Stations.HN,
+                        status=Status.FAILED,
+                        num_bytes=payload["num_bytes"],
+                        message=f"DSOC does not have enough storage. Failed 15 times.",
+                    )
                     print("DSOC failed to clear storage in 15 tries. Try again manually later.")
 
                 else: 
@@ -230,9 +238,9 @@ def process_msg(msg, producer_topic, producer_config):
                             transfer_uuid=payload["transfer_uuid"],
                             gbt_uuid=payload["gbt_uuid"],
                             station=Stations.HN,
-                            status=Status.FAILED,
+                            status=Status.RETRYING,
                             num_bytes=payload["num_bytes"],
-                            message=f"DSOC does not have enough storage to accept the incoming data from {Stations.HN.label}",
+                            message=f"DSOC does not have enough storage. Retrying...",
                         )
                     send_kafka_message(
                         key = key, 
@@ -246,6 +254,7 @@ def process_msg(msg, producer_topic, producer_config):
                         message=payload["message"]+1,
                     )
                     print(f"DSOC does not have enough storage to accept the data transfer request. The remaining disk space is {space_remaining:0.2f}GB and the incoming data is {expected_num_bytes/1000000000:0.2f}GB")
+                    
 
             else:
                 if payload["message"] != 1:
