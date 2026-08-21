@@ -642,6 +642,10 @@ def publish_status_obsEvents(status, msg):
     """
 
     data = {
+        "object_id": 30104,
+        "target": "Moretus",
+        "rcvr_station": Stations.VLBA,
+        "xmit_station": Stations.GBT,
         "event_time": datetime.now(timezone.utc),
         "latency_ms": 0.00,
         "status": status,
