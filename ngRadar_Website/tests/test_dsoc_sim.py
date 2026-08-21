@@ -361,7 +361,7 @@ def test_process_msg_VLBA_REQUEST_STORAGE_15(
     process_msg(msg, producer_topic, producer_config)
 
     assert mock_get_folder_size.call_count == 1
-    assert mock_record_transfer_event.call_count == 0
+    assert mock_record_transfer_event.call_count == 1
     assert mock_send_kafka_message.call_count == 0
 
 #=====================================================================

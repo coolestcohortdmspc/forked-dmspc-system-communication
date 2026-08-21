@@ -909,7 +909,14 @@ def test_publish_status_obsEvents(mock_obs_event, mock_datetime):
     publish_status_obsEvents(status, msg)
 
     mock_datetime.now.assert_called_once_with(timezone.utc)
-    mock_obs_event.objects.create.assert_called_once_with(event_time=fake_datetime, latency_ms=0.00, status=status, message=msg)
+    mock_obs_event.objects.create.assert_called_once_with(object_id = 30104,
+                                                          target = "Moretus",
+                                                          rcvr_station = Stations.HN,
+                                                          xmit_station = Stations.GBT,
+                                                          event_time=fake_datetime, 
+                                                          latency_ms=0.00, 
+                                                          status=status, 
+                                                          message=msg)
 
 @patch("ngRadar_Website.utils.datetime")
 @patch("ngRadar_Website.utils.ObservatoryEvent")
@@ -928,5 +935,12 @@ def test_publish_status_obsEvents_error(mock_obs_event, mock_datetime, capsys):
     captured=capsys.readouterr()
 
     mock_datetime.now.assert_called_once_with(timezone.utc)
-    mock_obs_event.objects.create.assert_called_once_with(event_time=fake_datetime, latency_ms=0.00, status=status, message=msg)
+    mock_obs_event.objects.create.assert_called_once_with(object_id = 30104,
+                                                          target = "Moretus",
+                                                          rcvr_station = Stations.HN,
+                                                          xmit_station = Stations.GBT,
+                                                          event_time=fake_datetime, 
+                                                          latency_ms=0.00, 
+                                                          status=status, 
+                                                          message=msg)
     assert captured.out.strip() == "Database error: Database error"
