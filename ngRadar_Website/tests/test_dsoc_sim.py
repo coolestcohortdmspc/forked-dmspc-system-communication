@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from pathlib import Path
 from unittest.mock import patch, MagicMock
 from ngRadar_Website.enums import Status
 import uuid
@@ -144,6 +145,7 @@ def test_create_img_output():
 @patch("ngRadar_Website.management.commands.dsoc_sim.create_s3_client") #fake the boto3 module which interacts with seaweedfs
 @patch("ngRadar_Website.management.commands.dsoc_sim.upload_seaweedfs")
 def test_save_image_to_seaweedfs_success(mock_upload, mock_s3):
+    """Scenario 1: no errors"""
     #function inputs:
     target = "Venus"
     image_file = b"fake png bytes"
@@ -161,6 +163,27 @@ def test_save_image_to_seaweedfs_success(mock_upload, mock_s3):
     assert output == image_key
     mock_s3.assert_called_once()
     mock_upload.assert_called_once_with(mock_instance, f"ddm/Venus/12345.png", b"fake png bytes")
+
+
+@patch("ngRadar_Website.management.commands.dsoc_sim.create_s3_client")
+@patch("ngRadar_Website.management.commands.dsoc_sim.publish_status_obsEvents")
+def test_save_image_to_seaweedfs_error(mock_publish, mock_s3):
+    """Scenario 2: """
+    #function inputs:
+    target = "Venus"
+    image_file = b"fake png bytes"
+    dsoc_uuid = "12345"
+
+    mock_s3.side_effect = Exception("Failed to connect.")
+
+    output = save_image_to_seaweedfs(target, image_file, dsoc_uuid)
+
+    assert output == False
+    mock_s3.assert_called_once()
+    mock_publish.assert_called_once_with(
+            status=Status.FAILED,
+            msg="Failed to connect to SeaweedFS.",
+        )
 
 
 # ==============================================================================
@@ -595,8 +618,8 @@ def test_process_msg_VLBA_TRANSFERRING_verificationFAILED(
     assert mock_create_img.call_count == 0
     assert mock_save_image_to_seaweedfs.call_count == 0
     assert mock_publish_DB.call_count == 0
-
     assert mock_send_kafka_message.call_count == 0
+
 #=====================================================================
 
 
@@ -615,7 +638,7 @@ def test_process_msg_VLBA_TRANSFERRING_verificationFAILED(
 @patch("ngRadar_Website.management.commands.dsoc_sim.record_transfer_event")
 @patch("ngRadar_Website.management.commands.dsoc_sim.send_kafka_message")
 @patch("ngRadar_Website.management.commands.dsoc_sim.json.loads")
-def test_process_msg_VLBA_TRANSFERRING_verificationFAILED(
+def test_process_msg_VLBA_TRANSFERRING_processingFAILED(
     mock_json,
     mock_send_kafka_message,
     mock_record_transfer_event,
@@ -693,6 +716,243 @@ def test_process_msg_VLBA_TRANSFERRING_verificationFAILED(
 
     assert mock_send_kafka_message.call_count == 0
 
+#=====================================================================
+
+"""Scenario 8: VLBA_TRANSFERRING incoming message. track_etransfer_progress FAILED case."""
+#=====================================================================
+
+@patch("ngRadar_Website.management.commands.dsoc_sim.uuid")
+@patch("ngRadar_Website.management.commands.dsoc_sim.publish_dsocEvents")
+@patch("ngRadar_Website.management.commands.dsoc_sim.save_image_to_seaweedfs")
+@patch("ngRadar_Website.management.commands.dsoc_sim.create_img")
+@patch("ngRadar_Website.management.commands.dsoc_sim.DB_columns")
+@patch("ngRadar_Website.management.commands.dsoc_sim.latency_calc")
+@patch("ngRadar_Website.management.commands.dsoc_sim.DB_import")
+@patch("ngRadar_Website.management.commands.dsoc_sim.verify_incoming_transfer")
+@patch("ngRadar_Website.management.commands.dsoc_sim.track_etransfer_progress")
+@patch("ngRadar_Website.management.commands.dsoc_sim.record_transfer_event")
+@patch("ngRadar_Website.management.commands.dsoc_sim.send_kafka_message")
+@patch("ngRadar_Website.management.commands.dsoc_sim.json.loads")
+def test_process_msg_VLBA_TRANSFERRING_trackingFAILED(
+    mock_json,
+    mock_send_kafka_message,
+    mock_record_transfer_event,
+    mock_track_etransfer_progress,
+    mock_verify_incoming_transfer,
+    mock_DB_import,
+    mock_latency_calc,
+    mock_DB_columns,
+    mock_create_img,
+    mock_save_image_to_seaweedfs,
+    mock_publish_DB,
+    mock_uuid
+):
+    
+    #The fake kafka message in the correct format:
+    msg = MagicMock()
+    msg.value.return_value = b'{"message"}'
+    msg.key.return_value = b'3'
+
+    producer_topic = MagicMock()
+    producer_config = MagicMock()
+
+    #giving fake uuid's in the correct format so that 'uuid.UUID()' works on it in the function:
+    transfer_uuid = uuid.UUID("11111111-1111-1111-1111-111111111111")
+    gbt_uuid = uuid.UUID("22222222-2222-2222-2222-222222222222")
+
+    #The fake output of the json.loads() function:
+    mock_payload = {
+            "transfer_uuid": str(transfer_uuid),
+            "gbt_uuid": str(gbt_uuid),
+            "status": 1,
+            "status_label": "READY",
+            "num_bytes": 2048,
+            "filename": str("fake_filename.png"),
+            "event_time": datetime(2026, 7, 15, 12, 0, 0, tzinfo=timezone.utc),
+            "message": 2,
+            "stations": str("fake_station"),
+        }
+    
+    #pretend that, given the fake uuid, this data is extracted from the DB:
+    mock_gbt_data = (
+        "obj001",
+        "Venus",
+        "SineWave",
+        datetime(2026, 7, 15, 12, 0, 0, tzinfo=timezone.utc)
+    )
+
+    mock_json.return_value = mock_payload
+    mock_track_etransfer_progress.side_effect = Exception("Failed.")
+    
+    process_msg(msg, producer_topic, producer_config)
+
+    assert mock_track_etransfer_progress.call_count == 1
+    assert mock_record_transfer_event.call_count == 0
+    assert mock_verify_incoming_transfer.call_count == 0
+    assert mock_DB_import.call_count == 0
+    assert mock_latency_calc.call_count == 0
+    assert mock_DB_columns.call_count == 0
+    assert mock_create_img.call_count == 0
+    assert mock_save_image_to_seaweedfs.call_count == 0
+    assert mock_publish_DB.call_count == 0
+
+    assert mock_send_kafka_message.call_count == 0
+#=====================================================================
+
+
+"""Scenario 9: VLBA_TRANSFERRING incoming message. Image key is FALSE case. Arbitrarily picking save_to_seaweedfs to fail"""
+#=====================================================================
+
+@patch("ngRadar_Website.management.commands.dsoc_sim.uuid.uuid4")
+@patch("ngRadar_Website.management.commands.dsoc_sim.publish_dsocEvents")
+@patch("ngRadar_Website.management.commands.dsoc_sim.save_image_to_seaweedfs")
+@patch("ngRadar_Website.management.commands.dsoc_sim.create_img")
+@patch("ngRadar_Website.management.commands.dsoc_sim.DB_columns")
+@patch("ngRadar_Website.management.commands.dsoc_sim.latency_calc")
+@patch("ngRadar_Website.management.commands.dsoc_sim.DB_import")
+@patch("ngRadar_Website.management.commands.dsoc_sim.verify_incoming_transfer")
+@patch("ngRadar_Website.management.commands.dsoc_sim.track_etransfer_progress")
+@patch("ngRadar_Website.management.commands.dsoc_sim.record_transfer_event")
+@patch("ngRadar_Website.management.commands.dsoc_sim.send_kafka_message")
+@patch("ngRadar_Website.management.commands.dsoc_sim.json.loads")
+def test_process_msg_VLBA_TRANSFERRING_image_falseFAILED(
+    mock_json,
+    mock_send_kafka_message,
+    mock_record_transfer_event,
+    mock_track_etransfer_progress,
+    mock_verify_incoming_transfer,
+    mock_DB_import,
+    mock_latency_calc,
+    mock_DB_columns,
+    mock_create_img,
+    mock_save_image_to_seaweedfs,
+    mock_publish_DB,
+    mock_uuid
+):
+    
+    #The fake kafka message in the correct format:
+    msg = MagicMock()
+    msg.value.return_value = b'{"message"}'
+    msg.key.return_value = b'3'
+
+    producer_topic = MagicMock()
+    producer_config = MagicMock()
+
+    #giving fake uuid's in the correct format so that 'uuid.UUID()' works on it in the function:
+    transfer_uuid = uuid.UUID("11111111-1111-1111-1111-111111111111")
+    gbt_uuid = uuid.UUID("22222222-2222-2222-2222-222222222222")
+
+    #The fake output of the json.loads() function:
+    mock_payload = {
+            "transfer_uuid": str(transfer_uuid),
+            "gbt_uuid": str(gbt_uuid),
+            "status": 1,
+            "status_label": "READY",
+            "num_bytes": 2048,
+            "filename": str("fake_filename.png"),
+            "event_time": datetime(2026, 7, 15, 12, 0, 0, tzinfo=timezone.utc),
+            "message": 2,
+            "stations": str("fake_station"),
+        }
+    
+    #pretend that, given the fake uuid, this data is extracted from the DB:
+    mock_gbt_data = (
+        "obj001",
+        "Venus",
+        "SineWave",
+        datetime(2026, 7, 15, 12, 0, 0, tzinfo=timezone.utc)
+    )
+
+    mock_json.return_value = mock_payload
+    mock_DB_import.return_value = mock_gbt_data
+    mock_latency_calc.return_value = 100
+
+    mock_data = MagicMock()
+    mock_DB_columns.return_value = mock_data
+
+    img_file = b"bytes"
+    num_bytes = 500
+    mock_create_img.return_value = img_file, num_bytes
+
+    mock_uuid.return_value = "54321"
+
+    mock_save_image_to_seaweedfs.return_value = False
+    
+    process_msg(msg, producer_topic, producer_config)
+
+    mock_track_etransfer_progress.assert_called_once_with(mock_payload, Path("/dsoc/incoming") / f"{mock_payload['transfer_uuid']}.bin")
+    assert mock_record_transfer_event.call_count == 2
+    mock_verify_incoming_transfer.assert_called_once_with( 
+                incoming_file=Path("/dsoc/incoming") / f"{mock_payload['transfer_uuid']}.bin",
+                expected_num_bytes=mock_payload["num_bytes"],
+            )
+    mock_DB_import.assert_called_once_with(str(uuid.UUID("22222222-2222-2222-2222-222222222222")))
+    mock_latency_calc.assert_called_once_with(datetime(2026, 7, 15, 12, 0, 0, tzinfo=timezone.utc))
+    mock_DB_columns.assert_called_once_with(mock_gbt_data)
+    mock_create_img.assert_called_once_with("SineWave")
+    mock_uuid.assert_called_once()
+    mock_save_image_to_seaweedfs.assert_called_once_with(
+                "Venus",
+                b"bytes",
+                "54321",
+            )
+    assert mock_publish_DB.call_count == 0
+    assert mock_send_kafka_message.call_count == 0
+
+#=====================================================================
+
+
+"""Scenario 10: incoming message is not VLBA_REQUEST_STORAGE or VLBA_TRANSFERRING."""
+#=====================================================================
+
+@patch("ngRadar_Website.management.commands.dsoc_sim.uuid.uuid4")
+@patch("ngRadar_Website.management.commands.dsoc_sim.publish_dsocEvents")
+@patch("ngRadar_Website.management.commands.dsoc_sim.save_image_to_seaweedfs")
+@patch("ngRadar_Website.management.commands.dsoc_sim.create_img")
+@patch("ngRadar_Website.management.commands.dsoc_sim.DB_columns")
+@patch("ngRadar_Website.management.commands.dsoc_sim.latency_calc")
+@patch("ngRadar_Website.management.commands.dsoc_sim.DB_import")
+@patch("ngRadar_Website.management.commands.dsoc_sim.verify_incoming_transfer")
+@patch("ngRadar_Website.management.commands.dsoc_sim.track_etransfer_progress")
+@patch("ngRadar_Website.management.commands.dsoc_sim.record_transfer_event")
+@patch("ngRadar_Website.management.commands.dsoc_sim.send_kafka_message")
+@patch("ngRadar_Website.management.commands.dsoc_sim.json.loads")
+def test_process_msg_invalid_key(
+    mock_json,
+    mock_send_kafka_message,
+    mock_record_transfer_event,
+    mock_track_etransfer_progress,
+    mock_verify_incoming_transfer,
+    mock_DB_import,
+    mock_latency_calc,
+    mock_DB_columns,
+    mock_create_img,
+    mock_save_image_to_seaweedfs,
+    mock_publish_DB,
+    mock_uuid
+):
+    
+    #The fake kafka message in the correct format:
+    msg = MagicMock()
+    msg.value.return_value = b'{"message"}'
+    msg.key.return_value = b'2'
+
+    producer_topic = MagicMock()
+    producer_config = MagicMock()
+    
+    process_msg(msg, producer_topic, producer_config)
+
+    assert mock_track_etransfer_progress.call_count == 0
+    assert mock_record_transfer_event.call_count == 0
+    assert mock_verify_incoming_transfer.call_count == 0
+    assert mock_DB_import.call_count == 0
+    assert mock_latency_calc.call_count == 0
+    assert mock_DB_columns.call_count == 0
+    assert mock_create_img.call_count == 0
+    assert mock_uuid.call_count == 0
+    assert mock_save_image_to_seaweedfs.call_count == 0
+    assert mock_publish_DB.call_count == 0
+    assert mock_send_kafka_message.call_count == 0
 
 
 # ==============================================================================

@@ -2,7 +2,7 @@ from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 from ngRadar_Website.views.views import get_obs_events
-from ngRadar_Website.enums import Stations, Message
+from ngRadar_Website.enums import Stations, Message, Status
 from datetime import datetime, timezone
 from ngRadar_Website.models.models import gbtEvent, dsocEvent, ObservatoryEvent, uiEvent
 from django.test import RequestFactory
@@ -114,6 +114,7 @@ with patch("pathlib.Path.read_text", return_value=mock_env_data):
 @patch("ngRadar_Website.views.views.get_object_or_404")
 @patch("ngRadar_Website.views.views.create_s3_client")
 def test_serve_image(mock_create, mock_get_obj):
+    """Scenario 1: no errors"""
 
     mock_event = MagicMock()
     mock_event.image_key = "images/test.png"
@@ -136,6 +137,22 @@ def test_serve_image(mock_create, mock_get_obj):
     mock_s3.get_object.assert_called_once_with(
         Bucket="fake_bucket", Key="images/test.png"
     )
+
+@patch("ngRadar_Website.views.views.get_object_or_404")
+@patch("ngRadar_Website.views.views.publish_status_obsEvents")
+def test_serve_image_error(mock_publish, mock_get_obj):
+    """Scenario 2: exception raised"""
+
+    mock_get_obj.side_effect = Exception("Failed to connect.")
+
+    #call the function:
+    output = serve_image(request = "request", uuid = "uuid")
+
+    mock_get_obj.assert_called_once_with(ObservatoryEvent, uuid="uuid")
+    mock_publish.assert_called_once_with(
+            status=Status.FAILED,
+            msg="Failed to connect to SeaweedFS.",
+        )
 
 # ===============================================================================
 # 3. Submit waveform test
