@@ -168,7 +168,7 @@ def lock_status(request):
     logger = logging.getLogger(__name__)
     try:
         # UNCOMMENT TO TEST GRACEFUL FAILURE:
-        raise Exception("TEST CACHE FAILURE")
+        #raise Exception("TEST CACHE FAILURE")
 
         lock_time = cache.get('submit_locked', None)
         if lock_time is None:
