@@ -1,13 +1,9 @@
 from datetime import datetime, timezone
-import os, time
+import time
 from django.core.management.base import BaseCommand
-from confluent_kafka import Producer
-from confluent_kafka import Consumer
 from ngRadar_Website.enums import Stations, Message
 from ngRadar_Website.models.models import uiEvent
 from ngRadar_Website.models.models import gbtEvent
-# from dotenv import find_dotenv
-from pathlib import Path
 from ngRadar_Website.utils import latency_calc, bootstrap, consume, produce
 
 
@@ -55,7 +51,7 @@ def turn_off_transmitter():
     time.sleep(5)
 
 
-def publish_to_db(payload):
+def publish_gbtEvents(payload):
     gbt_event = gbtEvent.objects.create(**payload)
 
     return gbt_event.uuid
@@ -71,7 +67,7 @@ def process_msg(msg, producer_topic, producer_config):
     payload = generate_payload(ui_uuid)
 
     # publish new transmission to the db
-    gbt_uuid = publish_to_db(payload)
+    gbt_uuid = publish_gbtEvents(payload)
 
     key, value = f"{Message.GBT_TX}", f"{gbt_uuid}"
 
@@ -84,12 +80,12 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         print("Starting GBT simulator")
-
+        #time.sleep(10)
         producer_topic, producer_config, consumer_topic, consumer_config = bootstrap(Stations.GBT)
 
         # generate a dummy data payload, publish this data to the db, produce a message with this payload, then start consuming
         payload = set_payload_dict('W48', -1)
-        gbt_uuid = publish_to_db(payload)
+        gbt_uuid = publish_gbtEvents(payload)
         key, value = f"{Message.GBT_TX}", f"{gbt_uuid}"
         produce(producer_topic, producer_config, key, value)
         consume(consumer_topic, consumer_config, process_msg, producer_topic=producer_topic, producer_config=producer_config)

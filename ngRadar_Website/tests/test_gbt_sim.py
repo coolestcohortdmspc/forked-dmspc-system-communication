@@ -20,7 +20,7 @@ with patch("pathlib.Path.read_text", return_value=mock_env_data):
         set_payload_dict,
         generate_payload,
         turn_off_transmitter,
-        publish_to_db,
+        publish_gbtEvents,
         process_msg,
     )
 
@@ -109,11 +109,11 @@ def test_turn_off_transmitter(mock_sleep, mock_gbt_event):
 
 
 # ==============================================================================
-# 4. publish_to_db Test
+# 4. publish_gbtEvents Test
 # ==============================================================================
 
 @patch("ngRadar_Website.management.commands.gbt_sim.gbtEvent")
-def test_publish_to_db(mock_gbt_event):
+def test_publish_gbtEvents(mock_gbt_event):
     input_data = {
             "object_id": 'fake_obj', 
             "target": 'fake_target', 
@@ -126,7 +126,7 @@ def test_publish_to_db(mock_gbt_event):
     mock_instance.uuid = uuid4()
     mock_gbt_event.objects.create.return_value = mock_instance
 
-    uuid = publish_to_db(input_data)
+    uuid = publish_gbtEvents(input_data)
 
     assert uuid == mock_instance.uuid
     mock_gbt_event.objects.create.assert_called_once_with(**input_data)
@@ -139,7 +139,7 @@ def test_publish_to_db(mock_gbt_event):
 
 @patch("ngRadar_Website.management.commands.gbt_sim.turn_off_transmitter")
 @patch("ngRadar_Website.management.commands.gbt_sim.generate_payload")
-@patch("ngRadar_Website.management.commands.gbt_sim.publish_to_db")
+@patch("ngRadar_Website.management.commands.gbt_sim.publish_gbtEvents")
 @patch("ngRadar_Website.management.commands.gbt_sim.produce")
 def test_process_msg(mock_produce, mock_publish_DB, mock_gen_payload, mock_transmitter):
     mock_msg = MagicMock()

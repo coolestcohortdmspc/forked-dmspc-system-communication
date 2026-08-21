@@ -53,7 +53,7 @@ def DB_columns(gbt_data):
 
 
 
-def publish_DB(
+def publish_dsocEvents(
     *,
     image_key,
     num_bytes,
@@ -116,19 +116,24 @@ def create_img(tx_waveform):
 def save_image_to_seaweedfs(target, image_file, dsoc_uuid):
     # Saves the image to SeaweedFS using S3 API
 
-    image_key = f"ddm/{target}/{dsoc_uuid}.png"
+    try:
+        image_key = f"ddm/{target}/{dsoc_uuid}.png"
 
-    s3 = create_s3_client()
-    
-    file_data = image_file
+        s3 = create_s3_client()
+        
+        file_data = image_file
 
-    image_key = upload_seaweedfs(s3, image_key, file_data)
+        image_key = upload_seaweedfs(s3, image_key, file_data)
 
-    print(f"Success: Image saved to SeaweedFS at {image_key}")
+        print(f"Success: Image saved to SeaweedFS at {image_key}")
 
-    return image_key
-
-
+        return image_key
+    except:
+        publish_status_obsEvents(
+            status=Status.FAILED,
+            msg="Failed to connect to SeaweedFS.",
+        )
+        return False
 
 
 # Verifies that the incoming file exists and has the expected number of bytes that VLBA sent in the kafka message.
@@ -241,6 +246,14 @@ def process_msg(msg, producer_topic, producer_config):
             if storage_used+expected_num_bytes >= storage_limit:
                 # if the current storage plus the incoming file exceeds our imposed limit, we decline the e-transfer
                 if payload["message"] == 15:
+                    record_transfer_event(
+                        transfer_uuid=payload["transfer_uuid"],
+                        gbt_uuid=payload["gbt_uuid"],
+                        station=Stations.HN,
+                        status=Status.FAILED,
+                        num_bytes=payload["num_bytes"],
+                        message=f"DSOC does not have enough storage. Failed 15 times.",
+                    )
                     print("DSOC failed to clear storage in 15 tries. Try again manually later.")
 
                 else: 
@@ -250,9 +263,9 @@ def process_msg(msg, producer_topic, producer_config):
                             transfer_uuid=payload["transfer_uuid"],
                             gbt_uuid=payload["gbt_uuid"],
                             station=Stations.HN,
-                            status=Status.FAILED,
+                            status=Status.RETRYING,
                             num_bytes=payload["num_bytes"],
-                            message=f"DSOC does not have enough storage to accept the incoming data from {Stations.HN.label}",
+                            message=f"DSOC does not have enough storage. Retrying...",
                         )
                     send_kafka_message(
                         key = key, 
@@ -266,6 +279,7 @@ def process_msg(msg, producer_topic, producer_config):
                         message=payload["message"]+1,
                     )
                     print(f"DSOC does not have enough storage to accept the data transfer request. The remaining disk space is {space_remaining:0.2f}GB and the incoming data is {expected_num_bytes/1000000000:0.2f}GB")
+                    
 
             else:
                 if payload["message"] != 1:
@@ -354,17 +368,19 @@ def process_msg(msg, producer_topic, producer_config):
                 image_file,
                 dsoc_uuid,
             )
+            if image_key == False:
+                return
+            else:
+                data["uuid"] = dsoc_uuid
 
-            data["uuid"] = dsoc_uuid
-
-            publish_DB(
-                image_key=image_key,
-                num_bytes=image_num_bytes,
-                data=data,
-                xmit_station=Stations.GBT,
-                rcvr_station=Stations.HN,
-                transfer_uuid=payload["transfer_uuid"],
-            )
+                publish_dsocEvents(
+                    image_key=image_key,
+                    num_bytes=image_num_bytes,
+                    data=data,
+                    xmit_station=Stations.GBT,
+                    rcvr_station=Stations.HN,
+                    transfer_uuid=payload["transfer_uuid"],
+                )
 
         except Exception as exc:
             record_transfer_event(

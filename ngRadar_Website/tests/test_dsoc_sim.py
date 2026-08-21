@@ -1,10 +1,8 @@
 from datetime import datetime, timezone
 from unittest.mock import patch, MagicMock
-from ngRadar_Website.enums import Stations, Status
+from ngRadar_Website.enums import Status
 import uuid
-from pathlib import Path
 import pytest
-
 
 # =============================================
 # TEST THE STANDALONE FUNCTIONS FROM DSOC_SIM
@@ -20,7 +18,7 @@ with patch("pathlib.Path.read_text", return_value=mock_env_data):
     from ngRadar_Website.management.commands.dsoc_sim import (
         DB_import,
         DB_columns,
-        publish_DB,
+        publish_dsocEvents,
         create_img,
         save_image_to_seaweedfs,
         verify_incoming_transfer,
@@ -77,11 +75,11 @@ def test_db_columns_mapping(mock_datetime):
     assert result["event_time"] == fixed_now
 
 # ==============================================================================
-# 3. publish_DB COMPONENT TESTS
+# 3. publish_dsocEvents COMPONENT TESTS
 # ==============================================================================
 
 @patch("ngRadar_Website.management.commands.dsoc_sim.dsocEvent") # fake a dsocEvent record, let's you bypass having to connect to postres to test logic
-def test_publish_db_success(mock_dsoc_event):
+def test_publish_dsocEvents(mock_dsoc_event):
     """Scenario 1: Valid payload correctly creates and outputs the model instance."""
     mock_instance = MagicMock()
     mock_dsoc_event.objects.create.return_value = mock_instance
@@ -93,14 +91,14 @@ def test_publish_db_success(mock_dsoc_event):
     rcvr_station = "RCVR_STATION"
     transfer_uuid = "TRANSFER_UUID"
 
-    record = publish_DB(image_key=image_key, num_bytes=num_bytes, data=data, xmit_station=xmit_station, rcvr_station=rcvr_station, transfer_uuid=transfer_uuid)
+    record = publish_dsocEvents(image_key=image_key, num_bytes=num_bytes, data=data, xmit_station=xmit_station, rcvr_station=rcvr_station, transfer_uuid=transfer_uuid)
 
     assert record == mock_instance
     mock_dsoc_event.objects.create.assert_called_once_with(image_key='fake_key/img.png', num_bytes=2048, xmit_station='XMIT_STATION', rcvr_station='RCVR_STATION', transfer_uuid='TRANSFER_UUID', status=Status.COMPLETED)
 
 
 @patch("ngRadar_Website.management.commands.dsoc_sim.dsocEvent")
-def test_publish_db_exception(mock_dsoc_event):
+def test_publish_dsocEvents_exception(mock_dsoc_event):
     """Scenario 2: Handled database crash returns None instead of crashing runtime."""
     mock_dsoc_event.objects.create.side_effect = Exception("DB Connection Timeout")
 
@@ -111,7 +109,7 @@ def test_publish_db_exception(mock_dsoc_event):
     rcvr_station = "RCVR_STATION"
     transfer_uuid = "TRANSFER_UUID"
 
-    record = publish_DB(image_key=image_key, num_bytes=num_bytes, data=data, xmit_station=xmit_station, rcvr_station=rcvr_station, transfer_uuid=transfer_uuid)
+    record = publish_dsocEvents(image_key=image_key, num_bytes=num_bytes, data=data, xmit_station=xmit_station, rcvr_station=rcvr_station, transfer_uuid=transfer_uuid)
 
     assert record is None
 
@@ -363,7 +361,7 @@ def test_process_msg_VLBA_REQUEST_STORAGE_15(
     process_msg(msg, producer_topic, producer_config)
 
     assert mock_get_folder_size.call_count == 1
-    assert mock_record_transfer_event.call_count == 0
+    assert mock_record_transfer_event.call_count == 1
     assert mock_send_kafka_message.call_count == 0
 
 #=====================================================================
@@ -428,7 +426,7 @@ def test_process_msg_VLBA_REQUEST_STORAGE_1(
 #=====================================================================
 
 @patch("ngRadar_Website.management.commands.dsoc_sim.uuid.uuid4")
-@patch("ngRadar_Website.management.commands.dsoc_sim.publish_DB")
+@patch("ngRadar_Website.management.commands.dsoc_sim.publish_dsocEvents")
 @patch("ngRadar_Website.management.commands.dsoc_sim.save_image_to_seaweedfs")
 @patch("ngRadar_Website.management.commands.dsoc_sim.create_img")
 @patch("ngRadar_Website.management.commands.dsoc_sim.DB_columns")
@@ -524,7 +522,7 @@ def test_process_msg_VLBA_TRANSFERRING(
 #=====================================================================
 
 @patch("ngRadar_Website.management.commands.dsoc_sim.uuid")
-@patch("ngRadar_Website.management.commands.dsoc_sim.publish_DB")
+@patch("ngRadar_Website.management.commands.dsoc_sim.publish_dsocEvents")
 @patch("ngRadar_Website.management.commands.dsoc_sim.save_image_to_seaweedfs")
 @patch("ngRadar_Website.management.commands.dsoc_sim.create_img")
 @patch("ngRadar_Website.management.commands.dsoc_sim.DB_columns")
@@ -606,7 +604,7 @@ def test_process_msg_VLBA_TRANSFERRING_verificationFAILED(
 #=====================================================================
 
 @patch("ngRadar_Website.management.commands.dsoc_sim.uuid.uuid4")
-@patch("ngRadar_Website.management.commands.dsoc_sim.publish_DB")
+@patch("ngRadar_Website.management.commands.dsoc_sim.publish_dsocEvents")
 @patch("ngRadar_Website.management.commands.dsoc_sim.save_image_to_seaweedfs")
 @patch("ngRadar_Website.management.commands.dsoc_sim.create_img")
 @patch("ngRadar_Website.management.commands.dsoc_sim.DB_columns")

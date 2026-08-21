@@ -3,8 +3,8 @@ import uuid
 from confluent_kafka.admin import AdminClient
 from dotenv import load_dotenv
 from ngRadar_Website.enums import Stations, Status
-from ngRadar_Website.models.models import gbtEvent, dsocEvent, ETransferEvent
-from confluent_kafka import Consumer, Producer
+from ngRadar_Website.models.models import gbtEvent, dsocEvent, ETransferEvent, ObservatoryEvent
+from confluent_kafka import Consumer, Producer, KafkaError
 import boto3
 import os
 import time
@@ -97,6 +97,7 @@ def config_func(sim, bootstrap):
         producer_config = {
             "bootstrap.servers": bootstrap,
             "message.max.bytes": MAX_BYTES,# NOTE can make this constant
+            "message.timeout.ms": 2000,
             "client.id": f"{sim.name.lower()}-producer",
         }
 
@@ -126,6 +127,7 @@ def config_func(sim, bootstrap):
         config = {
             "bootstrap.servers": bootstrap,
             "message.max.bytes": MAX_BYTES,
+            "message.timeout.ms": 2000,
             "client.id": f"{sim.name.lower()}-producer",
         }
 
@@ -180,27 +182,38 @@ def consume(topic, config, process_msg, producer_topic=None, producer_config=Non
                 the partial file. Callers that opt in MUST have process_msg return True/False.
     Returns: N/A
     """
-
-    if manual_commit:
-        # Copy rather than mutate: bootstrap() hands the same config dict to other callers.
-        config = {**config, "enable.auto.commit": False}
-
-    consumer = Consumer(config)
-
-    #subscribes to the specified topic
-    consumer.subscribe(topic)
-    # TODO make sure works with multiple topics
-    
     try:
+        if manual_commit:
+            # Copy rather than mutate: bootstrap() hands the same config dict to other callers.
+            config = {**config, "enable.auto.commit": False}
+
+        consumer = Consumer(config)
+
+        #subscribes to the specified topic
+        consumer.subscribe(topic)
+        # TODO make sure works with multiple topics
+    
         while True:
             #consumer polls the topic and prints any incoming messages
             msg = consumer.poll(1.0) #polls for messages for 1 second
             
             if msg is None:
                 continue
-            if msg.error() is not None:
-                print("Consumer error:", msg.error())
-                continue
+            if msg.error():
+                error = msg.error()
+
+                if error.code() == KafkaError._PARTITION_EOF:
+                    print("Consumer reached partition EOF")
+                    continue
+
+                print("Consumer error:", error)
+
+                publish_status_obsEvents(
+                    status=Status.FAILED,
+                    msg="Failed to connect to Kafka.",
+                )
+
+                break
 
             #if msg is not None and msg.error() is None:
             succeeded = process_msg(msg, producer_topic, producer_config)
@@ -208,9 +221,10 @@ def consume(topic, config, process_msg, producer_topic=None, producer_config=Non
             if manual_commit and succeeded:
                 consumer.commit(msg)
     except Exception as e:
-        import traceback
-        print("An unhandled exception occurred in the consumer loop:")
-        traceback.print_exc()
+        publish_status_obsEvents(
+            status=Status.FAILED,
+            msg="Failed to connect to Kafka.",
+        )
         raise
 
 
@@ -232,19 +246,19 @@ def create_s3_client():
             s3={"addressing_style": "path"},
         ),
     )
-
-    for attempt in range(30):
+    # Change to range(5) if we want enough time to turn seaweed back on during polling
+    for attempt in range(3):
         try:
             s3.list_buckets()
             print("SeaweedFS S3 is ready.")
             break
 
         except (EndpointConnectionError, ConnectionError):
-            print(f"Waiting for SeaweedFS... ({attempt + 1}/30)")
-            time.sleep(2)
+            publish_status_obsEvents(status=Status.POLLING, msg=f"Waiting for SeaweedFS... ({attempt + 1}/3)")
+            print(f"Waiting for SeaweedFS... ({attempt + 1}/3)")
+            time.sleep(1)
 
         except ClientError as e:
-            # The S3 API is responding, so we're ready.
             print(f"SeaweedFS responded: {e.response['Error']['Code']}")
             break
     else:
@@ -525,15 +539,47 @@ def etc_send(frame_path):
 
 
 def produce(topic, config, key, value):
-    # creates a new producer instance
-    producer = Producer(config)
+    delivery_error = None
 
-    # producing a message to the specified topic 
-    producer.produce(topic, key=key, value=value)
-    print(f"Produced message to topic {topic} with key {key}.")
+    def delivery_report(err, msg):
+        nonlocal delivery_error
 
-    # send any outstanding or buffered messages to the Kafka broker
-    producer.flush()
+        if err is not None:
+            delivery_error = err
+
+    try:
+        # creates a new producer instance
+        producer = Producer(config)
+
+        # producing a message to the specified topic 
+        producer.produce(topic, key=key, value=value, callback=delivery_report)
+
+        # Give Kafka a limited amount of time to deliver the message
+        remaining = producer.flush(2)
+
+        if delivery_error is not None:
+            publish_status_obsEvents(
+                status=Status.FAILED,
+                msg=f"{delivery_error}",
+            )
+            return False
+
+        if remaining > 0:
+            publish_status_obsEvents(
+                status=Status.FAILED,
+                msg="Kafka broker did not respond.",
+            )
+            return False
+
+        print(f"Produced message to topic {topic} with key {key}.")
+        return True
+
+    except Exception as e:
+        publish_status_obsEvents(
+            status=Status.FAILED,
+            msg=f"Failed to send Kafka message: {e}",
+        )
+        return False
 
     
 def send_kafka_message(
@@ -568,7 +614,7 @@ def send_kafka_message(
     )
 
     
-def create_file(file_path, file_mb=100):
+def create_file(file_path, file_mb=200):
     file_size_bytes = file_mb * 1024 * 1024
     num_buffers = 100
 
@@ -641,3 +687,27 @@ def record_transfer_event(
         status=status,
         message=message,
     )
+
+def publish_status_obsEvents(status, msg):
+    """
+    Function to be used by all sims to publish failure status and message to the ObservatoryEvent database table.
+    """
+
+    data = {
+        "object_id": 30104,
+        "target": "Moretus",
+        "rcvr_station": Stations.HN,
+        "xmit_station": Stations.GBT,
+        "event_time": datetime.now(timezone.utc),
+        "latency_ms": 0.00,
+        "status": status,
+        "message": msg,
+    }
+
+    try:
+        # Create and capture the instantiated record model
+        record = ObservatoryEvent.objects.create(**data)
+        print("Status saved to database successfully.")
+    
+    except Exception as e:
+        print(f"Database error: {e}")

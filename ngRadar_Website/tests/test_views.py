@@ -326,7 +326,8 @@ def test_lock_status_none(mock_json, mock_cache_get):
 
     assert output == "fake_json_response"
     mock_cache_get.assert_called_once_with('submit_locked', None)
-    mock_json.assert_called_once_with({'locked':False})
+    mock_json.assert_called_once_with({"locked": False,
+                                 "error": False})
 
 
 @patch("ngRadar_Website.views.views.cache.get")
@@ -349,7 +350,8 @@ def test_lock_matching_event_time(mock_json, mock_cache_delete, mock_dsocEvent, 
     mock_cache_get.assert_called_once_with('submit_locked', None)
     mock_dsocEvent.objects.filter.assert_called_once_with(event_time__gt="fake_time")
     mock_cache_delete.assert_called_once_with('submit_locked')
-    mock_json.assert_called_once_with({'locked':False})
+    mock_json.assert_called_once_with({"locked": False,
+                                 "error": False})
 
 
 @patch("ngRadar_Website.views.views.cache.get")
@@ -368,8 +370,26 @@ def test_lock_true(mock_json, mock_dsocEvent, mock_cache_get):
     assert output == "fake_json_response"
     mock_cache_get.assert_called_once_with('submit_locked', None)
     mock_dsocEvent.objects.filter.assert_called_once_with(event_time__gt="fake_time")
-    mock_json.assert_called_once_with({'locked':True})
+    mock_json.assert_called_once_with({'locked':True,
+                             "error": False})
 
+@patch("ngRadar_Website.views.views.cache.get")
+@patch("ngRadar_Website.views.views.JsonResponse")
+def test_lock_status_exception(mock_json, mock_cache_get):
+    """Scenario 4: Exception is raised"""
+    mock_cache_get.side_effect = Exception("Caching Error")
+
+    mock_json.return_value = "fake_json_response"
+
+    output = lock_status("request")
+
+    assert output == "fake_json_response"
+    mock_cache_get.assert_called_once_with('submit_locked', None)
+    mock_json.assert_called_once_with({
+                                "locked": True,
+                                "error": True,
+                                "message": "Unable to determine lock status."
+                            }, status=503)
 
 # ==============================================================================
 # 7. logout_view Test
