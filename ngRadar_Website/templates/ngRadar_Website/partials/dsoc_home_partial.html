@@ -13,10 +13,23 @@
         <span class="fs-5">Verifying...</span>
         {% elif latest_etr_event.status == 6 %}
         <span class="fs-5">Transfer Complete. Creating DDM...</span>
+        {% elif latest_etr_event.status == 7 %}
+        <span class="fs-5">Transfer Failed!</span>
         {% elif latest_etr_event.status == 8 %}
         <span class="fs-5">Complete!</span>
         {% elif latest_etr_event.status is None %}
         <span class="fs-5">Waiting for signal...</span>
+        {% endif %}
+
+        {# Only while transferring: once it has failed or completed, the tag is noise. #}
+        {% if transfer_resumed and latest_etr_event.status == 4 %}
+        <span
+            class="text-muted small"
+            data-bs-toggle="tooltip"
+            data-bs-trigger="hover"
+            data-bs-delay='{"show":100,"hide":50}'
+            title="This transfer was interrupted and resumed where it left off. The data already delivered was not re-sent."
+        >(resumed)</span>
         {% endif %}
     </div>
 
