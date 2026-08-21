@@ -29,7 +29,7 @@ import json, uuid, os, time
 
 
 #program constants
-RECORDS_TO_DISPLAY=20
+RECORDS_TO_DISPLAY=30
 LAST_RECORDS = 5
 EXPIRE_TIME_SECONDS = 3600
 
