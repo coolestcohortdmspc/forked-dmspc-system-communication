@@ -21,6 +21,7 @@ from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout, logout
 from django.db.models import Avg
 from datetime import datetime, timezone
+import logging
 
 from ngRadar_Website.utils import produce
 
@@ -164,13 +165,29 @@ def serve_image(request, uuid):
 # Return True if event time is greater than lock time 
 # Othere wise False  
 def lock_status(request):
-    lock_time = cache.get('submit_locked', None)
-    if lock_time is None:
-        return JsonResponse({"locked": False})
-    elif dsocEvent.objects.filter(event_time__gt=lock_time).exists():
-        cache.delete('submit_locked')
-        return JsonResponse({'locked':False})
-    return JsonResponse({'locked':True})
+    logger = logging.getLogger(__name__)
+    try:
+        # UNCOMMENT TO TEST GRACEFUL FAILURE:
+        raise Exception("TEST CACHE FAILURE")
+
+        lock_time = cache.get('submit_locked', None)
+        if lock_time is None:
+            return JsonResponse({"locked": False,
+                                 "error": False})
+        elif dsocEvent.objects.filter(event_time__gt=lock_time).exists():
+            cache.delete('submit_locked')
+            return JsonResponse({'locked':False,
+                                 "error": False})
+        return JsonResponse({'locked':True,
+                             "error": False})
+    except Exception as e:
+        logger.error(f"Cache unavailable while checking submit lock: {e}")
+
+        return JsonResponse({
+            "locked": True,
+            "error": True,
+            "message": "Unable to determine lock status."
+        }, status=503)
 
 
 def submit_waveform(request):
