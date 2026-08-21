@@ -15,12 +15,13 @@ import subprocess
 # Because we read "ngrok_endpoint.env" on import, we need to patch the Path globally
 # before importing all the functions we want to test.
 # ==============================================================================
-mock_env_data = "BOOTSTRAP_SERVER=localhost:9092\nSOME_OTHER_VAR=value" 
+mock_env_data = "BOOTSTRAP_SERVER=localhost:9092\nSOME_OTHER_VAR=value"
 with patch("pathlib.Path.read_text", return_value=mock_env_data):
     from ngRadar_Website.management.commands.vlba_sim import (
         send_kafka_message,
         record_transfer_event,
         process_msg,
+        MAX_RESUME_ATTEMPTS,
     )
 
 
@@ -56,7 +57,7 @@ def test_process_msg_GBT_TX(
 
     # mock the thread so code coverage continues past this process
     mock_Thread.start.return_value = True
-    
+
     # raw_data_path = Path("/raw_data")
     mock_raw_data_path = MagicMock()
     mock_Path.return_value = mock_raw_data_path
@@ -107,7 +108,7 @@ def test_process_msg_GBT_TX_FAILED(
 
     # mock the thread so code coverage continues past this process
     mock_Thread.start.return_value = True
-    
+
     # raw_data_path = Path("/raw_data")
     mock_raw_data_path = MagicMock()
     mock_Path.return_value = mock_raw_data_path
@@ -189,6 +190,7 @@ def test_process_msg_DSOC_RESPOND_STORAGE(
 """Scenario 4: DSOC_RESPOND_STORAGE incoming message. etc_send raises CalledProcessError exception FAILED case."""
 #=====================================================================
 
+@patch("ngRadar_Website.management.commands.vlba_sim.wait_for_etd")
 @patch("ngRadar_Website.management.commands.vlba_sim.etc_send")
 @patch("ngRadar_Website.management.commands.vlba_sim.send_kafka_message")
 @patch("ngRadar_Website.management.commands.vlba_sim.record_transfer_event")
@@ -198,6 +200,7 @@ def test_process_msg_DSOC_RESPOND_STORAGE_CalledProcessError(
         mock_record_transfer_event,
         mock_send_kafka_message,
         mock_etc_send,
+        mock_wait_for_etd,
 ):
     msg = MagicMock()
     msg.value.return_value = b'{"value"}'
@@ -230,14 +233,22 @@ def test_process_msg_DSOC_RESPOND_STORAGE_CalledProcessError(
         cmd="etc_send"
     )
 
-    process_msg(msg, producer_topic, producer_config)
+    mock_wait_for_etd.return_value = True
+
+    result = process_msg(msg, producer_topic, producer_config)
+
+    assert result is False
 
     assert mock_json.call_count == 1
 
-    assert mock_send_kafka_message.call_count == 1
-    mock_etc_send.assert_called_once_with(Path("/raw_data/11111111-1111-1111-1111-111111111111.bin"))
+    assert mock_etc_send.call_count == MAX_RESUME_ATTEMPTS
 
-    assert mock_record_transfer_event.call_count == 2
+    assert mock_send_kafka_message.call_count == MAX_RESUME_ATTEMPTS
+    mock_etc_send.assert_called_with(Path("/raw_data/11111111-1111-1111-1111-111111111111.bin"))
+
+    assert mock_wait_for_etd.call_count == MAX_RESUME_ATTEMPTS - 1
+
+    assert mock_record_transfer_event.call_count == MAX_RESUME_ATTEMPTS * 2
     mock_record_transfer_event.assert_has_calls(
         [
             call(
@@ -254,7 +265,10 @@ def test_process_msg_DSOC_RESPOND_STORAGE_CalledProcessError(
                 station=Stations.HN,
                 status=Status.FAILED,
                 num_bytes=mock_payload["num_bytes"],
-                message="E-transfer failed with return code: 42",
+                message=(
+                    "The e-transfer failed mid-transfer. "
+                    "Transfer interrupted. (return code: 42)"
+                ),
             ),
         ],
         any_order=False,
