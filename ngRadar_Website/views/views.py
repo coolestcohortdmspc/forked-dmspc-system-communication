@@ -151,22 +151,6 @@ def serve_image(request, uuid):
         content_type=obj["ContentType"],
     )
 
-
-
-
-# Function for lock down user
-# Return True if event time is greater than lock time 
-# Othere wise False  
-def lock_status(request):
-    lock_time = cache.get('submit_locked', None)
-    if lock_time is None:
-        return JsonResponse({"locked": False})
-    elif dsocEvent.objects.filter(event_time__gt=lock_time).exists():
-        cache.delete('submit_locked')
-        return JsonResponse({'locked':False})
-    return JsonResponse({'locked':True})
-
-
 def submit_waveform(request):
     if request.method == "POST":
         uuid_input = uuid.uuid4()
@@ -179,29 +163,7 @@ def submit_waveform(request):
             event_time = timestamp
         )
 
-        # p = Path("../../../out/ngrok_endpoint.env")
-        # text = p.read_text().strip()
-
-        # bootstrap = None
-        # for line in text.splitlines():
-        #     if line.startswith("BOOTSTRAP_SERVER="):
-        #         bootstrap = line.split("=", 1)[1].strip()
-        #         break
-
-        # if not bootstrap:
-        #     raise RuntimeError("BOOTSTRAP_SERVER not found in /out/ngrok_endpoint.env")
-        
-        # bootstrap = ngrok_endpoint.objects.last().bootstrap
-
         topic, config = bootstrap(Stations.UI)
-
-        # Kafka version 
-        # topic = "user_input"
-        # config = {
-        #     "bootstrap.servers": bootstrap,
-        #     "message.max.bytes": 8388608,
-        #     "client.id": "ui-producer"}
-        # message = "User input a new waveform."
 
         def main():
             key = str(Message.UI_EVENT)
@@ -213,6 +175,9 @@ def submit_waveform(request):
         # add a cache for submit time
         cache.set('submit_locked', datetime.now(timezone.utc))
     return redirect('home')
+
+
+
 
 #====================================================
 # Render the templates

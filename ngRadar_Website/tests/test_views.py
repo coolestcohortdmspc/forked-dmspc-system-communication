@@ -22,7 +22,6 @@ mock_env_data = "BOOTSTRAP_SERVER=localhost:9092\nSOME_OTHER_VAR=value"
 with patch("pathlib.Path.read_text", return_value=mock_env_data):
     from ngRadar_Website.views.views import (
         serve_image,
-        lock_status,
         submit_waveform,
         login_view,
         logout_view,
@@ -309,66 +308,6 @@ def test_latency_graphing(mock_get_msg, mock_streaming):
     assert output == response
     mock_streaming.assert_called_once_with(mock_get_msg(), content_type="text/event-stream; charset=utf-8")
 
-
-# ==============================================================================
-# 6. lock_status Test
-# ==============================================================================
-
-@patch("ngRadar_Website.views.views.cache.get")
-@patch("ngRadar_Website.views.views.JsonResponse")
-def test_lock_status_none(mock_json, mock_cache_get):
-    """Scenario 1: lock time is None"""
-    mock_cache_get.return_value = None
-
-    mock_json.return_value = "fake_json_response"
-
-    output = lock_status("request")
-
-    assert output == "fake_json_response"
-    mock_cache_get.assert_called_once_with('submit_locked', None)
-    mock_json.assert_called_once_with({'locked':False})
-
-
-@patch("ngRadar_Website.views.views.cache.get")
-@patch("ngRadar_Website.views.views.dsocEvent")
-@patch("ngRadar_Website.views.views.cache.delete")
-@patch("ngRadar_Website.views.views.JsonResponse")
-def test_lock_matching_event_time(mock_json, mock_cache_delete, mock_dsocEvent, mock_cache_get):
-    """Scenario 2: lock time matches the event time"""
-    mock_cache_get.return_value = "fake_time"
-
-    mock_dsocEvent.objects.filter.return_value.exists.return_value = True
-
-    mock_cache_delete.return_value = None
-
-    mock_json.return_value = "fake_json_response"
-
-    output = lock_status("request")
-
-    assert output == "fake_json_response"
-    mock_cache_get.assert_called_once_with('submit_locked', None)
-    mock_dsocEvent.objects.filter.assert_called_once_with(event_time__gt="fake_time")
-    mock_cache_delete.assert_called_once_with('submit_locked')
-    mock_json.assert_called_once_with({'locked':False})
-
-
-@patch("ngRadar_Website.views.views.cache.get")
-@patch("ngRadar_Website.views.views.dsocEvent")
-@patch("ngRadar_Website.views.views.JsonResponse")
-def test_lock_true(mock_json, mock_dsocEvent, mock_cache_get):
-    """Scenario 3: lock status is True"""
-    mock_cache_get.return_value = "fake_time"
-
-    mock_dsocEvent.objects.filter.return_value.exists.return_value = False
-
-    mock_json.return_value = "fake_json_response"
-
-    output = lock_status("request")
-
-    assert output == "fake_json_response"
-    mock_cache_get.assert_called_once_with('submit_locked', None)
-    mock_dsocEvent.objects.filter.assert_called_once_with(event_time__gt="fake_time")
-    mock_json.assert_called_once_with({'locked':True})
 
 
 # ==============================================================================
