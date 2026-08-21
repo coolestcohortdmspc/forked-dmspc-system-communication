@@ -426,7 +426,7 @@ def test_create_s3_client_connection_error(mock_publish, mock_Config, mock_ensur
     with pytest.raises(RuntimeError) as exc_info:
         s3_client = create_s3_client()
 
-    assert mock_sleep.call_count == 5
+    assert mock_sleep.call_count == 3
     mock_boto3.assert_called_once_with(
         "s3",
         endpoint_url="fake_endpoint",
@@ -436,19 +436,19 @@ def test_create_s3_client_connection_error(mock_publish, mock_Config, mock_ensur
                 config=config_value
     )
     mock_ensure_bucket.assert_not_called()
-    assert mock_s3.list_buckets.call_count == 5
+    assert mock_s3.list_buckets.call_count == 3
 
     #just testing the first two calls:
     first = mock_publish.call_args_list[0]
     second = mock_publish.call_args_list[1]
-    assert mock_publish.call_count == 5
+    assert mock_publish.call_count == 3
     assert first.kwargs == {
         "status": Status.POLLING,
-        "msg": f"Waiting for SeaweedFS... ({0 + 1}/5)",
+        "msg": f"Waiting for SeaweedFS... ({0 + 1}/3)",
     }
     assert second.kwargs == {
             "status": Status.POLLING,
-            "msg": f"Waiting for SeaweedFS... ({1 + 1}/5)",
+            "msg": f"Waiting for SeaweedFS... ({1 + 1}/3)",
         }
 
 

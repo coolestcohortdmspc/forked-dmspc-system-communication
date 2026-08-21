@@ -236,16 +236,16 @@ def create_s3_client():
             s3={"addressing_style": "path"},
         ),
     )
-
-    for attempt in range(5):
+    # Change to range(5) if we want enough time to turn seaweed back on during polling
+    for attempt in range(3):
         try:
             s3.list_buckets()
             print("SeaweedFS S3 is ready.")
             break
 
         except (EndpointConnectionError, ConnectionError):
-            publish_status_obsEvents(status=Status.POLLING, msg=f"Waiting for SeaweedFS... ({attempt + 1}/5)")
-            print(f"Waiting for SeaweedFS... ({attempt + 1}/5)")
+            publish_status_obsEvents(status=Status.POLLING, msg=f"Waiting for SeaweedFS... ({attempt + 1}/3)")
+            print(f"Waiting for SeaweedFS... ({attempt + 1}/3)")
             time.sleep(1)
 
         except ClientError as e:
