@@ -90,9 +90,9 @@ WSGI_APPLICATION = 'wsgi.application'
 
 # This will allow for easy switching between local and demo databases without changing the code.
 # When local, it will use the local Postgres database from our non-commited .env file. 
-# When our code base is deployed on the cloud, and since we don't commit our .env file to Github,
-# Render will default to the DATABASE_URL that we will configure via the Render dashboard to connect 
-# to the Render-hosted Postgres database.
+# When our code base is deployed on the cloud and we bring up our local containers, all we need to do
+# to publish events happening in our local containers to our DO database + DO website, is switch to the
+# DO database_url rather than our local database_url.
 DATABASES = {
     "default": dj_database_url.config()
 }

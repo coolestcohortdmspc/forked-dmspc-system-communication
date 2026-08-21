@@ -97,6 +97,7 @@ CMD ["./load-staging-data.sh"]
 FROM chrislusf/seaweedfs:4.40 AS seaweedfs
 
 RUN apk add --no-cache gettext
+RUN apk add --no-cache gettext python3
 
 COPY s3.json.template /s3.json.template
 COPY filer.toml.template /filer.toml.template
