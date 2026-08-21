@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 import uuid
-# from confluent_kafka.admin import AdminClient, NewTopic, KafkaException, KafkaError
+from confluent_kafka.admin import AdminClient
 from dotenv import load_dotenv
 from ngRadar_Website.enums import Stations, Status
 from ngRadar_Website.models.models import gbtEvent, dsocEvent, ETransferEvent, ObservatoryEvent
@@ -33,7 +33,7 @@ PROGRESS_RE = re.compile(
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 
 #Program constants
-SESSION_TIMEOUT_MS = 45000
+SESSION_TIMEOUT_MS = 10000
 MAX_BYTES = 8388608
 
 
@@ -171,15 +171,22 @@ def bootstrap(sim):
 #     load_dotenv(override=True)
 
 
-def consume(topic, config, process_msg, producer_topic=None, producer_config=None):
+def consume(topic, config, process_msg, producer_topic=None, producer_config=None, manual_commit=False):
     """
     Description: Creates a new consumer instance; subscribes to a Kafka topic and receives messages.
     Inputs: topic = The Kafka topic to receieve messages from.
             config = Server configuration defining the bootstrap, byte and timeout limits, and IDs.
             process_msg = A function which accepts the Kafka message as an input.
+            manual_commit = If True, a message is only marked done once process_msg returns True,
+                so work killed mid e-transfer is redelivered on restart and etc --resume picks up
+                the partial file. Callers that opt in MUST have process_msg return True/False.
     Returns: N/A
     """
     try:
+        if manual_commit:
+            # Copy rather than mutate: bootstrap() hands the same config dict to other callers.
+            config = {**config, "enable.auto.commit": False}
+
         consumer = Consumer(config)
 
         #subscribes to the specified topic
@@ -209,7 +216,10 @@ def consume(topic, config, process_msg, producer_topic=None, producer_config=Non
                 break
 
             #if msg is not None and msg.error() is None:
-            process_msg(msg, producer_topic, producer_config)
+            succeeded = process_msg(msg, producer_topic, producer_config)
+
+            if manual_commit and succeeded:
+                consumer.commit(msg)
     except Exception as e:
         publish_status_obsEvents(
             status=Status.FAILED,
@@ -383,7 +393,49 @@ def parse_etc_progress(line, *, expected_num_bytes, transfer_id):
     # )
 
 
-# etransfer command to send data from client -> daemon 
+ETD_MAX_CONN_RETRY = 90     # 90 retries x 10s = waits up to 15 minutes
+ETD_RETRY_CONN_DELAY = 10
+
+
+def consumer_group_has_members(group_id):
+    """
+    Asks the Kafka broker whether anyone is still a member of group_id.
+
+    The broker drops a consumer that stops heartbeating after SESSION_TIMEOUT_MS,
+    so it is the only component that knows whether a sim is alive. A slow transfer
+    and a dead sim look identical from the outside, but not to the broker.
+
+    Inputs: group_id = the consumer group to look up, e.g. "hn-consumer-group"
+    Output: True if at least one member is in the group, False otherwise.
+    """
+    admin = AdminClient({"bootstrap.servers": os.environ["BOOTSTRAP_SERVER"]})
+    group = admin.describe_consumer_groups([group_id])[group_id].result()
+    return len(group.members) > 0
+
+
+def wait_for_etd():
+    """
+    Blocks until the e-transfer daemon at ETD_DESTINATION answers again.
+
+    etc --list is the detector: it exits 0 when the daemon replies, so we never
+    need etd's port number. etc's own retry flags do the waiting.
+
+    Output: True if the daemon came back, False if it never did.
+    """
+    result = subprocess.run(
+        [
+            "etc",
+            "--list",
+            os.environ["ETD_DESTINATION"],
+            "--max-conn-retry", str(ETD_MAX_CONN_RETRY),
+            "--retry-conn-delay", str(ETD_RETRY_CONN_DELAY),
+        ],
+        capture_output=True,
+    )
+    return result.returncode == 0
+
+
+# etransfer command to send data from client -> daemon
 def etc_send(frame_path):
     """
     Sends data from the client to the daemon using e-transfer.
@@ -393,11 +445,10 @@ def etc_send(frame_path):
     Input: 
         frame_path = Path to the file that we want to send to the daemon. On the client machine.
     Output: 
-        Command line output of the etc command, which will show the progress of the transfer and any errors that may occur. Overwrite flag used for now to demmonstrate sequencing even if same file is being sent multiple times.
-        Use --resume flag in production.
+        Command line output of the etc command, showing transfer progress and any errors.
+        Uses --resume. Each Kafka message gets a brand-new frame_path, so on a fresh transfer
+        --resume behaves like --overwrite; after an interruption it sends only the missing bytes.
     """
-
-    # Will need to add some logic here to determine when to use --overwrite vs --resume.
 
     expected_num_bytes = frame_path.stat().st_size
     transfer_id = str(uuid.uuid4())
@@ -416,6 +467,7 @@ def etc_send(frame_path):
             "etc",
             str(frame_path),
             os.environ["ETD_DESTINATION"],
+            "--resume",
         ],
         stdin=slave_fd,
         stdout=slave_fd,
@@ -562,7 +614,7 @@ def send_kafka_message(
     )
 
     
-def create_file(file_path, file_mb=30):
+def create_file(file_path, file_mb=200):
     file_size_bytes = file_mb * 1024 * 1024
     num_buffers = 100
 

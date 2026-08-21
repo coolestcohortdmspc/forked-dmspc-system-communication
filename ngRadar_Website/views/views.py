@@ -56,6 +56,11 @@ def get_obs_events():
             .first()
         )
 
+    # More than one TRANSFERRING row for a transfer means it was interrupted and resumed.
+    transferring_count = ETransferEvent.objects.filter(
+        transfer_uuid=current_transfer_uuid, status=Status.TRANSFERRING
+    ).count()
+
     return {
         'latest_events': latest_events,
         'latest_event': ObservatoryEvent.objects.order_by("-event_time").first() if latest_events else None,
@@ -65,6 +70,7 @@ def get_obs_events():
         'avg_latency': round(avg_latency, 2),
         'current_waveform': current_waveform,
         'latest_etr_events': latest_etr_events,
+        'transfer_resumed': transferring_count > 1,
         'latest_etr_event': latest_etr_event,
         'latest_image_event': latest_image_event,
     }
