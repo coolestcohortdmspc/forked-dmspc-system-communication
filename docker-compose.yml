@@ -150,6 +150,8 @@ services:
     profiles: ["kafka"]
     depends_on:
       - zookeeper
+    ports:
+      - "9094:9094"
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181

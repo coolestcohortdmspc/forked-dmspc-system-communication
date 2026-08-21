@@ -102,7 +102,7 @@ soft-reset)
 
     docker volume ls -q \
         | grep -v '^dmspc-system-communication_postgres_data$' \
-        | xargs -r docker volume rm
+        | xargs -r docker volume rm || true
 
     docker compose build
     docker compose up -d --force-recreate
@@ -130,6 +130,30 @@ hard-reset)
     docker compose build --no-cache && docker compose up -d
     ;;
 
+demo-time)
+    ./control.sh start
+    ./control.sh system-up
+
+    echo "Starting ngrok Kafka endpoint..."
+    ngrok tcp 9094 --url tcp://7.tcp.ngrok.io:26729 >/tmp/ngrok-kafka.log 2>&1 &
+
+    echo "Starting ngrok SeaweedFS endpoint..."
+    ngrok http 8333 --url https://nape-cage-those.ngrok-free.dev >/tmp/ngrok-s3.log 2>&1 &
+
+    echo "Demo environment is ready."
+    ;;
+
+
+demo-end)
+    echo "Stopping ngrok..."
+    pkill ngrok || true
+
+    ./control.sh system-down
+    ./control.sh stop
+
+    echo "Demo environment stopped."
+    ;;
+
 *)
 
     echo "Usage:"
@@ -144,11 +168,14 @@ hard-reset)
     echo "./control.sh attach"
     echo "./control.sh load-staging-data"
     echo "./control.sh hard-reset"
+    echo "./control.sh soft-reset"
     echo "./control.sh testcov"
     echo "./control.sh sims-up"
     echo "./control.sh sims-down"
     echo "./control.sh system-up"
     echo "./control.sh system-down"
+    echo "./control.sh demo-time"
+    echo "./control.sh demo-end"
     exit 1
     ;;
 
