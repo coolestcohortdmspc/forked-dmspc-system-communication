@@ -1,4 +1,4 @@
-<div class="border rounded p-3 bg-white d-flex align-items-center text-center" style="min-height: 5rem; display: flex; justify-content: center; align-items: center; font-size: 1.2rem">
+<div class="border rounded p-3 bg-white d-flex align-items-center text-center" style="min-height: 5rem; display: flex; justify-content: center; align-items: center; font-size: 1.2rem; white-space: normal">
     {% if gbt_event.tx_waveform == 'Tx_OFF' %}<!-- NOTE: We should maybe tie the return of the 'All Systems Online' status to the 'Generating...' status on the waveform input box (using ObservatoryEvent table)-->
         <span> ⏳ Changing waveform to {{ ui_event.selected_waveform }}... </span>
     {% elif latest_event.status == 7 %}
