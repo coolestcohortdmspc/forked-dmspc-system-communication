@@ -10,13 +10,13 @@ from django.http import StreamingHttpResponse, JsonResponse, HttpResponse, HttpR
 
 # serve_image imports
 from ngRadar_Website.utils import create_s3_client, bootstrap, write_transfer_progress #get_presigned_url
-from ngRadar_Website.enums import Stations, Message
+from ngRadar_Website.enums import Stations, Message, Status
 
 #libraries used for lock status
 from django.core.cache import cache
 
-from ngRadar_Website.models.models import ObservatoryEvent, uiEvent, gbtEvent, dsocEvent, ETransferEvent
-from ngRadar_Website.models.models import ObservatoryEvent, uiEvent, gbtEvent, dsocEvent, ETransferEvent
+from ngRadar_Website.models.models import ObservatoryEvent, uiEvent, gbtEvent, dsocEvent, StatusEvent
+from ngRadar_Website.models.models import ObservatoryEvent, uiEvent, gbtEvent, dsocEvent, StatusEvent
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout, logout
 from django.db.models import Avg
@@ -44,9 +44,9 @@ def get_obs_events():
     dsoc_events = dsocEvent.objects.order_by("-event_time")[:LAST_RECORDS]
     avg_latency = latest_events.aggregate(Avg('latency_ms'))['latency_ms__avg'] or 0
     current_waveform = ui_events.first().selected_waveform if ui_events.exists() else None
-    latest_etr_events = ETransferEvent.objects.order_by("-event_time")[:RECORDS_TO_DISPLAY]
+    latest_etr_events = StatusEvent.objects.order_by("-event_time")[:RECORDS_TO_DISPLAY]
     current_transfer_uuid = latest_events.first().transfer_uuid if latest_events.exists() else None
-    latest_etr_event = ETransferEvent.objects.filter(transfer_uuid=current_transfer_uuid).order_by("-event_time").first()
+    latest_etr_event = StatusEvent.objects.filter(transfer_uuid=current_transfer_uuid).order_by("-event_time").first()
     latest_image_event = (
             ObservatoryEvent.objects
             .exclude(image_key__isnull=True)
@@ -151,31 +151,74 @@ def serve_image(request, uuid):
         content_type=obj["ContentType"],
     )
 
+# def submit_waveform(request):
+#     if request.method == "POST":
+#         uuid_input = uuid.uuid4()
+#         waveform  = request.POST.get('waveform')
+#         timestamp = datetime.now(timezone.utc)
+#         # Database version
+#         ui_Event = uiEvent.objects.create(
+#             uuid = uuid_input,
+#             selected_waveform = waveform,
+#             event_time = timestamp
+#         )
+
+#         topic, config = bootstrap(Stations.UI)
+
+#         def main():
+#             key = str(Message.UI_EVENT)
+#             value = uuid_input.hex  # Use the UUID as the value for the Kafka message
+#             produce(topic, config, key, value)
+#             write_transfer_progress(received_bytes=0, total_bytes=0, percent=0.0, transfer_id=0)  # Reset the progress bar after sending the message
+#         main()
+        
+#         # add a cache for submit time
+#         cache.set('submit_locked', datetime.now(timezone.utc))
+#     return redirect('home')
+
+def submit_status(request, ui_uuid):
+    completed = StatusEvent.objects.filter(
+        ui_uuid=ui_uuid,
+        station=Stations.DSOC,
+        status=Status.COMPLETED,
+    ).exists()
+
+    return JsonResponse({
+        "completed": completed,
+    })
+
+
 def submit_waveform(request):
     if request.method == "POST":
         uuid_input = uuid.uuid4()
-        waveform  = request.POST.get('waveform')
+        waveform = request.POST.get("waveform")
         timestamp = datetime.now(timezone.utc)
-        # Database version
-        ui_Event = uiEvent.objects.create(
-            uuid = uuid_input,
-            selected_waveform = waveform,
-            event_time = timestamp
+
+        uiEvent.objects.create(
+            uuid=uuid_input,
+            selected_waveform=waveform,
+            event_time=timestamp,
+            status="PROCESSING",
         )
 
         topic, config = bootstrap(Stations.UI)
 
-        def main():
-            key = str(Message.UI_EVENT)
-            value = uuid_input.hex  # Use the UUID as the value for the Kafka message
-            produce(topic, config, key, value)
-            write_transfer_progress(received_bytes=0, total_bytes=0, percent=0.0, transfer_id=0)  # Reset the progress bar after sending the message
-        main()
-        
-        # add a cache for submit time
-        cache.set('submit_locked', datetime.now(timezone.utc))
-    return redirect('home')
+        key = str(Message.UI_EVENT)
+        value = uuid_input.hex
 
+        produce(topic, config, key, value)
+
+        write_transfer_progress(
+            received_bytes=0,
+            total_bytes=0,
+            percent=0.0,
+            transfer_id=0,
+        )
+
+        return JsonResponse({
+            "uuid": str(uuid_input),
+            "status": "PROCESSING",
+        })
 
 
 

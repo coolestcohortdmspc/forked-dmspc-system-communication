@@ -19,7 +19,7 @@ mock_env_data = "BOOTSTRAP_SERVER=localhost:9092\nSOME_OTHER_VAR=value"
 with patch("pathlib.Path.read_text", return_value=mock_env_data):
     from ngRadar_Website.management.commands.vlba_sim import (
         send_kafka_message,
-        record_transfer_event,
+        record_status_event,
         process_msg,
     )
 
@@ -33,7 +33,7 @@ with patch("pathlib.Path.read_text", return_value=mock_env_data):
 
 @patch("ngRadar_Website.management.commands.vlba_sim.Path")
 @patch("ngRadar_Website.management.commands.vlba_sim.send_kafka_message")
-@patch("ngRadar_Website.management.commands.vlba_sim.record_transfer_event")
+@patch("ngRadar_Website.management.commands.vlba_sim.record_status_event")
 @patch("ngRadar_Website.management.commands.vlba_sim.watch_for_file")
 @patch("ngRadar_Website.management.commands.vlba_sim.Thread")
 @patch("ngRadar_Website.management.commands.vlba_sim.uuid.uuid4")
@@ -41,7 +41,7 @@ def test_process_msg_GBT_TX(
         mock_uuid,
         mock_Thread,
         mock_watch_for_file,
-        mock_record_transfer_event,
+        mock_record_status_event,
         mock_send_kafka_message,
         mock_Path,
 ):
@@ -73,7 +73,7 @@ def test_process_msg_GBT_TX(
     assert mock_uuid.call_count == 1
     assert mock_Thread.call_count == 1
     mock_watch_for_file.assert_called_once_with(mock_frame_path)
-    assert mock_record_transfer_event.call_count == 1
+    assert mock_record_status_event.call_count == 1
     assert mock_send_kafka_message.call_count == 1
 
 #=====================================================================
@@ -84,7 +84,7 @@ def test_process_msg_GBT_TX(
 
 @patch("ngRadar_Website.management.commands.vlba_sim.Path")
 @patch("ngRadar_Website.management.commands.vlba_sim.send_kafka_message")
-@patch("ngRadar_Website.management.commands.vlba_sim.record_transfer_event")
+@patch("ngRadar_Website.management.commands.vlba_sim.record_status_event")
 @patch("ngRadar_Website.management.commands.vlba_sim.watch_for_file")
 @patch("ngRadar_Website.management.commands.vlba_sim.Thread")
 @patch("ngRadar_Website.management.commands.vlba_sim.uuid.uuid4")
@@ -92,7 +92,7 @@ def test_process_msg_GBT_TX_FAILED(
         mock_uuid,
         mock_Thread,
         mock_watch_for_file,
-        mock_record_transfer_event,
+        mock_record_status_event,
         mock_send_kafka_message,
         mock_Path,
 ):
@@ -123,7 +123,7 @@ def test_process_msg_GBT_TX_FAILED(
     assert mock_uuid.call_count == 1
     assert mock_Thread.call_count == 1
     mock_watch_for_file.assert_called_once_with(mock_frame_path)
-    assert mock_record_transfer_event.call_count == 0
+    assert mock_record_status_event.call_count == 0
     assert mock_send_kafka_message.call_count == 1
 
 #=====================================================================
@@ -134,11 +134,11 @@ def test_process_msg_GBT_TX_FAILED(
 
 @patch("ngRadar_Website.management.commands.vlba_sim.etc_send")
 @patch("ngRadar_Website.management.commands.vlba_sim.send_kafka_message")
-@patch("ngRadar_Website.management.commands.vlba_sim.record_transfer_event")
+@patch("ngRadar_Website.management.commands.vlba_sim.record_status_event")
 @patch("ngRadar_Website.management.commands.vlba_sim.json.loads")
 def test_process_msg_DSOC_RESPOND_STORAGE(
         mock_json,
-        mock_record_transfer_event,
+        mock_record_status_event,
         mock_send_kafka_message,
         mock_etc_send,
 ):
@@ -172,7 +172,7 @@ def test_process_msg_DSOC_RESPOND_STORAGE(
 
     assert mock_json.call_count == 1
 
-    mock_record_transfer_event.assert_called_once_with(
+    mock_record_status_event.assert_called_once_with(
         transfer_uuid=str(transfer_uuid),
         gbt_uuid=str(gbt_uuid),
         station=Stations.HN,
@@ -191,11 +191,11 @@ def test_process_msg_DSOC_RESPOND_STORAGE(
 
 @patch("ngRadar_Website.management.commands.vlba_sim.etc_send")
 @patch("ngRadar_Website.management.commands.vlba_sim.send_kafka_message")
-@patch("ngRadar_Website.management.commands.vlba_sim.record_transfer_event")
+@patch("ngRadar_Website.management.commands.vlba_sim.record_status_event")
 @patch("ngRadar_Website.management.commands.vlba_sim.json.loads")
 def test_process_msg_DSOC_RESPOND_STORAGE_CalledProcessError(
         mock_json,
-        mock_record_transfer_event,
+        mock_record_status_event,
         mock_send_kafka_message,
         mock_etc_send,
 ):
@@ -237,8 +237,8 @@ def test_process_msg_DSOC_RESPOND_STORAGE_CalledProcessError(
     assert mock_send_kafka_message.call_count == 1
     mock_etc_send.assert_called_once_with(Path("/raw_data/11111111-1111-1111-1111-111111111111.bin"))
 
-    assert mock_record_transfer_event.call_count == 2
-    mock_record_transfer_event.assert_has_calls(
+    assert mock_record_status_event.call_count == 2
+    mock_record_status_event.assert_has_calls(
         [
             call(
                 transfer_uuid=str(transfer_uuid),
@@ -268,11 +268,11 @@ def test_process_msg_DSOC_RESPOND_STORAGE_CalledProcessError(
 
 @patch("ngRadar_Website.management.commands.vlba_sim.etc_send")
 @patch("ngRadar_Website.management.commands.vlba_sim.send_kafka_message")
-@patch("ngRadar_Website.management.commands.vlba_sim.record_transfer_event")
+@patch("ngRadar_Website.management.commands.vlba_sim.record_status_event")
 @patch("ngRadar_Website.management.commands.vlba_sim.json.loads")
 def test_process_msg_DSOC_RESPOND_STORAGE_OSError(
         mock_json,
-        mock_record_transfer_event,
+        mock_record_status_event,
         mock_send_kafka_message,
         mock_etc_send,
 ):
@@ -307,7 +307,7 @@ def test_process_msg_DSOC_RESPOND_STORAGE_OSError(
     process_msg(msg, producer_topic, producer_config)
 
     assert mock_json.call_count == 1
-    assert mock_record_transfer_event.call_count == 2
+    assert mock_record_status_event.call_count == 2
 
     assert mock_send_kafka_message.call_count == 1
     mock_etc_send.assert_called_once_with(Path("/raw_data/11111111-1111-1111-1111-111111111111.bin"))
@@ -321,11 +321,11 @@ def test_process_msg_DSOC_RESPOND_STORAGE_OSError(
 @patch("ngRadar_Website.management.commands.vlba_sim.etc_send")
 @patch("ngRadar_Website.management.commands.vlba_sim.send_kafka_message")
 @patch("ngRadar_Website.management.commands.vlba_sim.time.sleep")
-@patch("ngRadar_Website.management.commands.vlba_sim.record_transfer_event")
+@patch("ngRadar_Website.management.commands.vlba_sim.record_status_event")
 @patch("ngRadar_Website.management.commands.vlba_sim.json.loads")
 def test_process_msg_DSOC_RESPOND_STORAGE_No(
         mock_json,
-        mock_record_transfer_event,
+        mock_record_status_event,
         mock_sleep,
         mock_send_kafka_message,
         mock_etc_send,
@@ -360,7 +360,7 @@ def test_process_msg_DSOC_RESPOND_STORAGE_No(
     process_msg(msg, producer_topic, producer_config)
 
     assert mock_json.call_count == 1
-    assert mock_record_transfer_event.call_count == 0
+    assert mock_record_status_event.call_count == 0
     assert mock_sleep.call_count == 1
     assert mock_send_kafka_message.call_count == 1
     assert mock_etc_send.call_count == 0
@@ -374,11 +374,11 @@ def test_process_msg_DSOC_RESPOND_STORAGE_No(
 @patch("ngRadar_Website.management.commands.vlba_sim.delete_observation_data")
 @patch("ngRadar_Website.management.commands.vlba_sim.etc_send")
 @patch("ngRadar_Website.management.commands.vlba_sim.send_kafka_message")
-@patch("ngRadar_Website.management.commands.vlba_sim.record_transfer_event")
+@patch("ngRadar_Website.management.commands.vlba_sim.record_status_event")
 @patch("ngRadar_Website.management.commands.vlba_sim.json.loads")
 def test_process_msg_VLBA_DELETE(
         mock_json,
-        mock_record_transfer_event,
+        mock_record_status_event,
         mock_send_kafka_message,
         mock_etc_send,
         mock_delete_observation_data,
@@ -400,7 +400,7 @@ def test_process_msg_VLBA_DELETE(
     process_msg(msg, producer_topic, producer_config)
 
     assert mock_json.call_count == 1
-    assert mock_record_transfer_event.call_count == 0 # making sure this never gets hit during logic.
+    assert mock_record_status_event.call_count == 0 # making sure this never gets hit during logic.
     assert mock_send_kafka_message.call_count == 0
     assert mock_etc_send.call_count == 0
     mock_delete_observation_data.assert_called_once_with("fake_filename.png")

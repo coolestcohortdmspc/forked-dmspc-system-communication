@@ -3,7 +3,7 @@ import uuid
 # from confluent_kafka.admin import AdminClient, NewTopic, KafkaException, KafkaError
 from dotenv import load_dotenv
 from ngRadar_Website.enums import Stations, Status
-from ngRadar_Website.models.models import gbtEvent, dsocEvent, ETransferEvent
+from ngRadar_Website.models.models import gbtEvent, dsocEvent, StatusEvent
 from confluent_kafka import Consumer, Producer
 import boto3
 import os
@@ -489,6 +489,7 @@ def send_kafka_message(
     key,
     producer_topic,
     producer_config,
+    ui_uuid,
     transfer_uuid,
     gbt_uuid,
     status,
@@ -498,6 +499,7 @@ def send_kafka_message(
     stations=Stations.HN,
 ):
     payload = {
+        "ui_uuid": str(ui_uuid),
         "transfer_uuid": str(transfer_uuid),
         "gbt_uuid": str(gbt_uuid),
         "status": int(status),
@@ -564,9 +566,10 @@ def get_folder_size(folder_path: Path):
     return total
 
   
-# Helper function to record the status of the e-transfer in the ETransferEvent table
-def record_transfer_event(
+# Helper function to record the status of the e-transfer in the StatusEvent table
+def record_status_event(
     *,
+    ui_uuid,
     transfer_uuid,
     gbt_uuid,
     station,
@@ -577,7 +580,8 @@ def record_transfer_event(
 ):
     gbt_event = gbtEvent.objects.get(uuid=gbt_uuid)
 
-    return ETransferEvent.objects.create(
+    return StatusEvent.objects.create(
+        ui_uuid=ui_uuid,
         transfer_uuid=transfer_uuid,
         gbt_uuid=gbt_uuid,
         object_id=gbt_event.object_id,

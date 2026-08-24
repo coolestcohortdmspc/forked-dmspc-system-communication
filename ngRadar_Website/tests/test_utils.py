@@ -34,7 +34,7 @@ with patch("pathlib.Path.read_text", return_value=mock_env_data):
         etc_send,
         watch_for_file,
         produce,
-        record_transfer_event,
+        record_status_event,
         send_kafka_message,
         get_folder_size,
         write_transfer_progress,
@@ -591,12 +591,12 @@ def test_produce(mock_Producer):
 
 
 # ==============================================================================
-# 7. record_transfer_event Test
+# 7. record_status_event Test
 # ==============================================================================
 
 @patch("ngRadar_Website.utils.gbtEvent")
-@patch("ngRadar_Website.utils.ETransferEvent")
-def test_record_transfer_event(mock_etr_event, mock_gbt_event):
+@patch("ngRadar_Website.utils.StatusEvent")
+def test_record_status_event(mock_etr_event, mock_gbt_event):
 
     mock_gbt_data = MagicMock()
     mock_gbt_data.object_id = "123"
@@ -607,7 +607,7 @@ def test_record_transfer_event(mock_etr_event, mock_gbt_event):
     etr_record = MagicMock()
     mock_etr_event.objects.create.return_value = etr_record
 
-    record_transfer_event(
+    record_status_event(
         transfer_uuid="transfer-uuid",
         gbt_uuid="gbt-uuid",
         station=Stations.DSOC,

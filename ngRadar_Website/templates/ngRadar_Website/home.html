@@ -28,7 +28,12 @@
     <!-- Input Waveform -->
     <div class="col-12 col-md-6 col-lg-5">
         <div class="border rounded p-3 bg-white d-flex align-items-center" style="min-height: 5rem;">
-            <form action="{% url 'submit_waveform' %}" method="POST" class="d-flex align-items-center w-100 gap-2">
+            <form
+                id="waveform-form"
+                action="{% url 'submit_waveform' %}"
+                method="POST"
+                class="d-flex align-items-center w-100 gap-2"
+            >
                 {% csrf_token %}
                 <label class="mb-0 fw-bold" for="waveform" style="white-space:nowrap;">
                     Input waveform here:  
@@ -83,6 +88,45 @@
             window.location.reload()
         }
     });
+</script>
+
+<script>
+const form = document.querySelector("#waveform-form");
+const button = document.querySelector("#waveform-submit-btn");
+
+form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    button.disabled = true;
+    button.textContent = "Processing...";
+
+    const response = await fetch(form.action, {
+        method: "POST",
+        body: new FormData(form),
+        headers: {
+            "X-CSRFToken": form.querySelector(
+                "[name=csrfmiddlewaretoken]"
+            ).value,
+        },
+    });
+
+    const data = await response.json();
+
+    const timer = setInterval(async () => {
+        const response = await fetch(
+            `/submission-status/${data.uuid}/`
+        );
+
+        const status = await response.json();
+
+        if (status.completed) {
+            clearInterval(timer);
+
+            button.disabled = false;
+            button.textContent = "Submit";
+        }
+    }, 1000);
+});
 </script>
 
 {% endblock %}

@@ -24,7 +24,7 @@ class Migration(migrations.Migration):
             field=models.PositiveSmallIntegerField(blank=True, choices=[(9, 'Green Bank (100-m, GBT)'), (90, 'St. Croix (25-m, VLBA)'), (91, 'Hancock (25-m, VLBA)'), (92, 'North Liberty (25-m, VLBA)'), (93, 'Fort Davis (25-m, VLBA)'), (94, 'Los Alamos (25-m, VLBA)'), (95, 'Pie Town (25-m, VLBA)'), (96, 'Kitt Peak (25-m, VLBA)'), (97, 'Owens Valley (25-m, VLBA)'), (98, 'Brewster (25-m, VLBA)'), (99, 'Mauna Kea (25-m, VLBA)'), (100, 'DSOC (Domenici Socorro Operations Center)'), (101, 'User Interface'), (102, 'E-Transfer Progress Writer')], null=True),
         ),
         migrations.AlterField(
-            model_name='etransferevent',
+            model_name='StatusEvent',
             name='station',
             field=models.PositiveSmallIntegerField(blank=True, choices=[(9, 'Green Bank (100-m, GBT)'), (90, 'St. Croix (25-m, VLBA)'), (91, 'Hancock (25-m, VLBA)'), (92, 'North Liberty (25-m, VLBA)'), (93, 'Fort Davis (25-m, VLBA)'), (94, 'Los Alamos (25-m, VLBA)'), (95, 'Pie Town (25-m, VLBA)'), (96, 'Kitt Peak (25-m, VLBA)'), (97, 'Owens Valley (25-m, VLBA)'), (98, 'Brewster (25-m, VLBA)'), (99, 'Mauna Kea (25-m, VLBA)'), (100, 'DSOC (Domenici Socorro Operations Center)'), (101, 'User Interface'), (102, 'E-Transfer Progress Writer')], null=True),
         ),

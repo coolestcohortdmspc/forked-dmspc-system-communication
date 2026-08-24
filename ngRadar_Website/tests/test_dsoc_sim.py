@@ -212,7 +212,7 @@ def test_verify_incoming_transfer_nofile(mock_sleep):
 """Scenario 1: VLBA_REQUEST_STORAGE incoming message. Clean run, no failure cases. Respond YES to storage check."""
 #=====================================================================
 
-@patch("ngRadar_Website.management.commands.dsoc_sim.record_transfer_event")
+@patch("ngRadar_Website.management.commands.dsoc_sim.record_status_event")
 @patch("ngRadar_Website.management.commands.dsoc_sim.send_kafka_message")
 @patch("ngRadar_Website.management.commands.dsoc_sim.get_folder_size")
 @patch("ngRadar_Website.management.commands.dsoc_sim.json.loads")
@@ -220,7 +220,7 @@ def test_process_msg_VLBA_REQUEST_STORAGE(
     mock_json,
     mock_get_folder_size,
     mock_send_kafka_message,
-    mock_record_transfer_event,
+    mock_record_status_event,
     monkeypatch,
 ):
     
@@ -257,7 +257,7 @@ def test_process_msg_VLBA_REQUEST_STORAGE(
     process_msg(msg, producer_topic, producer_config)
 
     assert mock_get_folder_size.call_count == 1
-    assert mock_record_transfer_event.call_count == 1
+    assert mock_record_status_event.call_count == 1
     assert mock_send_kafka_message.call_count == 1
 #=====================================================================
 
@@ -265,7 +265,7 @@ def test_process_msg_VLBA_REQUEST_STORAGE(
 """Scenario 2: VLBA_REQUEST_STORAGE incoming message. Payload status == FAILED case."""
 #=====================================================================
 
-@patch("ngRadar_Website.management.commands.dsoc_sim.record_transfer_event")
+@patch("ngRadar_Website.management.commands.dsoc_sim.record_status_event")
 @patch("ngRadar_Website.management.commands.dsoc_sim.send_kafka_message")
 @patch("ngRadar_Website.management.commands.dsoc_sim.get_folder_size")
 @patch("ngRadar_Website.management.commands.dsoc_sim.json.loads")
@@ -273,7 +273,7 @@ def test_process_msg_VLBA_REQUEST_STORAGE_FAILED(
     mock_json,
     mock_get_folder_size,
     mock_send_kafka_message,
-    mock_record_transfer_event,
+    mock_record_status_event,
     monkeypatch,
 ):
     
@@ -309,7 +309,7 @@ def test_process_msg_VLBA_REQUEST_STORAGE_FAILED(
     process_msg(msg, producer_topic, producer_config)
 
     assert mock_get_folder_size.call_count == 0
-    assert mock_record_transfer_event.call_count == 1
+    assert mock_record_status_event.call_count == 1
     assert mock_send_kafka_message.call_count == 0
 
 #=====================================================================
@@ -318,7 +318,7 @@ def test_process_msg_VLBA_REQUEST_STORAGE_FAILED(
 """Scenario 3: VLBA_REQUEST_STORAGE incoming message. Payload message == 15 FAILED case - meaning final storage check failed."""
 #=====================================================================
 
-@patch("ngRadar_Website.management.commands.dsoc_sim.record_transfer_event")
+@patch("ngRadar_Website.management.commands.dsoc_sim.record_status_event")
 @patch("ngRadar_Website.management.commands.dsoc_sim.send_kafka_message")
 @patch("ngRadar_Website.management.commands.dsoc_sim.get_folder_size")
 @patch("ngRadar_Website.management.commands.dsoc_sim.json.loads")
@@ -326,7 +326,7 @@ def test_process_msg_VLBA_REQUEST_STORAGE_15(
     mock_json,
     mock_get_folder_size,
     mock_send_kafka_message,
-    mock_record_transfer_event,
+    mock_record_status_event,
     monkeypatch,
 ):
     
@@ -363,7 +363,7 @@ def test_process_msg_VLBA_REQUEST_STORAGE_15(
     process_msg(msg, producer_topic, producer_config)
 
     assert mock_get_folder_size.call_count == 1
-    assert mock_record_transfer_event.call_count == 0
+    assert mock_record_status_event.call_count == 0
     assert mock_send_kafka_message.call_count == 0
 
 #=====================================================================
@@ -372,7 +372,7 @@ def test_process_msg_VLBA_REQUEST_STORAGE_15(
 """Scenario 4: VLBA_REQUEST_STORAGE incoming message. Payload message == 1 FAILED case - meaning DSOC is retrying a storage check."""
 #=====================================================================
 
-@patch("ngRadar_Website.management.commands.dsoc_sim.record_transfer_event")
+@patch("ngRadar_Website.management.commands.dsoc_sim.record_status_event")
 @patch("ngRadar_Website.management.commands.dsoc_sim.send_kafka_message")
 @patch("ngRadar_Website.management.commands.dsoc_sim.get_folder_size")
 @patch("ngRadar_Website.management.commands.dsoc_sim.json.loads")
@@ -380,7 +380,7 @@ def test_process_msg_VLBA_REQUEST_STORAGE_1(
     mock_json,
     mock_get_folder_size,
     mock_send_kafka_message,
-    mock_record_transfer_event,
+    mock_record_status_event,
     monkeypatch,
 ):
     
@@ -417,7 +417,7 @@ def test_process_msg_VLBA_REQUEST_STORAGE_1(
     process_msg(msg, producer_topic, producer_config)
 
     assert mock_get_folder_size.call_count == 1
-    assert mock_record_transfer_event.call_count == 1
+    assert mock_record_status_event.call_count == 1
     assert mock_send_kafka_message.call_count == 1
 
 
@@ -436,13 +436,13 @@ def test_process_msg_VLBA_REQUEST_STORAGE_1(
 @patch("ngRadar_Website.management.commands.dsoc_sim.DB_import")
 @patch("ngRadar_Website.management.commands.dsoc_sim.verify_incoming_transfer")
 @patch("ngRadar_Website.management.commands.dsoc_sim.track_etransfer_progress")
-@patch("ngRadar_Website.management.commands.dsoc_sim.record_transfer_event")
+@patch("ngRadar_Website.management.commands.dsoc_sim.record_status_event")
 @patch("ngRadar_Website.management.commands.dsoc_sim.send_kafka_message")
 @patch("ngRadar_Website.management.commands.dsoc_sim.json.loads")
 def test_process_msg_VLBA_TRANSFERRING(
     mock_json,
     mock_send_kafka_message,
-    mock_record_transfer_event,
+    mock_record_status_event,
     mock_track_etransfer_progress,
     mock_verify_incoming_transfer,
     mock_DB_import,
@@ -506,7 +506,7 @@ def test_process_msg_VLBA_TRANSFERRING(
     process_msg(msg, producer_topic, producer_config)
 
     assert mock_track_etransfer_progress.call_count == 1
-    assert mock_record_transfer_event.call_count == 3
+    assert mock_record_status_event.call_count == 3
     assert mock_verify_incoming_transfer.call_count == 1
     mock_DB_import.assert_called_once_with(mock_payload["gbt_uuid"])
     mock_latency_calc.assert_called_once_with(mock_gbt_data[3])
@@ -532,13 +532,13 @@ def test_process_msg_VLBA_TRANSFERRING(
 @patch("ngRadar_Website.management.commands.dsoc_sim.DB_import")
 @patch("ngRadar_Website.management.commands.dsoc_sim.verify_incoming_transfer")
 @patch("ngRadar_Website.management.commands.dsoc_sim.track_etransfer_progress")
-@patch("ngRadar_Website.management.commands.dsoc_sim.record_transfer_event")
+@patch("ngRadar_Website.management.commands.dsoc_sim.record_status_event")
 @patch("ngRadar_Website.management.commands.dsoc_sim.send_kafka_message")
 @patch("ngRadar_Website.management.commands.dsoc_sim.json.loads")
 def test_process_msg_VLBA_TRANSFERRING_verificationFAILED(
     mock_json,
     mock_send_kafka_message,
-    mock_record_transfer_event,
+    mock_record_status_event,
     mock_track_etransfer_progress,
     mock_verify_incoming_transfer,
     mock_DB_import,
@@ -589,7 +589,7 @@ def test_process_msg_VLBA_TRANSFERRING_verificationFAILED(
     process_msg(msg, producer_topic, producer_config)
 
     assert mock_track_etransfer_progress.call_count == 1
-    assert mock_record_transfer_event.call_count == 3
+    assert mock_record_status_event.call_count == 3
     assert mock_verify_incoming_transfer.call_count == 1
     assert mock_DB_import.call_count == 0
     assert mock_latency_calc.call_count == 0
@@ -614,13 +614,13 @@ def test_process_msg_VLBA_TRANSFERRING_verificationFAILED(
 @patch("ngRadar_Website.management.commands.dsoc_sim.DB_import")
 @patch("ngRadar_Website.management.commands.dsoc_sim.verify_incoming_transfer")
 @patch("ngRadar_Website.management.commands.dsoc_sim.track_etransfer_progress")
-@patch("ngRadar_Website.management.commands.dsoc_sim.record_transfer_event")
+@patch("ngRadar_Website.management.commands.dsoc_sim.record_status_event")
 @patch("ngRadar_Website.management.commands.dsoc_sim.send_kafka_message")
 @patch("ngRadar_Website.management.commands.dsoc_sim.json.loads")
 def test_process_msg_VLBA_TRANSFERRING_verificationFAILED(
     mock_json,
     mock_send_kafka_message,
-    mock_record_transfer_event,
+    mock_record_status_event,
     mock_track_etransfer_progress,
     mock_verify_incoming_transfer,
     mock_DB_import,
@@ -683,7 +683,7 @@ def test_process_msg_VLBA_TRANSFERRING_verificationFAILED(
     process_msg(msg, producer_topic, producer_config)
 
     assert mock_track_etransfer_progress.call_count == 1
-    assert mock_record_transfer_event.call_count == 3
+    assert mock_record_status_event.call_count == 3
     assert mock_verify_incoming_transfer.call_count == 1
     assert mock_DB_import.call_count == 1
     assert mock_latency_calc.call_count == 1
@@ -706,7 +706,7 @@ def test_process_msg_VLBA_TRANSFERRING_verificationFAILED(
 
 @patch("ngRadar_Website.management.commands.dsoc_sim.time.sleep", return_value=None)
 @patch("ngRadar_Website.management.commands.dsoc_sim.write_transfer_progress")
-@patch("ngRadar_Website.management.commands.dsoc_sim.ETransferEvent")
+@patch("ngRadar_Website.management.commands.dsoc_sim.StatusEvent")
 def test_track_etransfer_progress(
     mock_etransfer_event,
     mock_write_transfer_progress,
@@ -767,7 +767,7 @@ from ngRadar_Website.management.commands.dsoc_sim import track_etransfer_progres
 
 @patch("ngRadar_Website.management.commands.dsoc_sim.time.sleep", return_value=None)
 @patch("ngRadar_Website.management.commands.dsoc_sim.write_transfer_progress")
-@patch("ngRadar_Website.management.commands.dsoc_sim.ETransferEvent")
+@patch("ngRadar_Website.management.commands.dsoc_sim.StatusEvent")
 def test_track_etransfer_progress_status_FAILED(
     mock_etransfer_event,
     mock_write_transfer_progress,
@@ -808,7 +808,7 @@ def test_track_etransfer_progress_status_FAILED(
 
 @patch("ngRadar_Website.management.commands.dsoc_sim.time.sleep", return_value=None)
 @patch("ngRadar_Website.management.commands.dsoc_sim.write_transfer_progress")
-@patch("ngRadar_Website.management.commands.dsoc_sim.ETransferEvent")
+@patch("ngRadar_Website.management.commands.dsoc_sim.StatusEvent")
 def test_track_etransfer_progress_status_OTHER(
     mock_etransfer_event,
     mock_write_transfer_progress,

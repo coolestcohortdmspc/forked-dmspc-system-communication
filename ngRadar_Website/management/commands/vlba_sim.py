@@ -9,7 +9,7 @@ from ngRadar_Website.enums import Stations, Status, Message
 from confluent_kafka import Producer
 from pathlib import Path
 from django.utils import timezone
-from ngRadar_Website.models.models import gbtEvent, ETransferEvent
+from ngRadar_Website.models.models import gbtEvent, StatusEvent
 from datetime import datetime, timezone
 from threading import Thread
 
@@ -47,7 +47,7 @@ def process_msg(msg, producer_topic, producer_config):
         if frame_path.is_file():
             num_bytes = frame_path.stat().st_size
     
-            record_transfer_event(
+            record_status_event(
                     transfer_uuid=transfer_uuid,
                     gbt_uuid=gbt_uuid,
                     station=Stations.HN,
@@ -92,7 +92,7 @@ def process_msg(msg, producer_topic, producer_config):
         if payload["message"] == "Yes":
 
             try:
-                record_transfer_event(
+                record_status_event(
                     transfer_uuid=payload["transfer_uuid"],
                     gbt_uuid=payload["gbt_uuid"],
                     station=Stations.HN,
@@ -119,7 +119,7 @@ def process_msg(msg, producer_topic, producer_config):
 
             except subprocess.CalledProcessError as exc:
                 print(f"E-transfer failed with return code: {exc.returncode}")
-                record_transfer_event(
+                record_status_event(
                     transfer_uuid=payload["transfer_uuid"],
                     gbt_uuid=payload["gbt_uuid"],
                     station=Stations.HN,
@@ -131,7 +131,7 @@ def process_msg(msg, producer_topic, producer_config):
             
             except Exception as exc:
                 print(f"Unexpected e-transfer failure: {exc}")
-                record_transfer_event(
+                record_status_event(
                     transfer_uuid=payload["transfer_uuid"],
                     gbt_uuid=payload["gbt_uuid"],
                     station=Stations.HN,

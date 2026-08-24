@@ -21,7 +21,7 @@ class Migration(migrations.Migration):
             field=models.TextField(blank=True, default='', null=True),
         ),
         migrations.AlterField(
-            model_name='etransferevent',
+            model_name='StatusEvent',
             name='message',
             field=models.TextField(blank=True, default='', null=True),
         ),

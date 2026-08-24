@@ -112,6 +112,10 @@ class uiEvent(models.Model):
     uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     selected_waveform = models.CharField(max_length=100)
     event_time = models.DateTimeField()
+    status = models.PositiveSmallIntegerField(
+            choices=Status.choices,
+        )
+    message = models.TextField(blank=True, null=True, default="")
 
     def __str__(self):
         return f"UI Event: {self.selected_waveform} | {self.event_time}"
@@ -120,13 +124,18 @@ class uiEvent(models.Model):
 
 
 
-class ETransferEvent(models.Model):
+class StatusEvent(models.Model):
     # Unique ID for the individual status event
     uuid = models.UUIDField(
         primary_key=True,
         default=uuid.uuid4,
         editable=False,
     )
+    ui_uuid = models.UUIDField(
+            blank=True,
+            null=True,
+            db_index=True,
+        )
     # Shared by every status event for the same transfer
     transfer_uuid = models.UUIDField(
         db_index=True,

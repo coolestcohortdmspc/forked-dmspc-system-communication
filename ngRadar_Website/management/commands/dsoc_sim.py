@@ -6,7 +6,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import io
-from ngRadar_Website.models.models import gbtEvent, dsocEvent, ETransferEvent
+from ngRadar_Website.models.models import gbtEvent, dsocEvent, StatusEvent
 from ngRadar_Website.enums import Stations, Status, Message
 # from ngRadar_Website.utils import latency_calc, bootstrap, consume, create_s3_client, upload_seaweedfs, write_transfer_progress, send_kafka_message, get_folder_size
 from ngRadar_Website.utils import *
@@ -159,7 +159,7 @@ def track_etransfer_progress(payload, incoming_file: Path):
         transfer_id=0,
     )
     print("Transfer in progress...")
-    while ETransferEvent.objects.filter(transfer_uuid=transfer_uuid).order_by("-event_time").values_list("status", flat=True).first() == Status.TRANSFERRING:
+    while StatusEvent.objects.filter(transfer_uuid=transfer_uuid).order_by("-event_time").values_list("status", flat=True).first() == Status.TRANSFERRING:
         # while loop will break prematurely if status in DB ever changes - ex. if it changes to FAILED mid e-transfer.
         if incoming_file.exists():
             received_bytes = incoming_file.stat().st_size
@@ -179,7 +179,7 @@ def track_etransfer_progress(payload, incoming_file: Path):
             print(f"Transfer of <{transfer_uuid}.bin> COMPLETE.")
             break
 
-    if ETransferEvent.objects.filter(transfer_uuid=transfer_uuid).order_by("-event_time").values_list("status", flat=True).first() == Status.FAILED:
+    if StatusEvent.objects.filter(transfer_uuid=transfer_uuid).order_by("-event_time").values_list("status", flat=True).first() == Status.FAILED:
         raise ValueError("E-Transfer client reported a FAILED status mid-transfer.")
 
     if received_bytes != num_bytes:
@@ -197,7 +197,7 @@ def process_msg(msg, producer_topic, producer_config):
 
         key = f"{Message.DSOC_RESPOND_STORAGE}" #produced message will have this key no matter what the result of the below logic is
         if payload["status"] == Status.FAILED:
-            record_transfer_event(
+            record_status_event(
                 transfer_uuid=payload["transfer_uuid"],
                 gbt_uuid=payload["gbt_uuid"],
                 station=Stations.HN,
@@ -221,7 +221,7 @@ def process_msg(msg, producer_topic, producer_config):
                 else: 
                     if payload["message"] == 1:
                         # The FAILED record only gets saved to the DB the first time. The payload message for any storage check retries will contain message=2 
-                        record_transfer_event(
+                        record_status_event(
                             transfer_uuid=payload["transfer_uuid"],
                             gbt_uuid=payload["gbt_uuid"],
                             station=Stations.HN,
@@ -244,7 +244,7 @@ def process_msg(msg, producer_topic, producer_config):
 
             else:
                 if payload["message"] != 1:
-                    record_transfer_event(
+                    record_status_event(
                         transfer_uuid=payload["transfer_uuid"],
                         gbt_uuid=payload["gbt_uuid"],
                         station=Stations.HN,
@@ -275,7 +275,7 @@ def process_msg(msg, producer_topic, producer_config):
         try:
             track_etransfer_progress(payload, incoming_file)
 
-            record_transfer_event(
+            record_status_event(
                 transfer_uuid=payload["transfer_uuid"],
                 gbt_uuid=payload["gbt_uuid"],
                 station=Stations.HN,
@@ -283,7 +283,7 @@ def process_msg(msg, producer_topic, producer_config):
                 num_bytes=payload["num_bytes"],
                 message="Hancock VLBA e-transfer complete",
             )
-            record_transfer_event(
+            record_status_event(
                 transfer_uuid=payload["transfer_uuid"],
                 gbt_uuid=payload["gbt_uuid"],
                 station=Stations.DSOC,
@@ -303,7 +303,7 @@ def process_msg(msg, producer_topic, producer_config):
                 expected_num_bytes=payload["num_bytes"],
             )
         except Exception as exc:
-            record_transfer_event(
+            record_status_event(
                 transfer_uuid=payload["transfer_uuid"],
                 gbt_uuid=payload["gbt_uuid"],
                 station=Stations.DSOC,
@@ -342,7 +342,7 @@ def process_msg(msg, producer_topic, producer_config):
             )
 
         except Exception as exc:
-            record_transfer_event(
+            record_status_event(
                 transfer_uuid=payload["transfer_uuid"],
                 gbt_uuid=payload["gbt_uuid"],
                 station=Stations.DSOC,
@@ -352,7 +352,7 @@ def process_msg(msg, producer_topic, producer_config):
             )
             return
 
-        record_transfer_event(
+        record_status_event(
             transfer_uuid=payload["transfer_uuid"],
             gbt_uuid=payload["gbt_uuid"],
             station=Stations.DSOC,

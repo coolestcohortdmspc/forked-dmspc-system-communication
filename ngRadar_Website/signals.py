@@ -6,8 +6,8 @@ from django.utils import timezone
 from ngRadar_Website.models.models import (
     gbtEvent,
     dsocEvent,
-    ETransferEvent,
-    ETransferEvent,
+    StatusEvent,
+    StatusEvent,
     ObservatoryEvent,
 )
 
@@ -57,7 +57,7 @@ def create_obsevent_from_dsoc(sender, instance, created, **kwargs):
 
 
 
-@receiver(post_save, sender=ETransferEvent)
+@receiver(post_save, sender=StatusEvent)
 def create_obsevent_from_etransfer(sender, instance, created, **kwargs):
     if not created:
         return
