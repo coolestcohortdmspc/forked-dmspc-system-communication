@@ -20,7 +20,7 @@ from botocore.exceptions import (
 # Because we read "ngrok_endpoint.env" on import, we need to patch the Path globally
 # before importing all the functions we want to test.
 # ==============================================================================
-mock_env_data = "BOOTSTRAP_SERVER=localhost:9092\nSOME_OTHER_VAR=value" 
+mock_env_data = "BOOTSTRAP_SERVER=localhost:9092\nSOME_OTHER_VAR=value"
 with patch("pathlib.Path.read_text", return_value=mock_env_data):
     from ngRadar_Website.utils import (
         latency_calc,
@@ -40,6 +40,7 @@ with patch("pathlib.Path.read_text", return_value=mock_env_data):
         write_transfer_progress,
         publish_status_obsEvents,
         upload_seaweedfs,
+        consumer_group_has_members,
 
     )
 
@@ -77,7 +78,7 @@ def test_latency_calc_none(seconds, expected):
     latency = latency_calc(start_time, current_time=end_time)
 
     upper_bound = expected+300
-    
+
     # 3. Assert (1 second = 1000 milliseconds)
     assert expected <= latency < upper_bound, f"Expected latency around 1000 ms, got {latency} ms"
 
@@ -98,7 +99,7 @@ def test_latency_calc_gbt(seconds, expected):
     latency = latency_calc(start_time, sim, current_time=end_time)
 
     upper_bound = expected+300
-    
+
     # 3. Assert (1 second = 1000 milliseconds)
     assert expected <= latency < upper_bound, f"Expected latency around {expected} ms, got {latency} ms"
 
@@ -192,7 +193,7 @@ def test_config_func_DSOC():
             "auto.offset.reset": "earliest",
         }
 
-    
+
 def test_config_func_UI():
     """Scenario 4: kafka client is the UI. Producer only"""
 
@@ -251,7 +252,7 @@ def test_bootstrap_DSOC(mock_os_getenv, mock_config_func, mock_load_dotenv):
     mock_env_data = "BOOTSTRAP_SERVER=fake_bootstrap\nSOME_OTHER_VAR=value"
     mock_load_dotenv.return_value = mock_env_data
     mock_os_getenv.return_value = "fake_bootstrap"
-    
+
     mock_config_func.return_value = (
         "VLBA_data",
         {"bootstrap.servers": "fake_bootstrap"},
@@ -477,7 +478,7 @@ def test_create_s3_client_client_error(mock_Config, mock_ensure_bucket, mock_bot
     config_value = "fake_config"
     mock_Config.return_value = config_value
 
-   
+
     s3_client = create_s3_client()
 
     assert s3_client == mock_s3
@@ -642,7 +643,7 @@ def test_produce(mock_Producer):
     config = "config"
     key = "key"
     value = "value"
-    
+
     mock_producer = mock_Producer.return_value
     mock_producer.flush.return_value = 0
 
@@ -661,7 +662,7 @@ def test_produce_delivery_error(mock_publish, mock_Producer):
     config = "config"
     key = "key"
     value = "value"
-    
+
     mock_producer = mock_Producer.return_value
     mock_producer.flush.return_value = 0
 
@@ -687,7 +688,7 @@ def test_produce_delivery_flush_error(mock_publish, mock_Producer):
     config = "config"
     key = "key"
     value = "value"
-    
+
     mock_producer = mock_Producer.return_value
     mock_producer.flush.return_value = 1
 
@@ -707,7 +708,7 @@ def test_produce_delivery_exception(mock_publish, mock_Producer):
     config = "config"
     key = "key"
     value = "value"
-    
+
     mock_producer = mock_Producer.return_value
     mock_producer.flush.return_value = 1
 
@@ -792,7 +793,7 @@ def test_send_kafka_message(mock_datetime, mock_produce):
         gbt_uuid=gbt_uuid,
         status=status,
         num_bytes=num_bytes,
-        filename=filename, 
+        filename=filename,
         message=message,
     )
 
@@ -914,9 +915,9 @@ def test_publish_status_obsEvents(mock_obs_event, mock_datetime):
                                                           target = "Moretus",
                                                           rcvr_station = Stations.HN,
                                                           xmit_station = Stations.GBT,
-                                                          event_time=fake_datetime, 
-                                                          latency_ms=0.00, 
-                                                          status=status, 
+                                                          event_time=fake_datetime,
+                                                          latency_ms=0.00,
+                                                          status=status,
                                                           message=msg)
 
 @patch("ngRadar_Website.utils.datetime")
@@ -940,8 +941,53 @@ def test_publish_status_obsEvents_error(mock_obs_event, mock_datetime, capsys):
                                                           target = "Moretus",
                                                           rcvr_station = Stations.HN,
                                                           xmit_station = Stations.GBT,
-                                                          event_time=fake_datetime, 
-                                                          latency_ms=0.00, 
-                                                          status=status, 
+                                                          event_time=fake_datetime,
+                                                          latency_ms=0.00,
+                                                          status=status,
                                                           message=msg)
     assert captured.out.strip() == "Database error: Database error"
+
+
+# ==============================================================================
+# 12. consumer_group_has_members True Test
+# ==============================================================================
+@patch.dict(os.environ, {"BOOTSTRAP_SERVER" : "fake-broker:9092"})
+@patch("ngRadar_Website.utils.AdminClient")
+def test_consumer_group_has_member_true(mock_admin):
+    # Group with at least one member means sim is alive
+    mock_group = MagicMock()
+    mock_group.members = ["hn-consumer-1"]
+
+    mock_future = MagicMock()
+    mock_future.result.return_value = mock_group
+
+    mock_admin.return_value.describe_consumer_groups.return_value = {
+        "hn-consumer-group" : mock_future
+    }
+
+    assert consumer_group_has_members("hn-consumer-group") is True
+
+    mock_admin.return_value.describe_consumer_groups.assert_called_once_with(["hn-consumer-group"])
+
+
+# ==============================================================================
+# 13. consumer_group_has_members False Test
+# ==============================================================================
+@patch.dict(os.environ, {"BOOTSTRAP_SERVER" : "fake-broker:9092"})
+@patch("ngRadar_Website.utils.AdminClient")
+def test_consumer_group_has_member_false(mock_admin):
+    # Group with at no member means sim is gone
+    mock_group = MagicMock()
+    mock_group.members = []
+
+    mock_future = MagicMock()
+    mock_future.result.return_value = mock_group
+
+    mock_admin.return_value.describe_consumer_groups.return_value = {
+        "hn-consumer-group" : mock_future
+    }
+
+    assert consumer_group_has_members("hn-consumer-group") is False
+
+    mock_admin.return_value.describe_consumer_groups.assert_called_once_with(["hn-consumer-group"])
+
