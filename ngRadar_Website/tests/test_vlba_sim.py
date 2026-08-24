@@ -1,5 +1,5 @@
 from unittest.mock import patch, MagicMock, call
-from ngRadar_Website.enums import Stations, Status
+from ngRadar_Website.enums import Stations, Status, Message
 from datetime import datetime, timezone
 import uuid
 from pathlib import Path
@@ -32,6 +32,7 @@ with patch("pathlib.Path.read_text", return_value=mock_env_data):
 """Scenario 1: GBT_TX incoming message. Clean run, no failure cases."""
 #=====================================================================
 
+@patch("ngRadar_Website.management.commands.vlba_sim.create_file")
 @patch("ngRadar_Website.management.commands.vlba_sim.Path")
 @patch("ngRadar_Website.management.commands.vlba_sim.send_kafka_message")
 @patch("ngRadar_Website.management.commands.vlba_sim.record_transfer_event")
@@ -45,6 +46,7 @@ def test_process_msg_GBT_TX(
         mock_record_transfer_event,
         mock_send_kafka_message,
         mock_Path,
+        mock_create
 ):
     msg = MagicMock()
     msg.value.return_value = b'{"value"}'
@@ -72,10 +74,27 @@ def test_process_msg_GBT_TX(
     process_msg(msg, producer_topic, producer_config)
 
     assert mock_uuid.call_count == 1
-    assert mock_Thread.call_count == 1
+    mock_Thread.assert_called_once_with(target=mock_create, args=(mock_frame_path,), daemon=True)
     mock_watch_for_file.assert_called_once_with(mock_frame_path)
-    assert mock_record_transfer_event.call_count == 1
-    assert mock_send_kafka_message.call_count == 1
+    mock_record_transfer_event.assert_called_once_with(
+                    transfer_uuid="12345",
+                    gbt_uuid='{"value"}',
+                    station=Stations.HN,
+                    status=Status.READY,
+                    num_bytes=500,
+                    message="Hancock VLBA data file complete. Ready for e-transfer.",
+                )
+    mock_send_kafka_message.assert_called_once_with(
+                    key = f"{Message.VLBA_REQUEST_STORAGE}",
+                    producer_topic=producer_topic,
+                    producer_config=producer_config,
+                    transfer_uuid="12345",
+                    gbt_uuid='{"value"}',
+                    status=Status.READY,
+                    num_bytes=500,
+                    filename=mock_frame_path.name,
+                    message=1,
+                )
 
 #=====================================================================
 
@@ -83,6 +102,7 @@ def test_process_msg_GBT_TX(
 """Scenario 2: GBT_TX incoming message. Generated file does not exist FAILED case."""
 #=====================================================================
 
+@patch("ngRadar_Website.management.commands.vlba_sim.create_file")
 @patch("ngRadar_Website.management.commands.vlba_sim.Path")
 @patch("ngRadar_Website.management.commands.vlba_sim.send_kafka_message")
 @patch("ngRadar_Website.management.commands.vlba_sim.record_transfer_event")
@@ -96,6 +116,7 @@ def test_process_msg_GBT_TX_FAILED(
         mock_record_transfer_event,
         mock_send_kafka_message,
         mock_Path,
+        mock_create,
 ):
     msg = MagicMock()
     msg.value.return_value = b'{"value"}'
@@ -122,11 +143,20 @@ def test_process_msg_GBT_TX_FAILED(
     process_msg(msg, producer_topic, producer_config)
 
     assert mock_uuid.call_count == 1
-    assert mock_Thread.call_count == 1
+    mock_Thread.assert_called_once_with(target=mock_create, args=(mock_frame_path,), daemon=True)
     mock_watch_for_file.assert_called_once_with(mock_frame_path)
     assert mock_record_transfer_event.call_count == 0
-    assert mock_send_kafka_message.call_count == 1
-
+    mock_send_kafka_message.assert_called_once_with(
+                    key = f"{Message.VLBA_REQUEST_STORAGE}",
+                    producer_topic=producer_topic,
+                    producer_config=producer_config,
+                    transfer_uuid="12345",
+                    gbt_uuid='{"value"}',
+                    status=Status.FAILED,
+                    num_bytes=0,
+                    filename=mock_frame_path.name,
+                    message="Source file does not exist",
+                )
 #=====================================================================
 
 
@@ -172,16 +202,25 @@ def test_process_msg_DSOC_RESPOND_STORAGE(
     process_msg(msg, producer_topic, producer_config)
 
     assert mock_json.call_count == 1
-
     mock_record_transfer_event.assert_called_once_with(
-        transfer_uuid=str(transfer_uuid),
-        gbt_uuid=str(gbt_uuid),
-        station=Stations.HN,
-        status=Status.TRANSFERRING,
-        num_bytes=mock_payload["num_bytes"],
-        message="Hancock VLBA e-transfer in progress"
-    )
-    assert mock_send_kafka_message.call_count == 1
+                    transfer_uuid=str(transfer_uuid),
+                    gbt_uuid=str(gbt_uuid),
+                    station=Stations.HN,
+                    status=Status.TRANSFERRING,
+                    num_bytes=mock_payload["num_bytes"],
+                    message="Hancock VLBA e-transfer in progress"
+                )
+    mock_send_kafka_message.assert_called_once_with(
+                    key = f"{Message.VLBA_TRANSFERRING}",
+                    producer_topic=producer_topic,
+                    producer_config=producer_config,
+                    transfer_uuid="11111111-1111-1111-1111-111111111111",
+                    gbt_uuid="22222222-2222-2222-2222-222222222222",
+                    status=Status.TRANSFERRING,
+                    num_bytes=2048,
+                    filename="fake_filename.png",
+                    message="Hancock VLBA has started to send the data file to DSOC via e-transfer",
+                )    
     mock_etc_send.assert_called_once_with(Path("/raw_data/11111111-1111-1111-1111-111111111111.bin"))
 
 #=====================================================================
@@ -238,16 +277,11 @@ def test_process_msg_DSOC_RESPOND_STORAGE_CalledProcessError(
     result = process_msg(msg, producer_topic, producer_config)
 
     assert result is False
-
     assert mock_json.call_count == 1
-
     assert mock_etc_send.call_count == MAX_RESUME_ATTEMPTS
-
     assert mock_send_kafka_message.call_count == MAX_RESUME_ATTEMPTS
     mock_etc_send.assert_called_with(Path("/raw_data/11111111-1111-1111-1111-111111111111.bin"))
-
     assert mock_wait_for_etd.call_count == MAX_RESUME_ATTEMPTS - 1
-
     assert mock_record_transfer_event.call_count == MAX_RESUME_ATTEMPTS * 2
     mock_record_transfer_event.assert_has_calls(
         [
@@ -322,8 +356,17 @@ def test_process_msg_DSOC_RESPOND_STORAGE_OSError(
 
     assert mock_json.call_count == 1
     assert mock_record_transfer_event.call_count == 2
-
-    assert mock_send_kafka_message.call_count == 1
+    mock_send_kafka_message.assert_called_once_with(
+                    key = f"{Message.VLBA_TRANSFERRING}",
+                    producer_topic=producer_topic,
+                    producer_config=producer_config,
+                    transfer_uuid="11111111-1111-1111-1111-111111111111",
+                    gbt_uuid="22222222-2222-2222-2222-222222222222",
+                    status=Status.TRANSFERRING,
+                    num_bytes=2048,
+                    filename="fake_filename.png",
+                    message="Hancock VLBA has started to send the data file to DSOC via e-transfer",
+                )     
     mock_etc_send.assert_called_once_with(Path("/raw_data/11111111-1111-1111-1111-111111111111.bin"))
 
 #=====================================================================
@@ -375,8 +418,18 @@ def test_process_msg_DSOC_RESPOND_STORAGE_No(
 
     assert mock_json.call_count == 1
     assert mock_record_transfer_event.call_count == 0
-    assert mock_sleep.call_count == 1
-    assert mock_send_kafka_message.call_count == 1
+    mock_sleep.assert_called_once_with(5)
+    mock_send_kafka_message.assert_called_once_with(
+                    key = f"{Message.VLBA_REQUEST_STORAGE}",
+                    producer_topic=producer_topic,
+                    producer_config=producer_config,
+                    transfer_uuid="11111111-1111-1111-1111-111111111111",
+                    gbt_uuid="22222222-2222-2222-2222-222222222222",
+                    status=Status.READY,
+                    num_bytes=2048,
+                    filename="fake_filename.png",
+                    message=1,
+                )      
     assert mock_etc_send.call_count == 0
 
 #=====================================================================
@@ -418,5 +471,46 @@ def test_process_msg_VLBA_DELETE(
     assert mock_send_kafka_message.call_count == 0
     assert mock_etc_send.call_count == 0
     mock_delete_observation_data.assert_called_once_with("fake_filename.png")
+
+#=====================================================================
+
+
+"""Scenario 8: Incoming message has invalid value."""
+#=====================================================================
+
+@patch("ngRadar_Website.management.commands.vlba_sim.etc_send")
+@patch("ngRadar_Website.management.commands.vlba_sim.send_kafka_message")
+@patch("ngRadar_Website.management.commands.vlba_sim.record_transfer_event")
+@patch("ngRadar_Website.management.commands.vlba_sim.json.loads")
+def test_process_msg_VLBA_invalid(
+        mock_json,
+        mock_record_transfer_event,
+        mock_send_kafka_message,
+        mock_etc_send,
+        capsys
+):
+    msg = MagicMock()
+    msg.value.return_value = b'{"value"}'
+    msg.key.return_value = b'6'
+
+    producer_topic = MagicMock()
+    producer_config = MagicMock()
+
+    #The fake output of the json.loads() function:
+    mock_payload = {
+        "filename": str("fake_filename.png"),
+    }
+
+    mock_json.return_value = mock_payload
+
+    process_msg(msg, producer_topic, producer_config)
+
+    captured=capsys.readouterr()
+
+    assert mock_json.call_count == 0
+    assert mock_record_transfer_event.call_count == 0 # making sure this never gets hit during logic.
+    assert mock_send_kafka_message.call_count == 0
+    assert mock_etc_send.call_count == 0
+    assert captured.out.strip() == "NOT A VALID KAFKA MESSAGE VALUE!"
 
 #=====================================================================
