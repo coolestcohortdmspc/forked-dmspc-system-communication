@@ -223,7 +223,7 @@ def consume(topic, config, process_msg, producer_topic=None, producer_config=Non
     except Exception as e:
         publish_status_obsEvents(
             status=Status.FAILED,
-            msg="Failed to connect to Kafka.",
+            msg="Failed to connect to Kafka!",
         )
         raise
 

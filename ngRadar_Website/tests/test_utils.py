@@ -10,6 +10,7 @@ from botocore.exceptions import (
     ConnectionError,
     ClientError,
 )
+from confluent_kafka import KafkaError
 
 # ===============================================
 # Here we can test all of our utility functions
@@ -293,8 +294,9 @@ def test_bootstrap_none(mock_os_getenv, mock_config_func, mock_load_dotenv):
 # ==============================================================================
 
 @patch("ngRadar_Website.utils.Consumer")
-def test_consume(mock_Consumer):
-    """Scenario 1: msg is Not None and error is None"""
+@patch("ngRadar_Website.utils.publish_status_obsEvents")
+def test_consume_exception(mock_publish, mock_Consumer):
+    """Scenario 1: msg is Not None and error is None on FIRST loop, breaks out with exception on SECOND loop"""
 
     # mock the results of the Consumer and subscribe calls:
     mock_consumer = mock_Consumer.return_value
@@ -318,7 +320,99 @@ def test_consume(mock_Consumer):
     mock_Consumer.assert_called_once_with("config")
     mock_consumer.subscribe.assert_called_once_with("topic")
     mock_process_msg.assert_called_once_with(mock_msg, None, None)
+    mock_publish.assert_called_once_with(
+            status=Status.FAILED,
+            msg="Failed to connect to Kafka!",
+        )
 
+@patch("ngRadar_Website.utils.Consumer")
+@patch("ngRadar_Website.utils.publish_status_obsEvents")
+def test_consume_error(mock_publish, mock_Consumer):
+    """Scenario 2: msg is Not None and error is Not None"""
+
+    # mock the results of the Consumer and subscribe calls:
+    mock_consumer = mock_Consumer.return_value
+    mock_consumer.subscribe.return_value = None
+
+    mock_process_msg = MagicMock()
+
+    # make a fake message returned from polling:
+    mock_msg = MagicMock()
+    mock_msg.error.return_value = "fake_error"
+
+    #call the function to use our fake values:
+    consume("topic", "config", mock_process_msg)
+
+    mock_Consumer.assert_called_once_with("config")
+    mock_consumer.subscribe.assert_called_once_with("topic")
+    mock_process_msg.assert_not_called()
+    mock_publish.assert_called_once_with(
+            status=Status.FAILED,
+            msg="Failed to connect to Kafka.",
+        )
+
+@patch("ngRadar_Website.utils.Consumer")
+@patch("ngRadar_Website.utils.publish_status_obsEvents")
+def test_consume_manual(mock_publish, mock_Consumer):
+    """Scenario 3: Manual Commit is True"""
+
+    # mock the results of the Consumer and subscribe calls:
+    mock_consumer = mock_Consumer.return_value
+    mock_consumer.subscribe.return_value = None
+
+    mock_process_msg = MagicMock()
+
+    # make a fake message returned from polling:
+    mock_msg = MagicMock()
+    mock_msg.error.return_value = "fake_error"
+
+    mock_config = MagicMock()
+    #call the function to use our fake values:
+    consume("topic", mock_config, mock_process_msg, manual_commit=True)
+
+    mock_Consumer.assert_called_once_with({'enable.auto.commit': False})
+    mock_consumer.subscribe.assert_called_once_with("topic")
+    mock_process_msg.assert_not_called()
+    mock_publish.assert_called_once_with(
+            status=Status.FAILED,
+            msg="Failed to connect to Kafka.",
+        )
+
+@patch("ngRadar_Website.utils.Consumer")
+@patch("ngRadar_Website.utils.publish_status_obsEvents")
+def test_consume_partition_error(mock_publish, mock_Consumer, capsys):
+    """Scenario 4: msg is Not None and error is KafkaError._PARTITION_EOF"""
+
+    # mock the results of the Consumer and subscribe calls:
+    mock_consumer = mock_Consumer.return_value
+    mock_consumer.subscribe.return_value = None
+
+    mock_process_msg = MagicMock()
+
+    # make a fake message returned from polling:
+    mock_msg = MagicMock()
+    mock_error = MagicMock()
+    mock_msg.error.return_value = mock_error
+    mock_error.code.return_value = KafkaError._PARTITION_EOF
+    # Second poll raises an exception to stop the infinite loop.
+    mock_consumer.poll.side_effect = [
+        mock_msg,
+        RuntimeError("Stop Test"),
+    ]
+
+    #call the function to use our fake values:
+    with pytest.raises(RuntimeError):
+        consume("topic", "config", mock_process_msg)
+
+    captured = capsys.readouterr()
+
+    mock_Consumer.assert_called_once_with("config")
+    mock_consumer.subscribe.assert_called_once_with("topic")
+    mock_publish.assert_called_once_with(
+                    status=Status.FAILED,
+                    msg="Failed to connect to Kafka!",
+                )
+    assert captured.out.strip() == "Consumer reached partition EOF"
 
 # ==============================================================================
 # X. create_file Test
