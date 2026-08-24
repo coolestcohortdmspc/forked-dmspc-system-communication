@@ -1,12 +1,9 @@
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from ngRadar_Website.enums import Stations
-from django.utils import timezone
-from django.utils import timezone
 from ngRadar_Website.models.models import (
     gbtEvent,
     dsocEvent,
-    StatusEvent,
     StatusEvent,
     ObservatoryEvent,
 )
