@@ -198,7 +198,7 @@ def submit_waveform(request):
             uuid=uuid_input,
             selected_waveform=waveform,
             event_time=timestamp,
-            status="PROCESSING",
+            status=Status.LOCK,
         )
 
         topic, config = bootstrap(Stations.UI)
@@ -217,9 +217,20 @@ def submit_waveform(request):
 
         return JsonResponse({
             "uuid": str(uuid_input),
-            "status": "PROCESSING",
+            "status": Status.LOCK.label,
         })
 
+def submit_status(request, ui_uuid):
+    event = get_object_or_404(
+        uiEvent,
+        uuid=ui_uuid,
+    )
+
+    return JsonResponse({
+        "status": event.status,
+        "status_label": event.get_status_display(),
+        "unlocked": event.status == Status.UNLOCK,
+    })
 
 
 #====================================================

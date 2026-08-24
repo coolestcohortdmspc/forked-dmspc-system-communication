@@ -112,10 +112,13 @@ class uiEvent(models.Model):
     uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     selected_waveform = models.CharField(max_length=100)
     event_time = models.DateTimeField()
+    # what is happening in the workflow, the sequencing of events
     status = models.PositiveSmallIntegerField(
             choices=Status.choices,
         )
     message = models.TextField(blank=True, null=True, default="")
+    # vs whether the submit_waveform button should be locked based of the status
+    is_locked = models.BooleanField(default=False)
 
     def __str__(self):
         return f"UI Event: {self.selected_waveform} | {self.event_time}"

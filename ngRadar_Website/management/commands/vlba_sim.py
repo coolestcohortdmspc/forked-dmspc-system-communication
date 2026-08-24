@@ -48,6 +48,7 @@ def process_msg(msg, producer_topic, producer_config):
             num_bytes = frame_path.stat().st_size
     
             record_status_event(
+                    ui_uuid=payload["ui_uuid"],
                     transfer_uuid=transfer_uuid,
                     gbt_uuid=gbt_uuid,
                     station=Stations.HN,
@@ -93,6 +94,7 @@ def process_msg(msg, producer_topic, producer_config):
 
             try:
                 record_status_event(
+                    ui_uuid=payload["ui_uuid"],
                     transfer_uuid=payload["transfer_uuid"],
                     gbt_uuid=payload["gbt_uuid"],
                     station=Stations.HN,
@@ -120,6 +122,7 @@ def process_msg(msg, producer_topic, producer_config):
             except subprocess.CalledProcessError as exc:
                 print(f"E-transfer failed with return code: {exc.returncode}")
                 record_status_event(
+                    ui_uuid=payload["ui_uuid"],
                     transfer_uuid=payload["transfer_uuid"],
                     gbt_uuid=payload["gbt_uuid"],
                     station=Stations.HN,
@@ -132,6 +135,7 @@ def process_msg(msg, producer_topic, producer_config):
             except Exception as exc:
                 print(f"Unexpected e-transfer failure: {exc}")
                 record_status_event(
+                    ui_uuid=payload["ui_uuid"],
                     transfer_uuid=payload["transfer_uuid"],
                     gbt_uuid=payload["gbt_uuid"],
                     station=Stations.HN,

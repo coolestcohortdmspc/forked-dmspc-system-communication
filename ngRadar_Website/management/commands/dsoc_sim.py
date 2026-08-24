@@ -6,9 +6,8 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import io
-from ngRadar_Website.models.models import gbtEvent, dsocEvent, StatusEvent
+from ngRadar_Website.models.models import gbtEvent, dsocEvent, StatusEvent, uiEvent
 from ngRadar_Website.enums import Stations, Status, Message
-# from ngRadar_Website.utils import latency_calc, bootstrap, consume, create_s3_client, upload_seaweedfs, write_transfer_progress, send_kafka_message, get_folder_size
 from ngRadar_Website.utils import *
 from pathlib import Path
 import json
@@ -27,7 +26,6 @@ This code will:
 - save image file to seaweedfs object store
 - load the image key + the uuid into the DB
 """
-
 
 def DB_import(uuid):
     
@@ -198,6 +196,7 @@ def process_msg(msg, producer_topic, producer_config):
         key = f"{Message.DSOC_RESPOND_STORAGE}" #produced message will have this key no matter what the result of the below logic is
         if payload["status"] == Status.FAILED:
             record_status_event(
+                ui_uuid=payload["ui_uuid"],
                 transfer_uuid=payload["transfer_uuid"],
                 gbt_uuid=payload["gbt_uuid"],
                 station=Stations.HN,
@@ -222,6 +221,7 @@ def process_msg(msg, producer_topic, producer_config):
                     if payload["message"] == 1:
                         # The FAILED record only gets saved to the DB the first time. The payload message for any storage check retries will contain message=2 
                         record_status_event(
+                            ui_uuid=payload["ui_uuid"],
                             transfer_uuid=payload["transfer_uuid"],
                             gbt_uuid=payload["gbt_uuid"],
                             station=Stations.HN,
@@ -245,6 +245,7 @@ def process_msg(msg, producer_topic, producer_config):
             else:
                 if payload["message"] != 1:
                     record_status_event(
+                        ui_uuid=payload["ui_uuid"],
                         transfer_uuid=payload["transfer_uuid"],
                         gbt_uuid=payload["gbt_uuid"],
                         station=Stations.HN,
@@ -276,6 +277,7 @@ def process_msg(msg, producer_topic, producer_config):
             track_etransfer_progress(payload, incoming_file)
 
             record_status_event(
+                ui_uuid=payload["ui_uuid"],
                 transfer_uuid=payload["transfer_uuid"],
                 gbt_uuid=payload["gbt_uuid"],
                 station=Stations.HN,
@@ -284,6 +286,7 @@ def process_msg(msg, producer_topic, producer_config):
                 message="Hancock VLBA e-transfer complete",
             )
             record_status_event(
+                ui_uuid=payload["ui_uuid"],
                 transfer_uuid=payload["transfer_uuid"],
                 gbt_uuid=payload["gbt_uuid"],
                 station=Stations.DSOC,
@@ -304,6 +307,7 @@ def process_msg(msg, producer_topic, producer_config):
             )
         except Exception as exc:
             record_status_event(
+                ui_uuid=payload["ui_uuid"],
                 transfer_uuid=payload["transfer_uuid"],
                 gbt_uuid=payload["gbt_uuid"],
                 station=Stations.DSOC,
@@ -343,6 +347,7 @@ def process_msg(msg, producer_topic, producer_config):
 
         except Exception as exc:
             record_status_event(
+                ui_uuid=payload["ui_uuid"],
                 transfer_uuid=payload["transfer_uuid"],
                 gbt_uuid=payload["gbt_uuid"],
                 station=Stations.DSOC,
@@ -353,6 +358,7 @@ def process_msg(msg, producer_topic, producer_config):
             return
 
         record_status_event(
+            ui_uuid=payload["ui_uuid"],
             transfer_uuid=payload["transfer_uuid"],
             gbt_uuid=payload["gbt_uuid"],
             station=Stations.DSOC,
@@ -372,6 +378,11 @@ def process_msg(msg, producer_topic, producer_config):
             num_bytes=payload["num_bytes"],
             filename=payload["filename"],
             message="Processing complete. Delete your raw data.",
+        )
+
+        # and finally, the submit_waveform button on the UI can unlock
+        uiEvent.objects.filter(uuid=payload["ui_uuid"]).update(
+            status=Status.UNLOCK,
         )
         
     else:
