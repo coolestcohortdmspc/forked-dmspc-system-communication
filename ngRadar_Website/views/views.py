@@ -9,8 +9,8 @@ from django.views.decorators.http import require_POST, require_GET
 from django.http import StreamingHttpResponse, JsonResponse, HttpResponse, HttpResponseNotFound
 
 # serve_image imports
-from ngRadar_Website.utils import create_s3_client, bootstrap, write_transfer_progress #get_presigned_url
-from ngRadar_Website.enums import Stations, Message, Status
+from ngRadar_Website.utils import create_s3_client, bootstrap, write_transfer_progress # , get_presigned_url
+from ngRadar_Website.enums import Stations, Message
 
 #libraries used for lock status
 from django.core.cache import cache
@@ -20,26 +20,23 @@ from ngRadar_Website.models.models import ObservatoryEvent, uiEvent, gbtEvent, d
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout, logout
 from django.db.models import Avg
-from datetime import datetime, timezone
+from confluent_kafka import Producer
+import uuid
+import os
+import time
+from datetime import datetime, timezone 
+# from ngRadar_Website.utils import views_bootstrap
 
-from ngRadar_Website.utils import produce
-
-import json, uuid, os, time
-
-from queue import Queue, Empty
-
-button_state_change = Queue()
+# views_bootstrap()
 
 #program constants
-
-RECORDS_TO_DISPLAY=20
+RECORDS_TO_DISPLAY=30
 LAST_RECORDS = 5
 EXPIRE_TIME_SECONDS = 3600
 
 def get_obs_events():
     """Helper function to keep data uniform across view updates"""
 
-    # latest_events = ObservatoryEvent.objects.order_by("-event_time")[:RECORDS_TO_DISPLAY]
     latest_events = ObservatoryEvent.objects.order_by(
         "-event_time",
         "-uuid",
@@ -47,25 +44,23 @@ def get_obs_events():
     ui_events = uiEvent.objects.order_by("-event_time")[:LAST_RECORDS]
     gbt_events = gbtEvent.objects.order_by("-event_time")[:LAST_RECORDS]
     dsoc_events = dsocEvent.objects.order_by("-event_time")[:LAST_RECORDS]
-    latest_image_event = (
-        ObservatoryEvent.objects
-        .exclude(image_key__isnull=True)
-        .exclude(image_key="")
-        .order_by("-event_time")
-        .first()
-    )
-    latest_image_event = (
-        ObservatoryEvent.objects
-        .exclude(image_key__isnull=True)
-        .exclude(image_key="")
-        .order_by("-event_time")
-        .first()
-    )
     avg_latency = latest_events.aggregate(Avg('latency_ms'))['latency_ms__avg'] or 0
     current_waveform = ui_events.first().selected_waveform if ui_events.exists() else None
     latest_etr_events = ETransferEvent.objects.order_by("-event_time")[:RECORDS_TO_DISPLAY]
     current_transfer_uuid = latest_events.first().transfer_uuid if latest_events.exists() else None
     latest_etr_event = ETransferEvent.objects.filter(transfer_uuid=current_transfer_uuid).order_by("-event_time").first()
+    latest_image_event = (
+            ObservatoryEvent.objects
+            .exclude(image_key__isnull=True)
+            .exclude(image_key="")
+            .order_by("-event_time")
+            .first()
+        )
+
+    # More than one TRANSFERRING row for a transfer means it was interrupted and resumed.
+    transferring_count = ETransferEvent.objects.filter(
+        transfer_uuid=current_transfer_uuid, status=Status.TRANSFERRING
+    ).count()
 
     return {
         'latest_events': latest_events,
@@ -76,6 +71,7 @@ def get_obs_events():
         'avg_latency': round(avg_latency, 2),
         'current_waveform': current_waveform,
         'latest_etr_events': latest_etr_events,
+        'transfer_resumed': transferring_count > 1,
         'latest_etr_event': latest_etr_event,
         'latest_image_event': latest_image_event,
     }
@@ -89,6 +85,12 @@ def get_dsoc_events():
     return {
         'dsoc_latest_event': latest_event
     }
+
+
+# Keep as a placeholder when we develop this feature.
+# def create_observation(request):
+#     # this is the initial view to load the newObservation page
+#     return render(request, 'ngRadar_Website/newObservation.html')
 
 
 def get_Message_Latency():
@@ -144,30 +146,6 @@ def get_Message_Latency():
     yield f"data: {json.dumps(data_to_send)}\n\n"
 
 
-# def get_Message_Latency():
-#     #create empty arrays for message latency and time
-#     message_latency_arr=[]
-#     message_time_arr=[]
-#     database_events = ObservatoryEvent.objects.order_by("-event_time")
-#     latest_events = database_events[:RECORDS_TO_DISPLAY]
-
-#     for object in latest_events: #loop will
-#         unformatted_date_time = str(object.event_time)
-#         formatted_date_time = unformatted_date_time[0:10], unformatted_date_time[11:19]#format the time in the views rather than in the front end
-        
-#         # Prevent the tx off messages from being displayed since they do not have latency
-#         if(str(object.tx_waveform)!= "Tx_OFF"):
-#             message_latency_arr.append(str(round(object.latency_ms,3)))#round the latency to 3 decimal places
-#             message_time_arr.append(formatted_date_time)
-    
-#     data_to_send = {
-#         "latency_array": message_latency_arr,
-#         "time_sent_array": message_time_arr
-#     }
-#     yield f"data: {json.dumps(data_to_send)}\n\n"
-
-
-
 def latency_graphing(request):
     response = StreamingHttpResponse(
         get_Message_Latency(),
@@ -178,24 +156,30 @@ def latency_graphing(request):
 
 
 def serve_image(request, uuid):
-    event = get_object_or_404(ObservatoryEvent, uuid=uuid)
+    try:
+        event = get_object_or_404(ObservatoryEvent, uuid=uuid)
 
-    bucket = bucket = os.environ["WEED_S3_BUCKET"]
+        bucket = os.environ["WEED_S3_BUCKET"]
 
-    s3 = create_s3_client()
+        s3 = create_s3_client()
 
-    # presigned_url = get_presigned_url(s3, event)
-    # return redirect(presigned_url)
+        # presigned_url = get_presigned_url(s3, event)
+        # return redirect(presigned_url)
 
-    obj = s3.get_object(
-    Bucket=bucket,
-    Key=event.image_key,
-    )
+        obj = s3.get_object(
+        Bucket=bucket,
+        Key=event.image_key,
+        )
 
-    return HttpResponse(
-        obj["Body"].read(),
-        content_type=obj["ContentType"],
-    )
+        return HttpResponse(
+            obj["Body"].read(),
+            content_type=obj["ContentType"],
+        )
+    except:
+        publish_status_obsEvents(
+            status=Status.FAILED,
+            msg="Failed to connect to SeaweedFS.",
+        )
 
 
 
@@ -221,32 +205,13 @@ def getLockStatus(lock_time):
     return currentStatus
 
 def lock_status(request):
-
-    currentStatus = None
     lock_time = cache.get('submit_locked', None)
-    currentStatus = getLockStatus(lock_time)
-    #send intial button status
-    yield f"event: lock-status\ndata: {json.dumps(currentStatus)}\n\n"
-
-    keepConnect = True
-    while keepConnect == True:
-        try:
-            button_state_change.get(timeout=30)
-            lock_time = cache.get('submit_locked')
-            currentStatus = getLockStatus(lock_time)
-            yield f"event: lock-status\ndata: {json.dumps(currentStatus)}\n\n"
-        except Empty:
-            # Prevent timeout
-            yield ": keep-alive\n\n"
-
-def lock_status_response(request):
-    response = StreamingHttpResponse(
-        lock_status(request),
-        content_type="text/event-stream; charset=utf-8",
-        status = 200
-    )
-    response["Cache-Control"] = "no-cache"
-    return response
+    if lock_time is None:
+        return JsonResponse({"locked": False})
+    elif dsocEvent.objects.filter(event_time__gt=lock_time):
+        cache.delete('submit_locked')
+        return JsonResponse({'locked':False})
+    return JsonResponse({'locked':True})
 
 # Need a function AND another partial template for handling the user inputted payload
 def submit_waveform(request):
@@ -285,12 +250,6 @@ def submit_waveform(request):
         #     "client.id": "ui-producer"}
         # message = "User input a new waveform."
 
-        def produce(topic, config, key, value):
-            producer = Producer(config)
-            producer.produce(topic, key=key, value=value)
-            
-            producer.flush()
-
         def main():
             key = str(Message.UI_EVENT)
             value = uuid_input.hex  # Use the UUID as the value for the Kafka message
@@ -301,7 +260,6 @@ def submit_waveform(request):
         # add a cache for submit time
         cache.set('submit_locked', datetime.now(timezone.utc))
     return redirect('home')
-
 
 #====================================================
 # Render the templates
@@ -353,7 +311,6 @@ def logout_view(request):
 def home_view(request):
 
     response = render(request, "ngRadar_Website/home.html", get_obs_events())
-    #Need to add cache control modifiers here
     return response
 
 
@@ -362,7 +319,6 @@ def home_view(request):
 def dashboard_view(request):
 
     response = render(request, "ngRadar_Website/dashboard.html", get_obs_events())
-    #Need to add cache control modifiers here
     return response
 
 
@@ -395,7 +351,6 @@ def dsoc_event_partial(request):
         request,
         "ngRadar_Website/partials/dsoc_home_partial.html",
         get_obs_events(),
-        get_dsoc_events(),
     )
 
 

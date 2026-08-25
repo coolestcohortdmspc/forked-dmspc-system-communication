@@ -40,7 +40,11 @@
             const data = JSON.parse(event.data);
             const submitBTN = document.getElementById('waveform-submit-btn');
             submitBTN.disabled = data.locked;
-            if (data.locked){
+            if (data.error) {
+                        btn.disabled = true;
+                        btn.textContent = "Error locking button";
+            }
+            else if (data.locked){
                 submitBTN.textContent = "Generating ..."
             }
             else{
