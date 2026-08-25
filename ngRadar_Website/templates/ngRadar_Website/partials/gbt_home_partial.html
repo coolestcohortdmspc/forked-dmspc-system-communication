@@ -33,24 +33,28 @@
 
 <!--Script to disable button and change the context in button-->
 <script>
-    function checkLock(){
-        fetch('/home/lock-status/')
-                .then(response => response.json())
-                .then(data =>{
-                    var btn = document.getElementById('waveform-submit-btn');
-                    btn.disabled = data.locked;
-                    if (data.locked){
-                        btn.textContent = "Generating ..."
-                    }
-                    else{
-                        btn.textContent = "Submit"
-                    }
-
-                })  
+    function checkLockSSE()
+    {
+        const eventSource = new EventSource('/home/lock-status/')
+        eventSource.addEventListener('lock-status',function(event){
+            const data = JSON.parse(event.data);
+            const submitBTN = document.getElementById('waveform-submit-btn');
+            submitBTN.disabled = data.locked;
+            if (data.locked){
+                submitBTN.textContent = "Generating ..."
+            }
+            else{
+                submitBTN.textContent = "Submit"
+            }
+        });
+        eventSource.onerror = () => {
+            eventSource.close()
+        }
     }
-
-    checkLock();
-    setInterval(checkLock, 15000);
+    window.addEventListener('beforeunload',() => {
+        if(eventSource) eventSource.close();
+    });
+    checkLockSSE();
 </script>
 
 

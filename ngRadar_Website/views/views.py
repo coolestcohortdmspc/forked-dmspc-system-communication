@@ -6,29 +6,29 @@ from django.views.decorators.cache import cache_control
 from django.views.decorators.http import require_POST, require_GET
 
 #libraries used for data streaming
-import json
 from django.http import StreamingHttpResponse, JsonResponse, HttpResponse, HttpResponseNotFound
 
 # serve_image imports
-from ngRadar_Website.utils import create_s3_client, bootstrap, write_transfer_progress # , get_presigned_url
-from ngRadar_Website.enums import Stations, Message
+from ngRadar_Website.utils import create_s3_client, bootstrap, write_transfer_progress #get_presigned_url
+from ngRadar_Website.enums import Stations, Message, Status
 
 #libraries used for lock status
 from django.core.cache import cache
 
-from ngRadar_Website.models.models import ObservatoryEvent, uiEvent, gbtEvent, dsocEvent, ETransferEvent  # , ngrok_endpoint
-from ngRadar_Website.models.models import ObservatoryEvent, uiEvent, gbtEvent, dsocEvent, ETransferEvent  # , ngrok_endpoint
+from ngRadar_Website.models.models import ObservatoryEvent, uiEvent, gbtEvent, dsocEvent, ETransferEvent
+from ngRadar_Website.models.models import ObservatoryEvent, uiEvent, gbtEvent, dsocEvent, ETransferEvent
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout, logout
 from django.db.models import Avg
-from confluent_kafka import Producer
-import uuid
-import os
-import time
-from datetime import datetime, timezone 
-# from ngRadar_Website.utils import views_bootstrap
+from datetime import datetime, timezone
 
-# views_bootstrap()
+from ngRadar_Website.utils import produce
+
+import json, uuid, os, time
+
+from queue import Queue, Empty
+
+button_state_change = Queue()
 
 #program constants
 
@@ -89,12 +89,6 @@ def get_dsoc_events():
     return {
         'dsoc_latest_event': latest_event
     }
-
-
-# Keep as a placeholder when we develop this feature.
-# def create_observation(request):
-#     # this is the initial view to load the newObservation page
-#     return render(request, 'ngRadar_Website/newObservation.html')
 
 
 def get_Message_Latency():
@@ -207,16 +201,52 @@ def serve_image(request, uuid):
 
 
 # Function for lock down user
-# Return True if event time is greater than lock time 
-# Othere wise False  
-def lock_status(request):
-    lock_time = cache.get('submit_locked', None)
+def getLockStatus(lock_time):
     if lock_time is None:
-        return JsonResponse({"locked": False})
-    elif dsocEvent.objects.filter(event_time__gt=lock_time):
+            currentStatus = None
+            eTransfer_object = dsocEvent.objects.order_by("-event_time").last()
+            #check if object exists
+            if eTransfer_object:
+                eTransfer_Status = eTransfer_object.status
+                print(eTransfer_Status)
+                if eTransfer_Status == Status.COMPLETED:
+                    currentStatus = {'locked':False}
+                else:
+                    currentStatus = {'locked':True}
+    elif dsocEvent.objects.filter(event_time__gt=lock_time).exists():
         cache.delete('submit_locked')
-        return JsonResponse({'locked':False})
-    return JsonResponse({'locked':True})
+        currentStatus = {'locked':False}
+    else:
+        currentStatus = {'locked':True}
+    return currentStatus
+
+def lock_status(request):
+
+    currentStatus = None
+    lock_time = cache.get('submit_locked', None)
+    currentStatus = getLockStatus(lock_time)
+    #send intial button status
+    yield f"event: lock-status\ndata: {json.dumps(currentStatus)}\n\n"
+
+    keepConnect = True
+    while keepConnect == True:
+        try:
+            button_state_change.get(timeout=30)
+            lock_time = cache.get('submit_locked')
+            currentStatus = getLockStatus(lock_time)
+            yield f"event: lock-status\ndata: {json.dumps(currentStatus)}\n\n"
+        except Empty:
+            # Prevent timeout
+            yield ": keep-alive\n\n"
+
+def lock_status_response(request):
+    response = StreamingHttpResponse(
+        lock_status(request),
+        content_type="text/event-stream; charset=utf-8",
+        status = 200
+    )
+    response["Cache-Control"] = "no-cache"
+    return response
 
 # Need a function AND another partial template for handling the user inputted payload
 def submit_waveform(request):
