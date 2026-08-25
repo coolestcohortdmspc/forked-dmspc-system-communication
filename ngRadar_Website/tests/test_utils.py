@@ -10,6 +10,7 @@ from botocore.exceptions import (
     ConnectionError,
     ClientError,
 )
+from confluent_kafka import KafkaError
 
 # ===============================================
 # Here we can test all of our utility functions
@@ -38,6 +39,8 @@ with patch("pathlib.Path.read_text", return_value=mock_env_data):
         send_kafka_message,
         get_folder_size,
         write_transfer_progress,
+        publish_status_obsEvents,
+        upload_seaweedfs,
 
     )
 
@@ -118,13 +121,14 @@ def test_config_func_GBT():
     assert producer_config == {
             "bootstrap.servers": bootstrap,
             "message.max.bytes": 8388608,
+            "message.timeout.ms": 2000,
             "client.id": "gbt-producer"
         }
     assert consumer_topic == ["user_input"]
     assert consumer_config == {
             "bootstrap.servers": bootstrap,
             "fetch.max.bytes": 8388608,
-            "session.timeout.ms": 45000,
+            "session.timeout.ms": 10000,
             "client.id": "gbt-consumer",
             "group.id": "gbt-consumer-group",
             "auto.offset.reset": "earliest",
@@ -148,13 +152,14 @@ def test_config_func_VLBA():
     assert producer_config == {
             "bootstrap.servers": bootstrap,
             "message.max.bytes": 8388608,
+            "message.timeout.ms": 2000,
             "client.id": f"{sim.name.lower()}-producer"
         }
     assert consumer_topic == ["GBT_data", "DSOC_notif"]
     assert consumer_config == {
             "bootstrap.servers": bootstrap,
             "fetch.max.bytes": 8388608,
-            "session.timeout.ms": 45000,
+            "session.timeout.ms": 10000,
             "client.id": f"{sim.name.lower()}-consumer",
             "group.id": f"{sim.name.lower()}-consumer-group",
             "auto.offset.reset": "earliest",
@@ -174,13 +179,15 @@ def test_config_func_DSOC():
     assert producer_config == {
             "bootstrap.servers": bootstrap,
             "message.max.bytes": 8388608,
+            "message.timeout.ms": 2000,
             "client.id": f"{sim.name.lower()}-producer"
         }
     assert consumer_topic == ["VLBA_notif"]
     assert consumer_config == {
             "bootstrap.servers": bootstrap,
             "fetch.max.bytes": 8388608,
-            "session.timeout.ms": 45000,
+            # "session.timeout.ms": 45000,
+            "session.timeout.ms": 10000,
             "client.id": f"{sim.name.lower()}-consumer",
             "group.id": f"{sim.name.lower()}-consumer-group",
             "auto.offset.reset": "earliest",
@@ -199,6 +206,7 @@ def test_config_func_UI():
     assert config == {
             "bootstrap.servers": bootstrap,
             "message.max.bytes": 8388608,
+            "message.timeout.ms": 2000,
             "client.id": f"{sim.name.lower()}-producer",
         }
 
@@ -286,8 +294,9 @@ def test_bootstrap_none(mock_os_getenv, mock_config_func, mock_load_dotenv):
 # ==============================================================================
 
 @patch("ngRadar_Website.utils.Consumer")
-def test_consume(mock_Consumer):
-    """Scenario 1: msg is Not None and error is None"""
+@patch("ngRadar_Website.utils.publish_status_obsEvents")
+def test_consume_exception(mock_publish, mock_Consumer):
+    """Scenario 1: msg is Not None and error is None on FIRST loop, breaks out with exception on SECOND loop"""
 
     # mock the results of the Consumer and subscribe calls:
     mock_consumer = mock_Consumer.return_value
@@ -311,7 +320,99 @@ def test_consume(mock_Consumer):
     mock_Consumer.assert_called_once_with("config")
     mock_consumer.subscribe.assert_called_once_with("topic")
     mock_process_msg.assert_called_once_with(mock_msg, None, None)
+    mock_publish.assert_called_once_with(
+            status=Status.FAILED,
+            msg="Failed to connect to Kafka!",
+        )
 
+@patch("ngRadar_Website.utils.Consumer")
+@patch("ngRadar_Website.utils.publish_status_obsEvents")
+def test_consume_error(mock_publish, mock_Consumer):
+    """Scenario 2: msg is Not None and error is Not None"""
+
+    # mock the results of the Consumer and subscribe calls:
+    mock_consumer = mock_Consumer.return_value
+    mock_consumer.subscribe.return_value = None
+
+    mock_process_msg = MagicMock()
+
+    # make a fake message returned from polling:
+    mock_msg = MagicMock()
+    mock_msg.error.return_value = "fake_error"
+
+    #call the function to use our fake values:
+    consume("topic", "config", mock_process_msg)
+
+    mock_Consumer.assert_called_once_with("config")
+    mock_consumer.subscribe.assert_called_once_with("topic")
+    mock_process_msg.assert_not_called()
+    mock_publish.assert_called_once_with(
+            status=Status.FAILED,
+            msg="Failed to connect to Kafka.",
+        )
+
+@patch("ngRadar_Website.utils.Consumer")
+@patch("ngRadar_Website.utils.publish_status_obsEvents")
+def test_consume_manual(mock_publish, mock_Consumer):
+    """Scenario 3: Manual Commit is True"""
+
+    # mock the results of the Consumer and subscribe calls:
+    mock_consumer = mock_Consumer.return_value
+    mock_consumer.subscribe.return_value = None
+
+    mock_process_msg = MagicMock()
+
+    # make a fake message returned from polling:
+    mock_msg = MagicMock()
+    mock_msg.error.return_value = "fake_error"
+
+    mock_config = MagicMock()
+    #call the function to use our fake values:
+    consume("topic", mock_config, mock_process_msg, manual_commit=True)
+
+    mock_Consumer.assert_called_once_with({'enable.auto.commit': False})
+    mock_consumer.subscribe.assert_called_once_with("topic")
+    mock_process_msg.assert_not_called()
+    mock_publish.assert_called_once_with(
+            status=Status.FAILED,
+            msg="Failed to connect to Kafka.",
+        )
+
+@patch("ngRadar_Website.utils.Consumer")
+@patch("ngRadar_Website.utils.publish_status_obsEvents")
+def test_consume_partition_error(mock_publish, mock_Consumer, capsys):
+    """Scenario 4: msg is Not None and error is KafkaError._PARTITION_EOF"""
+
+    # mock the results of the Consumer and subscribe calls:
+    mock_consumer = mock_Consumer.return_value
+    mock_consumer.subscribe.return_value = None
+
+    mock_process_msg = MagicMock()
+
+    # make a fake message returned from polling:
+    mock_msg = MagicMock()
+    mock_error = MagicMock()
+    mock_msg.error.return_value = mock_error
+    mock_error.code.return_value = KafkaError._PARTITION_EOF
+    # Second poll raises an exception to stop the infinite loop.
+    mock_consumer.poll.side_effect = [
+        mock_msg,
+        RuntimeError("Stop Test"),
+    ]
+
+    #call the function to use our fake values:
+    with pytest.raises(RuntimeError):
+        consume("topic", "config", mock_process_msg)
+
+    captured = capsys.readouterr()
+
+    mock_Consumer.assert_called_once_with("config")
+    mock_consumer.subscribe.assert_called_once_with("topic")
+    mock_publish.assert_called_once_with(
+                    status=Status.FAILED,
+                    msg="Failed to connect to Kafka!",
+                )
+    assert captured.out.strip() == "Consumer reached partition EOF"
 
 # ==============================================================================
 # X. create_file Test
@@ -401,7 +502,8 @@ def test_create_s3_client_success(mock_Config, mock_ensure_bucket, mock_boto3):
 @patch("ngRadar_Website.utils.time.sleep")
 @patch("ngRadar_Website.utils.ensure_bucket_exists")
 @patch("ngRadar_Website.utils.Config")
-def test_create_s3_client_connection_error(mock_Config, mock_ensure_bucket, mock_sleep, mock_boto3):
+@patch("ngRadar_Website.utils.publish_status_obsEvents")
+def test_create_s3_client_connection_error(mock_publish, mock_Config, mock_ensure_bucket, mock_sleep, mock_boto3):
     """Scenario 2: connection error"""
     mock_s3 = MagicMock()
     mock_boto3.return_value = mock_s3
@@ -412,12 +514,14 @@ def test_create_s3_client_connection_error(mock_Config, mock_ensure_bucket, mock
     config_value = "fake_config"
     mock_Config.return_value = config_value
 
+    mock_publish.return_value = None
+
     mock_sleep.return_value = None
 
     with pytest.raises(RuntimeError) as exc_info:
         s3_client = create_s3_client()
 
-    assert mock_sleep.call_count == 30
+    assert mock_sleep.call_count == 3
     mock_boto3.assert_called_once_with(
         "s3",
         endpoint_url="fake_endpoint",
@@ -427,9 +531,60 @@ def test_create_s3_client_connection_error(mock_Config, mock_ensure_bucket, mock
                 config=config_value
     )
     mock_ensure_bucket.assert_not_called()
-    assert mock_s3.list_buckets.call_count == 30
+    assert mock_s3.list_buckets.call_count == 3
 
-#NOTE: needs one more scenario for client error
+    #just testing the first two calls:
+    first = mock_publish.call_args_list[0]
+    second = mock_publish.call_args_list[1]
+    assert mock_publish.call_count == 3
+    assert first.kwargs == {
+        "status": Status.POLLING,
+        "msg": f"Waiting for SeaweedFS... ({0 + 1}/3)",
+    }
+    assert second.kwargs == {
+            "status": Status.POLLING,
+            "msg": f"Waiting for SeaweedFS... ({1 + 1}/3)",
+        }
+
+
+@patch.dict(
+    "os.environ",
+    {
+        "WEED_S3_ENDPOINT": "fake_endpoint",
+        "WEED_S3_ACCESS_KEY": "fake_key",
+        "WEED_S3_SECRET_KEY": "fake_secret"
+    },
+)
+@patch("ngRadar_Website.utils.boto3.client")
+@patch("ngRadar_Website.utils.ensure_bucket_exists")
+@patch("ngRadar_Website.utils.Config")
+def test_create_s3_client_client_error(mock_Config, mock_ensure_bucket, mock_boto3):
+    """Scenario 3: client error"""
+    mock_s3 = MagicMock()
+    mock_boto3.return_value = mock_s3
+    mock_error = MagicMock()
+    mock_name = MagicMock()
+    mock_s3.list_buckets.side_effect = ClientError(error_response=mock_error, operation_name=mock_name)
+
+    mock_ensure_bucket.return_value = None
+
+    config_value = "fake_config"
+    mock_Config.return_value = config_value
+
+   
+    s3_client = create_s3_client()
+
+    assert s3_client == mock_s3
+    mock_boto3.assert_called_once_with(
+        "s3",
+        endpoint_url="fake_endpoint",
+        aws_access_key_id="fake_key",
+        aws_secret_access_key="fake_secret",
+        region_name="us-east-1",
+                config=config_value
+    )
+    mock_ensure_bucket.assert_called_once_with(mock_s3)
+    assert mock_s3.list_buckets.call_count == 1
 
 
 # ==============================================================================
@@ -530,7 +685,7 @@ def test_etc_send(mock_parse, mock_os_read, mock_select, mock_os_close, mock_pop
     mock_uuid.assert_called_once()
     mock_os_open.assert_called_once()
     mock_popen.assert_called_once_with(
-        ["etc", str(mock_frame_path), os.environ["ETD_DESTINATION"],],
+        ["etc", str(mock_frame_path), os.environ["ETD_DESTINATION"], "--resume",],
         stdin=mock_slave,
         stdout=mock_slave,
         stderr=mock_slave,
@@ -576,18 +731,89 @@ def test_watch_for_file(mock_sleep, mock_subprocess):
 
 @patch("ngRadar_Website.utils.Producer")
 def test_produce(mock_Producer):
+    """Scenario 1: No errors"""
     topic = "topic"
     config = "config"
     key = "key"
     value = "value"
     
     mock_producer = mock_Producer.return_value
+    mock_producer.flush.return_value = 0
 
-    produce(topic, config, key, value)
+    result = produce(topic, config, key, value)
 
+    assert result == True
     mock_Producer.assert_called_once_with(config)
-    mock_producer.produce.assert_called_once_with(topic, key=key, value=value)
-    mock_producer.flush.assert_called_once()
+    mock_producer.produce.assert_called_once_with(topic, key=key, value=value, callback=mock_producer.produce.call_args.kwargs["callback"])
+    mock_producer.flush.assert_called_once_with(2)
+
+@patch("ngRadar_Website.utils.Producer")
+@patch("ngRadar_Website.utils.publish_status_obsEvents")
+def test_produce_delivery_error(mock_publish, mock_Producer):
+    """Scenario 2: Delivery error"""
+    topic = "topic"
+    config = "config"
+    key = "key"
+    value = "value"
+    
+    mock_producer = mock_Producer.return_value
+    mock_producer.flush.return_value = 0
+
+    #defining this inside a function to handle the nonlocal command:
+    def produce_side_effect(topic, key, value, callback):
+        callback("Delivery failed", None)
+
+    mock_producer.produce.side_effect = produce_side_effect
+
+    result = produce(topic, config, key, value)
+
+    assert result == False
+    mock_Producer.assert_called_once_with(config)
+    mock_producer.produce.assert_called_once_with(topic, key=key, value=value, callback=mock_producer.produce.call_args.kwargs["callback"])
+    mock_producer.flush.assert_called_once_with(2)
+    mock_publish.assert_called_once_with(status=Status.FAILED, msg="Delivery failed")
+
+@patch("ngRadar_Website.utils.Producer")
+@patch("ngRadar_Website.utils.publish_status_obsEvents")
+def test_produce_delivery_flush_error(mock_publish, mock_Producer):
+    """Scenario 3: Flush error"""
+    topic = "topic"
+    config = "config"
+    key = "key"
+    value = "value"
+    
+    mock_producer = mock_Producer.return_value
+    mock_producer.flush.return_value = 1
+
+    result = produce(topic, config, key, value)
+
+    assert result == False
+    mock_Producer.assert_called_once_with(config)
+    mock_producer.produce.assert_called_once_with(topic, key=key, value=value, callback=mock_producer.produce.call_args.kwargs["callback"])
+    mock_producer.flush.assert_called_once_with(2)
+    mock_publish.assert_called_once_with(status=Status.FAILED, msg="Kafka broker did not respond.")
+
+@patch("ngRadar_Website.utils.Producer")
+@patch("ngRadar_Website.utils.publish_status_obsEvents")
+def test_produce_delivery_exception(mock_publish, mock_Producer):
+    """Scenario 4: Exception raised"""
+    topic = "topic"
+    config = "config"
+    key = "key"
+    value = "value"
+    
+    mock_producer = mock_Producer.return_value
+    mock_producer.flush.return_value = 1
+
+    mock_producer.produce.side_effect = Exception("Kafka Exception")
+
+    result = produce(topic, config, key, value)
+
+    assert result == False
+    mock_Producer.assert_called_once_with(config)
+    mock_producer.produce.assert_called_once_with(topic, key=key, value=value, callback=mock_producer.produce.call_args.kwargs["callback"])
+    mock_producer.flush.assert_not_called()
+    mock_publish.assert_called_once_with(status=Status.FAILED, msg="Failed to send Kafka message: Kafka Exception")
 
 
 # ==============================================================================
@@ -759,3 +985,57 @@ def test_write_transfer_progress(
         "/service/mock_assets/progress.json.tmp",
         "/service/mock_assets/progress.json"
     )
+
+
+# ==============================================================================
+# 11. publish_status_obsEvents Test
+# ==============================================================================
+
+@patch("ngRadar_Website.utils.datetime")
+@patch("ngRadar_Website.utils.ObservatoryEvent")
+def test_publish_status_obsEvents(mock_obs_event, mock_datetime):
+    """Scenario 1: no errors"""
+    status="fake_status"
+    msg="fake_msg"
+
+    fake_datetime = MagicMock()
+    mock_datetime.now.return_value = fake_datetime
+
+    publish_status_obsEvents(status, msg)
+
+    mock_datetime.now.assert_called_once_with(timezone.utc)
+    mock_obs_event.objects.create.assert_called_once_with(object_id = 30104,
+                                                          target = "Moretus",
+                                                          rcvr_station = Stations.HN,
+                                                          xmit_station = Stations.GBT,
+                                                          event_time=fake_datetime, 
+                                                          latency_ms=0.00, 
+                                                          status=status, 
+                                                          message=msg)
+
+@patch("ngRadar_Website.utils.datetime")
+@patch("ngRadar_Website.utils.ObservatoryEvent")
+def test_publish_status_obsEvents_error(mock_obs_event, mock_datetime, capsys):
+    """Scenario 2: database error"""
+    status="fake_status"
+    msg="fake_msg"
+
+    fake_datetime = MagicMock()
+    mock_datetime.now.return_value = fake_datetime
+
+    mock_obs_event.objects.create.side_effect = Exception("Database error")
+
+    publish_status_obsEvents(status, msg)
+
+    captured=capsys.readouterr()
+
+    mock_datetime.now.assert_called_once_with(timezone.utc)
+    mock_obs_event.objects.create.assert_called_once_with(object_id = 30104,
+                                                          target = "Moretus",
+                                                          rcvr_station = Stations.HN,
+                                                          xmit_station = Stations.GBT,
+                                                          event_time=fake_datetime, 
+                                                          latency_ms=0.00, 
+                                                          status=status, 
+                                                          message=msg)
+    assert captured.out.strip() == "Database error: Database error"

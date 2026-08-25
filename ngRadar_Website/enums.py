@@ -25,7 +25,9 @@ class Status(models.IntegerChoices):
     TRANSFERRED = 6, "Transferred"      # This status would be used when the e-transfer has completed from etc -> etd successfully, will be the status sent by kafka to DSOC to begin DSOC workflow.
     FAILED = 7, "Failed"        
     COMPLETED = 8, "Completed"          # This status would be used when the e-transfer has completed successfully and the data has been verified, processed, and stored appropriately.
-    SUBMIT_WAVEFORM = 9, "Submit Waveform"  # Status for UI to send a new waveform to GBT to kick off sequencing
+    POLLING = 9, "Polling SeaweedFS"    # Used during failure testing for transparency
+    RETRYING = 10, "Retrying storage check" # Used the first time DSOC has to retry a storage check
+    SUBMIT_WAVEFORM = 11, "Submit Waveform"  # Status for UI to send a new waveform to GBT to kick off sequencing
 
 
 class Message(models.IntegerChoices):

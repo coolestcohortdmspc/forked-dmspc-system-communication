@@ -9,7 +9,7 @@ from django.views.decorators.http import require_POST, require_GET
 from django.http import StreamingHttpResponse, JsonResponse, HttpResponse, HttpResponseNotFound
 
 # serve_image imports
-from ngRadar_Website.utils import create_s3_client, bootstrap, write_transfer_progress #get_presigned_url
+from ngRadar_Website.utils import create_s3_client, bootstrap, write_transfer_progress, produce, publish_status_obsEvents # , get_presigned_url
 from ngRadar_Website.enums import Stations, Message, Status
 
 #libraries used for lock status
@@ -21,6 +21,7 @@ from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout, logout
 from django.db.models import Avg
 from datetime import datetime, timezone
+import logging
 
 from ngRadar_Website.utils import produce
 
@@ -28,7 +29,7 @@ import json, uuid, os, time
 
 
 #program constants
-RECORDS_TO_DISPLAY=20
+RECORDS_TO_DISPLAY=30
 LAST_RECORDS = 5
 EXPIRE_TIME_SECONDS = 3600
 
@@ -55,6 +56,11 @@ def get_obs_events():
             .first()
         )
 
+    # More than one TRANSFERRING row for a transfer means it was interrupted and resumed.
+    transferring_count = ETransferEvent.objects.filter(
+        transfer_uuid=current_transfer_uuid, status=Status.TRANSFERRING
+    ).count()
+
     return {
         'latest_events': latest_events,
         'latest_event': ObservatoryEvent.objects.order_by("-event_time").first() if latest_events else None,
@@ -64,6 +70,7 @@ def get_obs_events():
         'avg_latency': round(avg_latency, 2),
         'current_waveform': current_waveform,
         'latest_etr_events': latest_etr_events,
+        'transfer_resumed': transferring_count > 1,
         'latest_etr_event': latest_etr_event,
         'latest_image_event': latest_image_event,
     }
@@ -132,24 +139,30 @@ def latency_graphing(request):
 
 
 def serve_image(request, uuid):
-    event = get_object_or_404(ObservatoryEvent, uuid=uuid)
+    try:
+        event = get_object_or_404(ObservatoryEvent, uuid=uuid)
 
-    bucket = os.environ["WEED_S3_BUCKET"]
+        bucket = os.environ["WEED_S3_BUCKET"]
 
-    s3 = create_s3_client()
+        s3 = create_s3_client()
 
-    # presigned_url = get_presigned_url(s3, event)
-    # return redirect(presigned_url)
+        # presigned_url = get_presigned_url(s3, event)
+        # return redirect(presigned_url)
 
-    obj = s3.get_object(
-    Bucket=bucket,
-    Key=event.image_key,
-    )
+        obj = s3.get_object(
+        Bucket=bucket,
+        Key=event.image_key,
+        )
 
-    return HttpResponse(
-        obj["Body"].read(),
-        content_type=obj["ContentType"],
-    )
+        return HttpResponse(
+            obj["Body"].read(),
+            content_type=obj["ContentType"],
+        )
+    except:
+        publish_status_obsEvents(
+            status=Status.FAILED,
+            msg="Failed to connect to SeaweedFS.",
+        )
 
 
 @require_POST

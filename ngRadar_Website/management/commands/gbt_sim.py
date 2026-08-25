@@ -51,7 +51,7 @@ def turn_off_transmitter():
     # time.sleep(5)
 
 
-def publish_to_db(payload):
+def publish_gbtEvents(payload):
     gbt_event = gbtEvent.objects.create(**payload)
 
     return gbt_event.uuid
@@ -64,7 +64,8 @@ def process_msg(msg, producer_topic, producer_config):
 
     payload = generate_payload(ui_uuid)
 
-    gbt_uuid = publish_to_db(payload)
+    # publish new transmission to the db
+    gbt_uuid = publish_gbtEvents(payload)
 
     kafka_payload = {
         "ui_uuid": str(ui_uuid),
