@@ -31,11 +31,16 @@ Note: I am going to treat this sim as the Hancock VLBA site (Stations.HN) for ha
 def process_msg(msg, producer_topic, producer_config):
     incoming_key = int(msg.key().decode("utf-8"))
     raw_data_path = Path("/raw_data")
-    
+    raw_value = msg.value().decode("utf-8")
+
     if incoming_key == Message.GBT_TX.value:
         print("Received Kafka message from GBT.")
         key = f"{Message.VLBA_REQUEST_STORAGE}"
-        gbt_uuid = msg.value().decode("utf-8")
+
+        payload = json.loads(raw_value)
+
+        ui_uuid = payload["ui_uuid"]
+        gbt_uuid = payload["gbt_uuid"]
         transfer_uuid = uuid.uuid4()
 
         frame_path = raw_data_path / f"{transfer_uuid}.bin"
@@ -48,9 +53,9 @@ def process_msg(msg, producer_topic, producer_config):
             num_bytes = frame_path.stat().st_size
     
             record_status_event(
-                    ui_uuid=payload["ui_uuid"],
                     transfer_uuid=transfer_uuid,
                     gbt_uuid=gbt_uuid,
+                    ui_uuid=ui_uuid,
                     station=Stations.HN,
                     status=Status.READY,
                     num_bytes=num_bytes,
@@ -62,6 +67,7 @@ def process_msg(msg, producer_topic, producer_config):
                 producer_config=producer_config,
                 transfer_uuid=transfer_uuid,
                 gbt_uuid=gbt_uuid,
+                ui_uuid=ui_uuid,
                 status=Status.READY,
                 num_bytes=num_bytes,
                 filename=frame_path.name,
@@ -76,6 +82,7 @@ def process_msg(msg, producer_topic, producer_config):
                 producer_config=producer_config,
                 transfer_uuid=transfer_uuid,
                 gbt_uuid=gbt_uuid,
+                ui_uuid=ui_uuid,
                 status=Status.FAILED,
                 num_bytes=0,
                 filename=frame_path.name,
@@ -88,15 +95,16 @@ def process_msg(msg, producer_topic, producer_config):
     elif incoming_key == Message.DSOC_RESPOND_STORAGE.value:
         print("Received DSOC's storage check response!")
         key = f"{Message.VLBA_TRANSFERRING}"
-        payload = json.loads(msg.value().decode("utf-8"))
+
+        payload = json.loads(raw_value)
 
         if payload["message"] == "Yes":
 
             try:
                 record_status_event(
-                    ui_uuid=payload["ui_uuid"],
                     transfer_uuid=payload["transfer_uuid"],
                     gbt_uuid=payload["gbt_uuid"],
+                    ui_uuid=payload["ui_uuid"],
                     station=Stations.HN,
                     status=Status.TRANSFERRING,
                     num_bytes=payload["num_bytes"],
@@ -109,6 +117,7 @@ def process_msg(msg, producer_topic, producer_config):
                     producer_config=producer_config,
                     transfer_uuid=payload["transfer_uuid"],
                     gbt_uuid=payload["gbt_uuid"],
+                    ui_uuid=payload["ui_uuid"],
                     status=Status.TRANSFERRING,
                     num_bytes=payload["num_bytes"],
                     filename=payload["filename"],
@@ -122,9 +131,9 @@ def process_msg(msg, producer_topic, producer_config):
             except subprocess.CalledProcessError as exc:
                 print(f"E-transfer failed with return code: {exc.returncode}")
                 record_status_event(
-                    ui_uuid=payload["ui_uuid"],
                     transfer_uuid=payload["transfer_uuid"],
                     gbt_uuid=payload["gbt_uuid"],
+                    ui_uuid=payload["ui_uuid"],
                     station=Stations.HN,
                     status=Status.FAILED,
                     num_bytes=payload["num_bytes"],
@@ -135,9 +144,9 @@ def process_msg(msg, producer_topic, producer_config):
             except Exception as exc:
                 print(f"Unexpected e-transfer failure: {exc}")
                 record_status_event(
-                    ui_uuid=payload["ui_uuid"],
                     transfer_uuid=payload["transfer_uuid"],
                     gbt_uuid=payload["gbt_uuid"],
+                    ui_uuid=payload["ui_uuid"],
                     station=Stations.HN,
                     status=Status.FAILED,
                     num_bytes=payload["num_bytes"],
@@ -155,6 +164,7 @@ def process_msg(msg, producer_topic, producer_config):
                 producer_config=producer_config,
                 transfer_uuid=payload["transfer_uuid"],
                 gbt_uuid=payload["gbt_uuid"],
+                ui_uuid=payload["ui_uuid"],
                 status=Status.READY,
                 num_bytes=payload["num_bytes"],
                 filename=payload["filename"],
@@ -162,7 +172,7 @@ def process_msg(msg, producer_topic, producer_config):
             )
 
     elif incoming_key == Message.VLBA_DELETE.value:
-        payload = json.loads(msg.value().decode("utf-8"))
+        payload = json.loads(raw_value)
         file_name = payload["filename"]
         delete_observation_data(file_name)
 
@@ -179,3 +189,4 @@ class Command(BaseCommand):
         producer_topic, producer_config, consumer_topic, consumer_config = bootstrap(Stations.HN)
 
         consume(consumer_topic, consumer_config, process_msg, producer_topic=producer_topic, producer_config=producer_config)
+

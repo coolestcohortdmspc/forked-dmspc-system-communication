@@ -127,7 +127,9 @@ hard-reset)
 
     docker system prune -f
 
-    docker compose build --no-cache && docker compose up -d
+    echo "Rebuilding containers from scratch + freshly injecting env vars based off whatever is currently in your .env file..."
+
+    docker compose build --no-cache && docker compose up -d --force-recreate
     ;;
 
 demo-time)

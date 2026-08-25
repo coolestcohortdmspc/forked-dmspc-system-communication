@@ -151,85 +151,51 @@ def serve_image(request, uuid):
         content_type=obj["ContentType"],
     )
 
-# def submit_waveform(request):
-#     if request.method == "POST":
-#         uuid_input = uuid.uuid4()
-#         waveform  = request.POST.get('waveform')
-#         timestamp = datetime.now(timezone.utc)
-#         # Database version
-#         ui_Event = uiEvent.objects.create(
-#             uuid = uuid_input,
-#             selected_waveform = waveform,
-#             event_time = timestamp
-#         )
 
-#         topic, config = bootstrap(Stations.UI)
+@require_POST
+def submit_waveform(request):
+    uuid_input = uuid.uuid4()
+    waveform = request.POST.get("waveform")
+    timestamp = datetime.now(timezone.utc)
 
-#         def main():
-#             key = str(Message.UI_EVENT)
-#             value = uuid_input.hex  # Use the UUID as the value for the Kafka message
-#             produce(topic, config, key, value)
-#             write_transfer_progress(received_bytes=0, total_bytes=0, percent=0.0, transfer_id=0)  # Reset the progress bar after sending the message
-#         main()
-        
-#         # add a cache for submit time
-#         cache.set('submit_locked', datetime.now(timezone.utc))
-#     return redirect('home')
+    uiEvent.objects.create(
+        uuid=uuid_input,
+        selected_waveform=waveform,
+        event_time=timestamp,
+        status=Status.SUBMIT_WAVEFORM,
+        is_locked=True,
+        message="Waveform submitted.",
+    )
 
-def submit_status(request, ui_uuid):
-    completed = StatusEvent.objects.filter(
-        ui_uuid=ui_uuid,
-        station=Stations.DSOC,
-        status=Status.COMPLETED,
-    ).exists()
+    topic, config = bootstrap(Stations.UI)
+
+    key = str(Message.UI_EVENT)
+    value = uuid_input.hex
+
+    produce(topic, config, key, value)
+
+    write_transfer_progress(
+        received_bytes=0,
+        total_bytes=0,
+        percent=0.0,
+        transfer_id=0,
+    )
 
     return JsonResponse({
-        "completed": completed,
+        "uuid": str(uuid_input),
+        "status": Status.SUBMIT_WAVEFORM.label,
+        "is_locked": True,
     })
 
-
-def submit_waveform(request):
-    if request.method == "POST":
-        uuid_input = uuid.uuid4()
-        waveform = request.POST.get("waveform")
-        timestamp = datetime.now(timezone.utc)
-
-        uiEvent.objects.create(
-            uuid=uuid_input,
-            selected_waveform=waveform,
-            event_time=timestamp,
-            status=Status.LOCK,
-        )
-
-        topic, config = bootstrap(Stations.UI)
-
-        key = str(Message.UI_EVENT)
-        value = uuid_input.hex
-
-        produce(topic, config, key, value)
-
-        write_transfer_progress(
-            received_bytes=0,
-            total_bytes=0,
-            percent=0.0,
-            transfer_id=0,
-        )
-
-        return JsonResponse({
-            "uuid": str(uuid_input),
-            "status": Status.LOCK.label,
-        })
-
 def submit_status(request, ui_uuid):
-    event = get_object_or_404(
-        uiEvent,
-        uuid=ui_uuid,
-    )
+    event = get_object_or_404(uiEvent, uuid=ui_uuid)
 
     return JsonResponse({
         "status": event.status,
         "status_label": event.get_status_display(),
-        "unlocked": event.status == Status.UNLOCK,
+        "is_locked": event.is_locked,
+        "completed": not event.is_locked,
+        "message": event.message,
     })
 
 

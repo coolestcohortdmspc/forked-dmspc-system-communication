@@ -60,14 +60,13 @@
 <!-- Row 3: HTMX GBT Partial - HTMX: 1 second refresh -->
 <div id="home-gbt-partial" 
      hx-get="{% url 'gbt_events' %}" 
-     hx-trigger="every 1s" 
+     hx-trigger="every 5s" 
      hx-target="#home-gbt-partial"
      class="w-100 mb-4">
     {% include 'ngRadar_Website/partials/gbt_home_partial.html' %}
 </div>
 
-<div id="progress_bar_partial"
-    class="w-100 mb-4"></div>
+<div id="progress_bar_partial" class="w-100 mb-4">
     {% include 'ngRadar_Website/partials/progress_bar_partial.html' %}
 </div>
 
@@ -91,41 +90,74 @@
 </script>
 
 <script>
-const form = document.querySelector("#waveform-form");
-const button = document.querySelector("#waveform-submit-btn");
+document.addEventListener("DOMContentLoaded", () => {
+    const form = document.querySelector("#waveform-form");
+    const button = document.querySelector("#waveform-submit-btn");
 
-form.addEventListener("submit", async (event) => {
-    event.preventDefault();
+    if (!form || !button) {
+        console.error("Waveform form or submit button not found.");
+        return;
+    }
 
-    button.disabled = true;
-    button.textContent = "Processing...";
+    form.addEventListener("submit", async (event) => {
+        event.preventDefault();
 
-    const response = await fetch(form.action, {
-        method: "POST",
-        body: new FormData(form),
-        headers: {
-            "X-CSRFToken": form.querySelector(
-                "[name=csrfmiddlewaretoken]"
-            ).value,
-        },
-    });
+        button.disabled = true;
+        button.textContent = "Submitting new waveform...";
 
-    const data = await response.json();
+        try {
+            const response = await fetch(form.action, {
+                method: "POST",
+                body: new FormData(form),
+                headers: {
+                    "X-CSRFToken": form.querySelector(
+                        "[name=csrfmiddlewaretoken]"
+                    ).value,
+                },
+            });
 
-    const timer = setInterval(async () => {
-        const response = await fetch(
-            `/submission-status/${data.uuid}/`
-        );
+            if (!response.ok) {
+                throw new Error(`Submit failed: ${response.status}`);
+            }
 
-        const status = await response.json();
+            const data = await response.json();
 
-        if (status.completed) {
-            clearInterval(timer);
+            const statusUrlTemplate =
+                "{% url 'submit_status' '00000000-0000-0000-0000-000000000000' %}";
+
+            const statusUrl = statusUrlTemplate.replace(
+                "00000000-0000-0000-0000-000000000000",
+                data.uuid
+            );
+
+            const timer = setInterval(async () => {
+                try {
+                    const response = await fetch(statusUrl);
+
+                    if (!response.ok) {
+                        return;
+                    }
+
+                    const status = await response.json();
+
+                    if (!status.is_locked) {
+                        clearInterval(timer);
+
+                        button.disabled = false;
+                        button.textContent = "Submit";
+                    }
+                } catch (error) {
+                    console.error("Status check failed:", error);
+                }
+            }, 1000);
+
+        } catch (error) {
+            console.error("Waveform submission failed:", error);
 
             button.disabled = false;
             button.textContent = "Submit";
         }
-    }, 1000);
+    });
 });
 </script>
 

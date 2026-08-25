@@ -196,9 +196,9 @@ def process_msg(msg, producer_topic, producer_config):
         key = f"{Message.DSOC_RESPOND_STORAGE}" #produced message will have this key no matter what the result of the below logic is
         if payload["status"] == Status.FAILED:
             record_status_event(
-                ui_uuid=payload["ui_uuid"],
                 transfer_uuid=payload["transfer_uuid"],
                 gbt_uuid=payload["gbt_uuid"],
+                ui_uuid=payload["ui_uuid"],
                 station=Stations.HN,
                 status=Status.FAILED,
                 num_bytes=payload["num_bytes"],
@@ -221,9 +221,9 @@ def process_msg(msg, producer_topic, producer_config):
                     if payload["message"] == 1:
                         # The FAILED record only gets saved to the DB the first time. The payload message for any storage check retries will contain message=2 
                         record_status_event(
-                            ui_uuid=payload["ui_uuid"],
                             transfer_uuid=payload["transfer_uuid"],
                             gbt_uuid=payload["gbt_uuid"],
+                            ui_uuid=payload["ui_uuid"],
                             station=Stations.HN,
                             status=Status.FAILED,
                             num_bytes=payload["num_bytes"],
@@ -235,6 +235,7 @@ def process_msg(msg, producer_topic, producer_config):
                         producer_config=producer_config, 
                         transfer_uuid=payload["transfer_uuid"],
                         gbt_uuid=payload["gbt_uuid"],
+                        ui_uuid=payload["ui_uuid"],
                         status=payload["status"],
                         num_bytes=payload["num_bytes"],
                         filename=payload["filename"],
@@ -245,9 +246,9 @@ def process_msg(msg, producer_topic, producer_config):
             else:
                 if payload["message"] != 1:
                     record_status_event(
-                        ui_uuid=payload["ui_uuid"],
                         transfer_uuid=payload["transfer_uuid"],
                         gbt_uuid=payload["gbt_uuid"],
+                        ui_uuid=payload["ui_uuid"],
                         station=Stations.HN,
                         status=Status.READY,
                         num_bytes=payload["num_bytes"],
@@ -260,6 +261,7 @@ def process_msg(msg, producer_topic, producer_config):
                     producer_config=producer_config, 
                     transfer_uuid=payload["transfer_uuid"],
                     gbt_uuid=payload["gbt_uuid"],
+                    ui_uuid=payload["ui_uuid"],
                     status=payload["status"],
                     num_bytes=payload["num_bytes"],
                     filename=payload["filename"],
@@ -277,18 +279,18 @@ def process_msg(msg, producer_topic, producer_config):
             track_etransfer_progress(payload, incoming_file)
 
             record_status_event(
-                ui_uuid=payload["ui_uuid"],
                 transfer_uuid=payload["transfer_uuid"],
                 gbt_uuid=payload["gbt_uuid"],
+                ui_uuid=payload["ui_uuid"],
                 station=Stations.HN,
                 status=Status.TRANSFERRED,
                 num_bytes=payload["num_bytes"],
                 message="Hancock VLBA e-transfer complete",
             )
             record_status_event(
-                ui_uuid=payload["ui_uuid"],
                 transfer_uuid=payload["transfer_uuid"],
                 gbt_uuid=payload["gbt_uuid"],
+                ui_uuid=payload["ui_uuid"],
                 station=Stations.DSOC,
                 status=Status.VERIFYING,
                 num_bytes=payload["num_bytes"],
@@ -307,9 +309,9 @@ def process_msg(msg, producer_topic, producer_config):
             )
         except Exception as exc:
             record_status_event(
-                ui_uuid=payload["ui_uuid"],
                 transfer_uuid=payload["transfer_uuid"],
                 gbt_uuid=payload["gbt_uuid"],
+                ui_uuid=payload["ui_uuid"],
                 station=Stations.DSOC,
                 status=Status.FAILED,
                 num_bytes=0,
@@ -347,9 +349,9 @@ def process_msg(msg, producer_topic, producer_config):
 
         except Exception as exc:
             record_status_event(
-                ui_uuid=payload["ui_uuid"],
                 transfer_uuid=payload["transfer_uuid"],
                 gbt_uuid=payload["gbt_uuid"],
+                ui_uuid=payload["ui_uuid"],
                 station=Stations.DSOC,
                 status=Status.FAILED,
                 num_bytes=payload["num_bytes"],
@@ -358,9 +360,9 @@ def process_msg(msg, producer_topic, producer_config):
             return
 
         record_status_event(
-            ui_uuid=payload["ui_uuid"],
             transfer_uuid=payload["transfer_uuid"],
             gbt_uuid=payload["gbt_uuid"],
+            ui_uuid=payload["ui_uuid"],
             station=Stations.DSOC,
             status=Status.COMPLETED,
             num_bytes=actual_num_bytes,
@@ -374,6 +376,7 @@ def process_msg(msg, producer_topic, producer_config):
             producer_config=producer_config, 
             transfer_uuid=payload["transfer_uuid"],
             gbt_uuid=payload["gbt_uuid"],
+            ui_uuid=payload["ui_uuid"],
             status=payload["status"],
             num_bytes=payload["num_bytes"],
             filename=payload["filename"],
@@ -381,10 +384,14 @@ def process_msg(msg, producer_topic, producer_config):
         )
 
         # and finally, the submit_waveform button on the UI can unlock
-        uiEvent.objects.filter(uuid=payload["ui_uuid"]).update(
-            status=Status.UNLOCK,
+        uiEvent.objects.filter(
+            uuid=payload["ui_uuid"]
+        ).update(
+            status=Status.COMPLETED,
+            is_locked=False,
+            message="Processing completed successfully. Unlocking submit waveform button",
         )
-        
+                
     else:
         print("Invalid Kafka Message Key!")
 

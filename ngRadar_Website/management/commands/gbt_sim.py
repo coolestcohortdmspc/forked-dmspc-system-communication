@@ -1,13 +1,9 @@
 from datetime import datetime, timezone
-import os, time
+import json
 from django.core.management.base import BaseCommand
-from confluent_kafka import Producer
-from confluent_kafka import Consumer
 from ngRadar_Website.enums import Stations, Message
 from ngRadar_Website.models.models import uiEvent
 from ngRadar_Website.models.models import gbtEvent
-# from dotenv import find_dotenv
-from pathlib import Path
 from ngRadar_Website.utils import latency_calc, bootstrap, consume, produce
 
 
@@ -52,7 +48,7 @@ def turn_off_transmitter():
             "latency_ms": 0,
         }
     )
-    time.sleep(5)
+    # time.sleep(5)
 
 
 def publish_to_db(payload):
@@ -62,21 +58,27 @@ def publish_to_db(payload):
 
 
 def process_msg(msg, producer_topic, producer_config):
-    ui_uuid = msg.value().decode("utf-8")  # this is the uuid of the ui_event
+    ui_uuid = msg.value().decode("utf-8")
 
-    # turn off the transmitter for 5 seconds
     turn_off_transmitter()
 
-    # fill in the values to be published to the db
     payload = generate_payload(ui_uuid)
 
-    # publish new transmission to the db
     gbt_uuid = publish_to_db(payload)
 
-    key, value = f"{Message.GBT_TX}", f"{gbt_uuid}"
+    kafka_payload = {
+        "ui_uuid": str(ui_uuid),
+        "gbt_uuid": str(gbt_uuid),
+    }
 
-    # produce this new message, lets DSOC know to produce image(s)
-    produce(producer_topic, producer_config, key, value)
+    # key = str(Message.GBT_TX)
+
+    produce(
+        producer_topic,
+        producer_config,
+        str(Message.GBT_TX),
+        json.dumps(kafka_payload),
+    )
 
 
 class Command(BaseCommand):
@@ -85,11 +87,14 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         print("Starting GBT simulator")
 
-        producer_topic, producer_config, consumer_topic, consumer_config = bootstrap(Stations.GBT)
+        producer_topic, producer_config, consumer_topic, consumer_config = bootstrap(
+            Stations.GBT
+        )
 
-        # generate a dummy data payload, publish this data to the db, produce a message with this payload, then start consuming
-        payload = set_payload_dict('W48', -1)
-        gbt_uuid = publish_to_db(payload)
-        key, value = f"{Message.GBT_TX}", f"{gbt_uuid}"
-        produce(producer_topic, producer_config, key, value)
-        consume(consumer_topic, consumer_config, process_msg, producer_topic=producer_topic, producer_config=producer_config)
+        consume(
+            consumer_topic,
+            consumer_config,
+            process_msg,
+            producer_topic=producer_topic,
+            producer_config=producer_config,
+        )

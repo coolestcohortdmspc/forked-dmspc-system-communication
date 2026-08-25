@@ -4,7 +4,7 @@ from django.contrib.auth.views import LogoutView
 
 
 urlpatterns = [
-    # Home page URLs
+    # Home page and partials URLs
     path('home/', views.home_view, name='home'),
     path('home/status/', views.status_partial, name="status"),
     path('home/gbtevent/', views.gbt_event_partial, name='gbt_events'),
@@ -12,7 +12,7 @@ urlpatterns = [
     path("home/image/<uuid:uuid>/", views.serve_image, name="serve_image"),
     path("progress/stream/", views.progress_sse, name="progress_sse"),
 
-    # Dashboard page URLs
+    # Dashboard page and partials URLs
     path('dashboard/', views.dashboard_view, name='dashboard_home'),
     path('dashboard/updates/', views.event_table_partial, name='event_table_update'),
     path('dashboard/latency/', views.latency_graphing, name='latency_graphing'),
