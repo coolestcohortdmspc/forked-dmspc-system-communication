@@ -201,13 +201,13 @@ services:
       target: base
     env_file:
       - .env
-    depends_on:
-      postgres:
-        condition: service_healthy
-      kafka-broker:
-        condition: service_healthy
-      kafka-init:
-        condition: service_completed_successfully
+    # depends_on:
+    #   postgres:
+    #     condition: service_healthy
+    #   kafka-broker:
+    #     condition: service_healthy
+    #   kafka-init:
+    #     condition: service_completed_successfully
     volumes:
       - .:/service
     networks:
@@ -265,15 +265,15 @@ services:
       target: etc
     env_file:
       - .env
-    depends_on:
-      postgres:
-        condition: service_healthy
-      kafka-broker:
-        condition: service_healthy
-      kafka-init:
-        condition: service_completed_successfully
-      etr_daemon:
-        condition: service_started
+    # depends_on:
+      # postgres:
+      #   condition: service_healthy
+      # kafka-broker:
+      #   condition: service_healthy
+      # kafka-init:
+      #   condition: service_completed_successfully
+      # etr_daemon:
+      #   condition: service_started
     volumes:
       - .:/service
       - vlba_data:/raw_data

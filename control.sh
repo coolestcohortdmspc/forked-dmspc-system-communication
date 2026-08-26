@@ -130,6 +130,48 @@ hard-reset)
     docker compose build --no-cache && docker compose up -d
     ;;
 
+gbt-up)
+    docker compose up -d gbt
+    ;;
+
+gbt-down)
+    docker compose stop gbt
+    docker compose rm -f gbt
+    ;;
+
+vlba-up)
+    docker compose up -d vlba
+    ;;
+
+vlba-down)
+    docker compose stop vlba
+    docker compose rm -f vlba
+    ;;
+
+dsoc-up)
+    "$0" start
+    "$0" kafka-up
+    docker compose up -d dsoc etr_daemon
+    ;;
+
+dsoc-down)
+    docker compose stop dsoc etr_daemon
+    docker compose rm -f dsoc etr_daemon
+    "$0" kafka-down
+    "$0" stop
+    ;;
+
+droplets-up)
+    "$0" dsoc-up
+    "$0" vlba-up
+    "$0" gbt-up
+    ;;
+
+droplets-down)
+    "$0" gbt-down
+    "$0" vlba-down
+    "$0" dsoc-down
+    ;;
 *)
 
     echo "Usage:"
