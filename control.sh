@@ -2,6 +2,10 @@
 
 set -euo pipefail
 
+set -a
+source .env
+set +a
+
 DSOC_DROPLET="root@${DSOC_DROPLET_IP}"
 VLBA_DROPLET="root@${VLBA_DROPLET_IP}"
 GBT_DROPLET="root@${GBT_DROPLET_IP}"
