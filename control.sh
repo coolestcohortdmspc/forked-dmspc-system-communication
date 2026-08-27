@@ -105,7 +105,7 @@ rebuild)
     docker compose down
 
     docker volume ls -q \
-        | grep -v 'postgres_data$' \
+        | grep -v '^dmspc-system-communication_postgres_data$' \
         | xargs -r docker volume rm || true
 
     # --no-cache ensures code changes are baked in cleanly
