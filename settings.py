@@ -24,7 +24,7 @@ DEBUG = os.environ.get('DJANGO_DEBUG', "False").lower() == "true"
 # This setting answers the question: "Is this Host header allowed?"
 ALLOWED_HOSTS = [
     host.strip() 
-    for host in os.environ.get('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+    for host in os.environ.get('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1,64.227.49.62').split(',')
 ]
 
 # This setting answers the question: "Is this HTTPS POST allowed to originate from this site?"
