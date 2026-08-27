@@ -40,7 +40,7 @@ services:
     ports:
       - "80:80"
       # - "443:443"
-      - "127.0.0.1:8080:8080"
+      - "8080:8080"
 
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -66,7 +66,7 @@ services:
 
       # API & Dashboard 
       - "--api.dashboard=true"
-      - "--api.insecure=false"
+      - "--api.insecure=true"
 
       # Observability 
       - "--log.level=INFO"
@@ -409,18 +409,18 @@ services:
 
 
 
-  storage-ui:
-    image: mastertinner/s3manager:latest
-    platform: linux/amd64
-    ports:
-      - "${GUI_PORT:-3000}:8080" 
-    environment:
-      - ACCESS_KEY_ID=${WEED_S3_ACCESS_KEY:-anykey}
-      - SECRET_ACCESS_KEY=${WEED_S3_SECRET_KEY:-anysecret}
-      - ENDPOINT=seaweedfs:8333 
-      - USE_SSL=false
-    networks:
-      - ngradar_website_network
+  # storage-ui:
+  #   image: mastertinner/s3manager:latest
+  #   platform: linux/amd64
+  #   ports:
+  #     - "${GUI_PORT:-3000}:8080" 
+  #   environment:
+  #     - ACCESS_KEY_ID=${WEED_S3_ACCESS_KEY:-anykey}
+  #     - SECRET_ACCESS_KEY=${WEED_S3_SECRET_KEY:-anysecret}
+  #     - ENDPOINT=seaweedfs:8333 
+  #     - USE_SSL=false
+  #   networks:
+  #     - ngradar_website_network
 
 
 #==========================
