@@ -12,6 +12,20 @@
 
 services:
 
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: portainer
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - "9000:9000"
+      - "9443:9443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
+
+
   traefik:
     image: traefik:v3.7
     container_name: traefik
@@ -25,7 +39,7 @@ services:
 
     ports:
       - "80:80"
-      - "443:443"
+      # - "443:443"
       - "127.0.0.1:8080:8080"
 
     volumes:
@@ -36,14 +50,14 @@ services:
     command:
       # EntryPoints
       - "--entrypoints.web.address=:80"
-      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
-      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
-      - "--entrypoints.web.http.redirections.entrypoint.permanent=true"
-      - "--entrypoints.websecure.address=:443"
-      - "--entrypoints.websecure.http.tls=true"
+      # - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      # - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      # - "--entrypoints.web.http.redirections.entrypoint.permanent=true"
+      # - "--entrypoints.websecure.address=:443"
+      # - "--entrypoints.websecure.http.tls=true"
 
-      # Attach the static configuration tls.yaml file that contains the tls configuration settings
-      - "--providers.file.filename=/dynamic/tls.yml"
+      # # Attach the static configuration tls.yaml file that contains the tls configuration settings
+      # - "--providers.file.filename=/dynamic/tls.yml"
 
       # Providers 
       - "--providers.docker=true"
@@ -66,9 +80,9 @@ services:
 
       # Dashboard router
       - "traefik.http.routers.dashboard.rule=Host(`dashboard.docker.localhost`)"
-      - "traefik.http.routers.dashboard.entrypoints=websecure"
+      - "traefik.http.routers.dashboard.entrypoints=web"
       - "traefik.http.routers.dashboard.service=api@internal"
-      - "traefik.http.routers.dashboard.tls=true"
+      # - "traefik.http.routers.dashboard.tls=true"
 
 
   ngradar_website:
@@ -82,20 +96,28 @@ services:
           condition: service_healthy
     volumes:
       - .:/service
-    ports:
-      - 8000:8000
+    # ports:
+    #   - 8000:8000
     networks:
       - ngradar_website_network
       - proxy
     labels:
       - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
       # Tells Traefik to route public requests matching your domain/IP to this container
       - "traefik.http.routers.my-website.rule=Host(`${WEBSITE_DOMAIN}`)"
       - "traefik.http.routers.my-website.entrypoints=web"
+      - "traefik.http.routers.my-website.service=my-website"
       # Optional: Explicitly tell Traefik which port your web app container listens on internally
-      - "traefik.http.services.my-website.loadbalancer.server.port=80"
+      - "traefik.http.services.my-website.loadbalancer.server.port=8000"
     stdin_open: true
     tty: true
+    command:
+      - python
+      - manage.py
+      - runserver
+      - 0.0.0.0:8000
+
 
   postgres:
     image: postgres:18-alpine
@@ -453,6 +475,7 @@ volumes:
   seaweed_data:
   dsoc_transfer:
   vlba_data:
+  portainer_data:
 
 networks:
   ngradar_website_network:
