@@ -44,8 +44,8 @@ services:
 
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./certs:/certs:ro
-      - ./dynamic:/dynamic:ro
+      # - ./certs:/certs:ro
+      # - ./dynamic:/dynamic:ro
 
     command:
       # EntryPoints
