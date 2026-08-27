@@ -19,13 +19,13 @@ load_dotenv(BASE_DIR / '.env')
 
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
 DEBUG = os.environ.get('DJANGO_DEBUG', "False").lower() == "true"
-GBT_ADDRESS = os.environ.get('WEBSITE_DOMAIN')
+DROPLET_IP = os.environ.get('WEBSITE_DOMAIN')
 
 # Allow local Docker containers AND Render's domain depending on environment
 # This setting answers the question: "Is this Host header allowed?"
 ALLOWED_HOSTS = [
     host.strip() 
-    for host in os.environ.get('DJANGO_ALLOWED_HOSTS', f'localhost,127.0.0.1,{GBT_ADDRESS}').split(',')
+    for host in os.environ.get('DJANGO_ALLOWED_HOSTS', f'localhost,127.0.0.1,{DROPLET_IP}').split(',')
 ]
 
 # This setting answers the question: "Is this HTTPS POST allowed to originate from this site?"
