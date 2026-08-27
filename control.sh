@@ -102,7 +102,7 @@ soft-reset)
 
     docker volume ls -q \
         | grep -v '^dmspc-system-communication_postgres_data$' \
-        | xargs -r docker volume rm
+        | xargs -r docker volume rm || true
 
     docker compose build
     docker compose up -d --force-recreate

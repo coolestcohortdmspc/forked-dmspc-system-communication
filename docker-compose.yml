@@ -121,27 +121,30 @@ services:
     restart: "no"
 
 
-  ngrok:
-    image: ngrok/ngrok:latest
-    profiles: ["kafka"]
-    env_file:
-      - .env
-    environment:
-      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN}
-    depends_on:
-      kafka-broker:
-        condition: service_healthy
-      seaweedfs:
-        condition: service_started
-    volumes:
-      - ./ngrok.yml:/etc/ngrok.yml:ro
-    command:
-      - start
-      - --all
-      - --config
-      - /etc/ngrok.yml
-    networks:
-      - ngradar_website_network
+
+# Commenting this out because we don't need it for local dev and we won't need it for the droplets on DO either.
+# But keeping it in case we ever do need ngrok again at some point?
+  # ngrok:
+  #   image: ngrok/ngrok:latest
+  #   profiles: ["kafka"]
+  #   env_file:
+  #     - .env
+  #   environment:
+  #     NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN}
+  #   depends_on:
+  #     kafka-broker:
+  #       condition: service_healthy
+  #     seaweedfs:
+  #       condition: service_started
+  #   volumes:
+  #     - ./ngrok.yml:/etc/ngrok.yml:ro
+  #   command:
+  #     - start
+  #     - --all
+  #     - --config
+  #     - /etc/ngrok.yml
+  #   networks:
+  #     - ngradar_website_network
     
 
   kafka-broker:
@@ -318,19 +321,20 @@ services:
     profiles: ["kafka"]
 
 
-
-  storage-ui:
-    image: mastertinner/s3manager:latest
-    platform: linux/amd64
-    ports:
-      - "${GUI_PORT:-3000}:8080" 
-    environment:
-      - ACCESS_KEY_ID=${WEED_S3_ACCESS_KEY:-anykey}
-      - SECRET_ACCESS_KEY=${WEED_S3_SECRET_KEY:-anysecret}
-      - ENDPOINT=seaweedfs:8333 
-      - USE_SSL=false
-    networks:
-      - ngradar_website_network
+# Commenting this out because we never use this, but keeping it in case we want to? 
+# You can also visit the filer port of the seaweedfs container and view the filer there too.
+  # storage-ui:
+  #   image: mastertinner/s3manager:latest
+  #   platform: linux/amd64
+  #   ports:
+  #     - "${GUI_PORT:-3000}:8080" 
+  #   environment:
+  #     - ACCESS_KEY_ID=${WEED_S3_ACCESS_KEY:-anykey}
+  #     - SECRET_ACCESS_KEY=${WEED_S3_SECRET_KEY:-anysecret}
+  #     - ENDPOINT=seaweedfs:8333 
+  #     - USE_SSL=false
+  #   networks:
+  #     - ngradar_website_network
 
 
 #==========================
