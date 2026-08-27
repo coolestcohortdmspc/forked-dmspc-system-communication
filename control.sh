@@ -18,7 +18,7 @@ start)
     docker compose up -d
     ;;
 
-rebuild)
+rebuild-old)
     echo "Rebuilding development environment..."
     # Take down kafka + sim containers
     docker compose stop $KAFKA_SERVICES
@@ -96,15 +96,15 @@ system-down)
     docker compose rm -f $SIM_SERVICES
     ;;
 
-soft-reset)
+rebuild)
     ./control.sh system-down
     ./control.sh stop
 
     docker volume ls -q \
-        | grep -v '^dmspc-system-communication_postgres_data$' \
+        | grep -v 'postgres_data$' \
         | xargs -r docker volume rm
 
-    docker compose build
+    docker compose build --no-cache
     docker compose up -d --force-recreate
 
     ./control.sh system-up
