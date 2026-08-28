@@ -187,11 +187,18 @@ droplets-up)
     ;;
 
 droplets-down)
-    "$0" gbt-down
-    "$0" vlba-down
-    "$0" dsoc-down
-    "$0" system-down
-    "$0" stop
+    echo "Stopping VLBA Droplet"
+    ssh "$VLBA_DROPLET" \
+        "cd $REMOTE_DIR && ./control.sh vlba-down"
+    
+    echo "Stopping GBT Droplet"
+    ssh "$GBT_DROPLET" \
+        "cd $REMOTE_DIR && ./control.sh gbt-down"
+    
+    echo "Stopping DSOC Droplet"
+    ssh "$DSOC_DROPLET" \
+        "cd $REMOTE_DIR && ./control.sh system-down && ./control.sh stop"
+    
     ;;
 *)
 
