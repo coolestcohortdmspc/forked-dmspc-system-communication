@@ -38,31 +38,40 @@ services:
 
     ports:
       - "80:80"
-      # - "443:443"
+      - "443:443"
       - "8080:8080"
 
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      - ./letsencrypt:/letsencrypt
       # - ./certs:/certs:ro
       # - ./dynamic:/dynamic:ro
 
     command:
       # EntryPoints
       - "--entrypoints.web.address=:80"
-      # - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
-      # - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
-      # - "--entrypoints.web.http.redirections.entrypoint.permanent=true"
-      # - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.websecure.address=:443"
+
+      # Optional redirect HTTP to HTTPS
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--entrypoints.web.http.redirections.entrypoint.permanent=true"
       # - "--entrypoints.websecure.http.tls=true"
 
       # # Attach the static configuration tls.yaml file that contains the tls configuration settings
       # - "--providers.file.filename=/dynamic/tls.yml"
 
-      # Providers 
+      # Docker providers 
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
       - "--providers.docker.network=proxy"
 
+      # Let's Encrypt / ACME
+      - "--certificatesresolvers.le.acme.email=coolestcohortdmspc@gmail.com"
+      - "--certificatesresolvers.le.acme.storage=/letsencrypt/acme.json"
+      - "--certificatesresolvers.le.acme.httpchallenge=true"
+      - "--certificatesresolvers.le.acme.httpchallenge.entrypoint=web"
+      
       # API & Dashboard 
       - "--api.dashboard=true"
       - "--api.insecure=true"
@@ -79,8 +88,11 @@ services:
 
       # Dashboard router
       - "traefik.http.routers.dashboard.rule=Host(`dashboard.docker.localhost`)"
-      - "traefik.http.routers.dashboard.entrypoints=web"
+      - "traefik.http.routers.dashboard.entrypoints=websecure"
       - "traefik.http.routers.dashboard.service=api@internal"
+      - "traefik.http.routers.dashboard.tls=true"
+      - "traefik.http.routers.dashboard.tls.certresolver=le"
+      # - "traefik.http.routers.dashboard.entrypoints=web"
       # - "traefik.http.routers.dashboard.tls=true"
 
 
@@ -103,13 +115,21 @@ services:
       - proxy
     labels:
       - "traefik.enable=true"
+
+      # Telling Traefik which Docker network to use
       - "traefik.docker.network=proxy"
+
       # Tells Traefik to route public requests matching your domain/IP to this container
-      - "traefik.http.routers.my-website.rule=Host(`${WEBSITE_DOMAIN}`)"
-      - "traefik.http.routers.my-website.entrypoints=web"
-      - "traefik.http.routers.my-website.service=my-website"
+      - "traefik.http.routers.ngradar_website.rule=Host(`${WEBSITE_DOMAIN}`)"
+      - "traefik.http.routers.ngradar_website.entrypoints=websecure"
+      # - "traefik.http.routers.ngradar_website.entrypoints=web"
+      - "traefik.http.routers.ngradar_website.service=ngradar_website"
+      - "traefik.http.routers.ngradar_website.tls=true"
+      - "traefik.http.routers.ngradar_website.tls.certresolver=le"
+
+
       # Optional: Explicitly tell Traefik which port your web app container listens on internally
-      - "traefik.http.services.my-website.loadbalancer.server.port=8000"
+      - "traefik.http.services.ngradar_website.loadbalancer.server.port=8000"
     stdin_open: true
     tty: true
     command:
@@ -501,3 +521,4 @@ networks:
   proxy:
     name: proxy
     driver: bridge
+    external: true
