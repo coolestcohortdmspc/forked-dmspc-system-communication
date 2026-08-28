@@ -86,6 +86,7 @@ services:
 
 
   ngradar_website:
+    container_name: ngradar_website
     build:
       context: .
       target: app
@@ -120,6 +121,7 @@ services:
 
 
   postgres:
+    container_name: postgres
     image: postgres:18-alpine
     volumes:
       - postgres_data:/var/lib/postgresql
@@ -139,6 +141,7 @@ services:
       retries: 5
 
   staging_loader:
+    container_name: staging_loader
     build:
       context: .
       target: load-staging-data
@@ -158,6 +161,7 @@ services:
 #==========================
 
   zookeeper:
+    container_name: zookeeper
     image: confluentinc/cp-zookeeper:7.5.1
     profiles: ["kafka"]
     environment:
@@ -170,6 +174,7 @@ services:
 
 # A one-shot init service that creates the Kafka topics after the broker is healthy
   kafka-init:
+    container_name: kafka-init
     image: confluentinc/cp-kafka:7.5.1
     depends_on:
       kafka-broker:
@@ -212,6 +217,7 @@ services:
 
 
   ngrok:
+    container_name: ngrok
     image: ngrok/ngrok:latest
     profiles: ["kafka"]
     env_file:
@@ -235,6 +241,7 @@ services:
     
 
   kafka-broker:
+    container_name: kafka-broker
     user: "0:0"
     image: confluentinc/cp-kafka:7.5.1
     profiles: ["kafka"]
@@ -266,6 +273,7 @@ services:
     
 
   kafka-ui:
+    container_name: kafka-ui
     image: provectuslabs/kafka-ui:latest
     profiles: ["kafka"]
     ports:
@@ -286,6 +294,7 @@ services:
 #==========================
 
   gbt:
+    container_name: gbt
     build:
       context: .
       target: base
@@ -315,6 +324,7 @@ services:
 
 
   dsoc:
+    container_name: dsoc
     build:
       context: .
       target: base
@@ -350,6 +360,7 @@ services:
   
 
   vlba:
+    container_name: vlba
     build:
       context: .
       target: etc
@@ -386,6 +397,7 @@ services:
 # storage containers:
 #==========================
   seaweedfs:
+    container_name: seaweedfs
     build: 
       context: .
       target: seaweedfs
@@ -428,6 +440,7 @@ services:
 #==========================
 # a one-shot init service that creates the volume before etd starts
   dsoc-volume-init:
+    container_name: dsoc-volume-init
     image: alpine:3.20
     profiles: ["kafka"]
     user: "0:0"
@@ -442,6 +455,7 @@ services:
         chmod 775 /dsoc/incoming
 
   etr_daemon:
+    container_name: etr_daemon
     build:
       context: .
       target: etd
