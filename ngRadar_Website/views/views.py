@@ -9,8 +9,8 @@ from django.views.decorators.http import require_POST, require_GET
 from django.http import StreamingHttpResponse, JsonResponse, HttpResponse, HttpResponseNotFound
 
 # serve_image imports
-from ngRadar_Website.utils import create_s3_client, bootstrap, write_transfer_progress # , get_presigned_url
-from ngRadar_Website.enums import Stations, Message
+from ngRadar_Website.utils import create_s3_client, bootstrap, write_transfer_progress #get_presigned_url
+from ngRadar_Website.enums import Stations, Message, Status
 
 #libraries used for lock status
 from django.core.cache import cache
@@ -20,12 +20,15 @@ from ngRadar_Website.models.models import ObservatoryEvent, uiEvent, gbtEvent, d
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout, logout
 from django.db.models import Avg
-from confluent_kafka import Producer
-import uuid
-import os
-import time
-from datetime import datetime, timezone 
-# from ngRadar_Website.utils import views_bootstrap
+from datetime import datetime, timezone
+
+from ngRadar_Website.utils import produce
+
+import json, uuid, os, time
+
+from queue import Queue, Empty
+
+button_state_change = Queue()
 
 # views_bootstrap()
 
@@ -205,13 +208,34 @@ def getLockStatus(lock_time):
     return currentStatus
 
 def lock_status(request):
+
+    currentStatus = None
     lock_time = cache.get('submit_locked', None)
-    if lock_time is None:
-        return JsonResponse({"locked": False})
-    elif dsocEvent.objects.filter(event_time__gt=lock_time):
-        cache.delete('submit_locked')
-        return JsonResponse({'locked':False})
-    return JsonResponse({'locked':True})
+    currentStatus = getLockStatus(lock_time)
+    #send intial button status
+    yield f"event: lock-status\ndata: {json.dumps(currentStatus)}\n\n"
+
+    keepConnect = True
+    while keepConnect == True:
+        try:
+            button_state_change.get(timeout=30)
+            lock_time = cache.get('submit_locked')
+            currentStatus = getLockStatus(lock_time)
+            yield f"event: lock-status\ndata: {json.dumps(currentStatus)}\n\n"
+        except Empty:
+            # Prevent timeout
+            yield ": keep-alive\n\n"
+
+def lock_status_response(request):
+    response = StreamingHttpResponse(
+        lock_status(request),
+        content_type="text/event-stream; charset=utf-8",
+        status = 200
+    )
+    response["Cache-Control"] = "no-cache"
+    return response
+
+
 
 # Need a function AND another partial template for handling the user inputted payload
 def submit_waveform(request):
@@ -225,20 +249,6 @@ def submit_waveform(request):
             selected_waveform = waveform,
             event_time = timestamp
         )
-
-        # p = Path("../../../out/ngrok_endpoint.env")
-        # text = p.read_text().strip()
-
-        # bootstrap = None
-        # for line in text.splitlines():
-        #     if line.startswith("BOOTSTRAP_SERVER="):
-        #         bootstrap = line.split("=", 1)[1].strip()
-        #         break
-
-        # if not bootstrap:
-        #     raise RuntimeError("BOOTSTRAP_SERVER not found in /out/ngrok_endpoint.env")
-        
-        # bootstrap = ngrok_endpoint.objects.last().bootstrap
 
         topic, config = bootstrap(Stations.UI)
 
