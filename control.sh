@@ -1,6 +1,17 @@
 #!/usr/bin/env bash
 
 set -euo pipefail
+
+set -a
+source .env
+set +a
+
+DSOC_DROPLET="root@${DSOC_DROPLET_IP}"
+VLBA_DROPLET="root@${VLBA_DROPLET_IP}"
+GBT_DROPLET="root@${GBT_DROPLET_IP}"
+
+REMOTE_DIR="/root/${REMOTE_REPO}"
+
 KAFKA_PROFILES="--profile kafka"
 # KAFKA_SERVICES="zookeeper broker kafka-ui ngrok gbt seaweedfs dsoc ngrok-writer vlba"
 # KAFKA_SERVICES="zookeeper kafka-broker kafka-ui kafka-init gbt seaweedfs dsoc vlba etr_daemon"
@@ -162,15 +173,32 @@ dsoc-down)
     ;;
 
 droplets-up)
-    "$0" dsoc-up
-    "$0" vlba-up
-    "$0" gbt-up
+    echo "Starting DSOC Droplet"
+    ssh "$DSOC_DROPLET" \
+        "cd $REMOTE_DIR && ./control.sh start && ./control.sh system-up"
+    
+    echo "Starting VLBA Droplet"
+    ssh "$VLBA_DROPLET" \
+        "cd $REMOTE_DIR && ./control.sh vlba-up"
+    
+    echo "Starting GBT Droplet"
+    ssh "$GBT_DROPLET" \
+        "cd $REMOTE_DIR && ./control.sh gbt-up"
     ;;
 
 droplets-down)
-    "$0" gbt-down
-    "$0" vlba-down
-    "$0" dsoc-down
+    echo "Stopping VLBA Droplet"
+    ssh "$VLBA_DROPLET" \
+        "cd $REMOTE_DIR && ./control.sh vlba-down"
+    
+    echo "Stopping GBT Droplet"
+    ssh "$GBT_DROPLET" \
+        "cd $REMOTE_DIR && ./control.sh gbt-down"
+    
+    echo "Stopping DSOC Droplet"
+    ssh "$DSOC_DROPLET" \
+        "cd $REMOTE_DIR && ./control.sh system-down && ./control.sh stop"
+    
     ;;
 *)
 
