@@ -120,7 +120,7 @@ services:
       - "traefik.docker.network=proxy"
 
       # Tells Traefik to route public requests matching your domain/IP to this container
-      - "traefik.http.routers.ngradar_website.rule=Host(`${WEBSITE_DOMAIN}`)"
+      - "traefik.http.routers.ngradar_website.rule=Host(`${WEBSITE_DOMAIN}`)" # Change to a real domain name so certificates work!!
       - "traefik.http.routers.ngradar_website.entrypoints=websecure"
       # - "traefik.http.routers.ngradar_website.entrypoints=web"
       - "traefik.http.routers.ngradar_website.service=ngradar_website"
