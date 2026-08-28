@@ -20,6 +20,12 @@ KAFKA_PROFILES="--profile kafka"
 KAFKA_SERVICES="zookeeper kafka-broker kafka-init kafka-ui seaweedfs dsoc-volume-init"
 SIM_SERVICES="etr_daemon gbt vlba dsoc"
 
+DIGITAL_OCEAN_SERVICES="portainer traefik"
+
+DSOC_SERVICES="ngradar_website postgres zookeeper kafka-broker kafka-init kafka-ui seaweedfs dsoc-volume-init dsoc etr_daemon"
+VLBA_SERVICES="vlba"
+GBT_SERVICES="gbt"
+
 COMMAND="$1"
 
 case "$COMMAND" in
@@ -141,41 +147,46 @@ hard-reset)
     docker compose build --no-cache && docker compose up -d
     ;;
 
+digital-ocean-up)
+    docker compose up -d $DIGITAL_OCEAN_SERVICES
+    ;;
+
+digital-ocean-down)
+    docker compose stop $DIGITAL_OCEAN_SERVICES
+    docker compose rm -f $DIGITAL_OCEAN_SERVICES
+    ;;
+
 gbt-up)
-    docker compose up -d gbt
+    docker compose up -d $GBT_SERVICES
     ;;
 
 gbt-down)
-    docker compose stop gbt
-    docker compose rm -f gbt
+    docker compose stop $GBT_SERVICES
+    docker compose rm -f $GBT_SERVICES
     ;;
 
 vlba-up)
-    docker compose up -d vlba
+    docker compose up -d $VLBA_SERVICES
     ;;
 
 vlba-down)
-    docker compose stop vlba
-    docker compose rm -f vlba
+    docker compose stop $VLBA_SERVICES
+    docker compose rm -f $VLBA_SERVICES
     ;;
 
 dsoc-up)
-    "$0" start
-    "$0" kafka-up
-    docker compose up -d dsoc etr_daemon
+    docker compose up -d $DSOC_SERVICES
     ;;
 
 dsoc-down)
-    docker compose stop dsoc etr_daemon
-    docker compose rm -f dsoc etr_daemon
-    "$0" kafka-down
-    "$0" stop
+    docker compose stop $DSOC_SERVICES
+    docker compose rm -f $DSOC_SERVICES
     ;;
 
 droplets-up)
     echo "Starting DSOC Droplet"
     ssh "$DSOC_DROPLET" \
-        "cd $REMOTE_DIR && ./control.sh start && ./control.sh system-up"
+        "cd $REMOTE_DIR && ./control.sh dsoc-up"
     
     echo "Starting VLBA Droplet"
     ssh "$VLBA_DROPLET" \
@@ -197,7 +208,7 @@ droplets-down)
     
     echo "Stopping DSOC Droplet"
     ssh "$DSOC_DROPLET" \
-        "cd $REMOTE_DIR && ./control.sh system-down && ./control.sh stop"
+        "cd $REMOTE_DIR && ./control.sh dsoc-down"
     
     ;;
 *)
