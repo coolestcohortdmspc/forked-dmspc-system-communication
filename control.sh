@@ -190,6 +190,8 @@ droplets-down)
     "$0" gbt-down
     "$0" vlba-down
     "$0" dsoc-down
+    "$0" system-down
+    "$0" stop
     ;;
 *)
 
