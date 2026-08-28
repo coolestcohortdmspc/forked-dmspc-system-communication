@@ -193,8 +193,19 @@ def lock_status(request):
 
         currentStatus = ({"locked": True, "error": True, "message": "Unable to determine lock status."})
         statusCode=503
+        
+    yield f"event: lock-status\ndata: {json.dumps(currentStatus)}\n\n"
+    # return JsonResponse(currentStatus, status = statusCode)
 
-    return JsonResponse(currentStatus, status = statusCode)
+
+def lock_status_response(request):
+    response = StreamingHttpResponse(
+        lock_status(request),
+        content_type="text/event-stream; charset=utf-8"
+    )
+    response["Cache-Control"] = "no-cache"
+    return response
+
 
 def submit_waveform(request):
     if request.method == "POST":
