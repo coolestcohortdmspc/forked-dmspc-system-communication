@@ -126,7 +126,7 @@ services:
       - postgres_data:/var/lib/postgresql
       - ./postgres/init:/docker-entrypoint-initdb.d
     ports:
-      - 5432:5432
+      - ${WEBSITE_DOMAIN}:5432:5432
     environment:
       - POSTGRES_USER=ngradar_website # Use env variables instead of exposing these!!!!
       - POSTGRES_PASSWORD=ngradar_website
@@ -247,7 +247,7 @@ services:
     depends_on:
       - zookeeper
     ports:
-      - ${WEBSITE_DOMAIN}9092:9092
+      - ${WEBSITE_DOMAIN}:9092:9092
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
@@ -462,6 +462,9 @@ services:
       target: etd
     profiles: ["kafka"]
     user: "33:33"   # non root user: www-data
+    ports:
+      - "${WEBSITE_DOMAIN}:4004:4004/tcp"
+      - "${WEBSITE_DOMAIN}:8008:8008/udp"
     depends_on:
       dsoc-volume-init:
         condition: service_completed_successfully
