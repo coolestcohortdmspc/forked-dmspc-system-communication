@@ -18,7 +18,7 @@ KAFKA_PROFILES="--profile kafka"
 
 # the order of these services matter!! learned the hard way..
 KAFKA_SERVICES="zookeeper kafka-broker kafka-init kafka-ui seaweedfs dsoc-volume-init"
-SIM_SERVICES="etr_daemon gbt vlba dsoc"
+SIM_SERVICES="etr_daemon dsoc"
 
 COMMAND="$1"
 
@@ -175,7 +175,7 @@ dsoc-down)
 droplets-up)
     echo "Starting DSOC Droplet"
     ssh "$DSOC_DROPLET" \
-        "cd $REMOTE_DIR && ./control.sh dsoc-up"
+        "cd $REMOTE_DIR && ./control.sh start && ./control.sh system-up"
     
     echo "Starting VLBA Droplet"
     ssh "$VLBA_DROPLET" \
