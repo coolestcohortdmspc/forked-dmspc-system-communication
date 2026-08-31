@@ -7,7 +7,11 @@ source .env
 set +a
 
 DSOC_DROPLET="root@${DSOC_DROPLET_IP}"
-VLBA_DROPLET="root@${VLBA_DROPLET_IP}"
+VLBA_1_DROPLET="root@${VLBA_DROPLET_IP}"  # TODO remove when scaling up
+# TODO use these for scaling up AND ADD THESE IPs to .env
+# VLBA_1_DROPLET="root@${VLBA_1_DROPLET_IP}"
+# VLBA_2_DROPLET="root@${VLBA_2_DROPLET_IP}"
+# VLBA_3_DROPLET="root@${VLBA_3_DROPLET_IP}"
 GBT_DROPLET="root@${GBT_DROPLET_IP}"
 
 REMOTE_DIR="/root/${REMOTE_REPO}"
@@ -170,19 +174,17 @@ gbt-down)
 
 vlba-up)
     # TODO start all of these when scaling up!
-    docker compose up -d $VLBA_1_SERVICES
-    # docker compose up -d $VLBA_2_SERVICES
-    # docker compose up -d $VLBA_3_SERVICES
+    # Get the services that are passed as the argument to vlba-up
+    SERVICES="${!2}"
+    docker compose up -d $SERVICES
     ;;
 
 vlba-down)
     # TODO remove all of these when scaling up!
-    docker compose stop $VLBA_1_SERVICES
-    docker compose rm -f $VLBA_1_SERVICES
-    # docker compose stop $VLBA_2_SERVICES
-    # docker compose rm -f $VLBA_2_SERVICES
-    # docker compose stop $VLBA_3_SERVICES
-    # docker compose rm -f $VLBA_3_SERVICES
+    # Get the services that are passed as the argument to vlba-down
+    SERVICES="${!2}"
+    docker compose stop $SERVICES
+    docker compose rm -f $SERVICES
     ;;
 
 dsoc-up)
@@ -199,9 +201,18 @@ droplets-up)
     ssh "$DSOC_DROPLET" \
         "cd $REMOTE_DIR && ./control.sh dsoc-up"
     
-    echo "Starting VLBA Droplet"
-    ssh "$VLBA_DROPLET" \
-        "cd $REMOTE_DIR && ./control.sh vlba-up"
+    echo "Starting VLBA 1 Droplet"
+    ssh "$VLBA_1_DROPLET" \
+        "cd $REMOTE_DIR && ./control.sh vlba-up VLBA_1_SERVICES"
+    
+    # TODO use these for scaling up
+    # echo "Starting VLBA 2 Droplet"
+    # ssh "$VLBA_2_DROPLET" \
+    #     "cd $REMOTE_DIR && ./control.sh vlba-up VLBA_2_SERVICES"
+
+    # echo "Starting VLBA 3 Droplet"
+    # ssh "$VLBA_3_DROPLET" \
+    #     "cd $REMOTE_DIR && ./control.sh vlba-up VLBA_3_SERVICES"
     
     echo "Starting GBT Droplet"
     ssh "$GBT_DROPLET" \
@@ -209,18 +220,26 @@ droplets-up)
     ;;
 
 droplets-down)
-    echo "Stopping VLBA Droplet"
-    ssh "$VLBA_DROPLET" \
-        "cd $REMOTE_DIR && ./control.sh vlba-down"
-    
     echo "Stopping GBT Droplet"
     ssh "$GBT_DROPLET" \
         "cd $REMOTE_DIR && ./control.sh gbt-down"
     
+    echo "Stopping VLBA 1 Droplet"
+    ssh "$VLBA_1_DROPLET" \
+        "cd $REMOTE_DIR && ./control.sh vlba-down VLBA_1_SERVICES"
+    
+    # TODO use these for scaling up
+    # echo "Stopping VLBA 2 Droplet"
+    # ssh "$VLBA_2_DROPLET" \
+    #     "cd $REMOTE_DIR && ./control.sh vlba-down VLBA_2_SERVICES"
+    
+    # echo "Stopping VLBA 3 Droplet"
+    # ssh "$VLBA_3_DROPLET" \
+    #     "cd $REMOTE_DIR && ./control.sh vlba-down VLBA_3_SERVICES"
+    
     echo "Stopping DSOC Droplet"
     ssh "$DSOC_DROPLET" \
         "cd $REMOTE_DIR && ./control.sh dsoc-down"
-    
     ;;
 *)
 
@@ -241,6 +260,8 @@ droplets-down)
     echo "./control.sh sims-down"
     echo "./control.sh system-up"
     echo "./control.sh system-down"
+    echo "./control.sh droplets-up"
+    echo "./control.sh droplets-down"
     exit 1
     ;;
 
