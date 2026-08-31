@@ -123,15 +123,20 @@ system-down)
 rebuild)
     ./control.sh system-down
     ./control.sh stop
+    # Take down the rest of the containers
+    docker compose down
 
     docker volume ls -q \
         | grep -v 'postgres_data$' \
         | xargs -r docker volume rm
 
+    # --no-cache ensures code changes are baked in cleanly
     docker compose build --no-cache
+    # --force-recreate guarantees .env variable updates  and config updates are pushed into the container upon rebuild
     docker compose up -d --force-recreate
-
-    ./control.sh system-up
+    # same with kafka profiles:
+    docker compose $KAFKA_PROFILES up -d --force-recreate
+    docker compose up -d --force-recreate $SIM_SERVICES
     ;;
 
 testcov)
