@@ -118,12 +118,15 @@ services:
       - "traefik.docker.network=proxy"
 
       # Tells Traefik to route public requests matching your domain/IP to this container
-      - "traefik.http.routers.ngradar_website.rule=Host(`${WEBSITE_DOMAIN}`)" # Change to a real domain name so certificates work!!
+      - "traefik.http.routers.ngradar_website.rule=Host(`${SITE_DOMAIN}`) || Host(`${WEBSITE_DOMAIN}`)"
       - "traefik.http.routers.ngradar_website.entrypoints=websecure"
-      # - "traefik.http.routers.ngradar_website.entrypoints=web"
       - "traefik.http.routers.ngradar_website.service=ngradar_website"
       - "traefik.http.routers.ngradar_website.tls=true"
       - "traefik.http.routers.ngradar_website.tls.certresolver=le"
+      # Pin the cert name: without this Traefik would also try to certify the
+      # bare IP from the rule above, which ACME can never issue.
+      - "traefik.http.routers.ngradar_website.tls.domains[0].main=${SITE_DOMAIN}"
+
 
 
       # Optional: Explicitly tell Traefik which port your web app container listens on internally
