@@ -67,7 +67,7 @@ services:
       - "--providers.docker.network=proxy"
 
       # Let's Encrypt / ACME
-      - "--certificatesresolvers.le.acme.email=coolestcohortdmspc@gmail.com"
+      - "--certificatesresolvers.le.acme.email=${COHORT_EMAIL}"
       - "--certificatesresolvers.le.acme.storage=/letsencrypt/acme.json"
       - "--certificatesresolvers.le.acme.httpchallenge=true"
       - "--certificatesresolvers.le.acme.httpchallenge.entrypoint=web"
@@ -91,7 +91,7 @@ services:
       - "traefik.http.routers.dashboard.entrypoints=websecure"
       - "traefik.http.routers.dashboard.service=api@internal"
       - "traefik.http.routers.dashboard.tls=true"
-      - "traefik.http.routers.dashboard.tls.certresolver=le"
+      - "traefik.http.routers.dashboard.tls.certresolver=le" # may cause problems locally idk yet
       # - "traefik.http.routers.dashboard.entrypoints=web"
       # - "traefik.http.routers.dashboard.tls=true"
 
@@ -521,4 +521,3 @@ networks:
   proxy:
     name: proxy
     driver: bridge
-    external: true
