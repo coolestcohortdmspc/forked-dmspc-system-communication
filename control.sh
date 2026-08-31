@@ -22,9 +22,12 @@ SIM_SERVICES="etr_daemon gbt vlba dsoc"
 
 DIGITAL_OCEAN_SERVICES="portainer traefik"
 
-DSOC_SERVICES="ngradar_website postgres zookeeper kafka-broker kafka-init kafka-ui seaweedfs dsoc-volume-init dsoc etr_daemon"
-VLBA_SERVICES="vlba"
-GBT_SERVICES="gbt"
+# TODO add the commented vlba sims when scaling up! (vlba9 and vlba10 should start before gbt)
+DSOC_SERVICES="ngradar_website postgres zookeeper kafka-broker kafka-init kafka-ui seaweedfs dsoc-volume-init dsoc etr_daemon"  # vlba7 vlba8
+VLBA_1_SERVICES="vlba"  # vlba2
+VLBA_2_SERVICES="vlba3 vlba4"
+VLBA_3_SERVICES="vlba5 vlba6"
+GBT_SERVICES="gbt"  # vlba9 vlba10
 
 COMMAND="$1"
 
@@ -166,12 +169,20 @@ gbt-down)
     ;;
 
 vlba-up)
-    docker compose up -d $VLBA_SERVICES
+    # TODO start all of these when scaling up!
+    docker compose up -d $VLBA_1_SERVICES
+    # docker compose up -d $VLBA_2_SERVICES
+    # docker compose up -d $VLBA_3_SERVICES
     ;;
 
 vlba-down)
-    docker compose stop $VLBA_SERVICES
-    docker compose rm -f $VLBA_SERVICES
+    # TODO remove all of these when scaling up!
+    docker compose stop $VLBA_1_SERVICES
+    docker compose rm -f $VLBA_1_SERVICES
+    # docker compose stop $VLBA_2_SERVICES
+    # docker compose rm -f $VLBA_2_SERVICES
+    # docker compose stop $VLBA_3_SERVICES
+    # docker compose rm -f $VLBA_3_SERVICES
     ;;
 
 dsoc-up)
