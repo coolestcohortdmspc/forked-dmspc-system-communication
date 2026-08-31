@@ -1,8 +1,7 @@
 # ===========================================================================
 # We use 1 Dockerfile and 1 docker-compose.yml file to build and 
 # run the Django application in a containerized environment.
-# If hosted locallly, it uses local .env and a local Postgres database. 
-# For live demo, it uses demo .env and the Render-hosted Postgres database.
+# Currently only configured to work across droplets. Will not work correctly fully local.
 # ===========================================================================
 
 
@@ -11,7 +10,82 @@
 #==========================
 
 services:
+
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: portainer
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - "9000:9000"
+      - "9443:9443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
+
+
+  traefik:
+    image: traefik:v3.7
+    container_name: traefik
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+
+    networks:
+     # Connect to the 'traefik_proxy' overlay network for inter-container communication across nodes
+      - proxy
+
+    ports:
+      - "80:80"
+      # - "443:443"
+      - "8080:8080"
+
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      # - ./certs:/certs:ro
+      # - ./dynamic:/dynamic:ro
+
+    command:
+      # EntryPoints
+      - "--entrypoints.web.address=:80"
+      # - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      # - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      # - "--entrypoints.web.http.redirections.entrypoint.permanent=true"
+      # - "--entrypoints.websecure.address=:443"
+      # - "--entrypoints.websecure.http.tls=true"
+
+      # # Attach the static configuration tls.yaml file that contains the tls configuration settings
+      # - "--providers.file.filename=/dynamic/tls.yml"
+
+      # Providers 
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=proxy"
+
+      # API & Dashboard 
+      - "--api.dashboard=true"
+      - "--api.insecure=true"
+
+      # Observability 
+      - "--log.level=INFO"
+      - "--accesslog=true"
+      - "--metrics.prometheus=true"
+
+  # Traefik Dynamic configuration via Docker labels
+    labels:
+      # Enable self‑routing
+      - "traefik.enable=true"
+
+      # Dashboard router
+      - "traefik.http.routers.dashboard.rule=Host(`dashboard.docker.localhost`)"
+      - "traefik.http.routers.dashboard.entrypoints=web"
+      - "traefik.http.routers.dashboard.service=api@internal"
+      # - "traefik.http.routers.dashboard.tls=true"
+
+
   ngradar_website:
+    container_name: ngradar_website
     build:
       context: .
       target: app
@@ -22,22 +96,39 @@ services:
           condition: service_healthy
     volumes:
       - .:/service
-    ports:
-      - 8000:8000
+    # ports:
+    #   - 8000:8000
     networks:
       - ngradar_website_network
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      # Tells Traefik to route public requests matching your domain/IP to this container
+      - "traefik.http.routers.my-website.rule=Host(`${WEBSITE_DOMAIN}`)"
+      - "traefik.http.routers.my-website.entrypoints=web"
+      - "traefik.http.routers.my-website.service=my-website"
+      # Optional: Explicitly tell Traefik which port your web app container listens on internally
+      - "traefik.http.services.my-website.loadbalancer.server.port=8000"
     stdin_open: true
     tty: true
+    command:
+      - python
+      - manage.py
+      - runserver
+      - 0.0.0.0:8000
+
 
   postgres:
+    container_name: postgres
     image: postgres:18-alpine
     volumes:
       - postgres_data:/var/lib/postgresql
       - ./postgres/init:/docker-entrypoint-initdb.d
     ports:
-      - 5432:5432
+      - ${WEBSITE_DOMAIN}:5432:5432
     environment:
-      - POSTGRES_USER=ngradar_website
+      - POSTGRES_USER=ngradar_website # Use env variables instead of exposing these!!!!
       - POSTGRES_PASSWORD=ngradar_website
       - POSTGRES_DB=localdev
     networks:
@@ -49,6 +140,7 @@ services:
       retries: 5
 
   staging_loader:
+    container_name: staging_loader
     build:
       context: .
       target: load-staging-data
@@ -68,6 +160,7 @@ services:
 #==========================
 
   zookeeper:
+    container_name: zookeeper
     image: confluentinc/cp-zookeeper:7.5.1
     profiles: ["kafka"]
     environment:
@@ -80,6 +173,7 @@ services:
 
 # A one-shot init service that creates the Kafka topics after the broker is healthy
   kafka-init:
+    container_name: kafka-init
     image: confluentinc/cp-kafka:7.5.1
     depends_on:
       kafka-broker:
@@ -148,16 +242,19 @@ services:
     
 
   kafka-broker:
+    container_name: kafka-broker
     user: "0:0"
     image: confluentinc/cp-kafka:7.5.1
     profiles: ["kafka"]
     depends_on:
       - zookeeper
+    ports:
+      - ${WEBSITE_DOMAIN}:9092:9092
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9094
-      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka-broker:29092,EXTERNAL://${NGROK_KAFKA_TCP_ADDRESS}
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka-broker:29092,EXTERNAL://${WEBSITE_DOMAIN}:9092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
@@ -179,6 +276,7 @@ services:
     
 
   kafka-ui:
+    container_name: kafka-ui
     image: provectuslabs/kafka-ui:latest
     profiles: ["kafka"]
     ports:
@@ -199,25 +297,26 @@ services:
 #==========================
 
   gbt:
+    container_name: gbt
     build:
       context: .
       target: base
     env_file:
       - .env
-    depends_on:
-      postgres:
-        condition: service_healthy
-      kafka-broker:
-        condition: service_healthy
-      kafka-init:
-        condition: service_completed_successfully
+    # depends_on:
+    #   postgres:
+    #     condition: service_healthy
+    #   kafka-broker:
+    #     condition: service_healthy
+    #   kafka-init:
+    #     condition: service_completed_successfully
     volumes:
       - .:/service
     networks:
       - ngradar_website_network
     profiles: ["kafka"]
     environment:
-      BOOTSTRAP_SERVER: kafka-broker:29092
+      BOOTSTRAP_SERVER: ${WEBSITE_DOMAIN}:9092
       # if we move this sim to a separate machine, use the below bootstrap server:
       # BOOTSTRAP_SERVER=7.tcp.ngrok.io:26729
     entrypoint:
@@ -228,6 +327,7 @@ services:
 
 
   dsoc:
+    container_name: dsoc
     build:
       context: .
       target: base
@@ -246,7 +346,7 @@ services:
         condition: service_started
     volumes:
       - .:/service
-      - dsoc_transfer:/dsoc/incoming
+      - dsoc_transfer:/dsoc/incoming 
     networks:
       - ngradar_website_network
     profiles: ["kafka"]
@@ -263,20 +363,21 @@ services:
   
 
   vlba:
+    container_name: vlba
     build:
       context: .
       target: etc
     env_file:
       - .env
-    depends_on:
-      postgres:
-        condition: service_healthy
-      kafka-broker:
-        condition: service_healthy
-      kafka-init:
-        condition: service_completed_successfully
-      etr_daemon:
-        condition: service_started
+    # depends_on:
+      # postgres:
+      #   condition: service_healthy
+      # kafka-broker:
+      #   condition: service_healthy
+      # kafka-init:
+      #   condition: service_completed_successfully
+      # etr_daemon:
+      #   condition: service_started
     volumes:
       - .:/service
       - vlba_data:/raw_data
@@ -284,8 +385,8 @@ services:
       - ngradar_website_network
     profiles: ["kafka"]
     environment:
-      ETD_DESTINATION: "etr_daemon:/dsoc/incoming/"
-      BOOTSTRAP_SERVER: kafka-broker:29092
+      ETD_DESTINATION: "etr_daemon:/dsoc/incoming/" # NO LONGER SHARED VOLUME - GET RID OF THIS WHEN WE FIGURE OUT HOW TO DO E-TRANSFER OVER PUBLIC INTERNET
+      BOOTSTRAP_SERVER: ${WEBSITE_DOMAIN}:9092
       # if we move this sim to a separate machine, use the below bootstrap server:
       # BOOTSTRAP_SERVER=7.tcp.ngrok.io:26729
     entrypoint:
@@ -299,6 +400,7 @@ services:
 # storage containers:
 #==========================
   seaweedfs:
+    container_name: seaweedfs
     build: 
       context: .
       target: seaweedfs
@@ -342,6 +444,7 @@ services:
 #==========================
 # a one-shot init service that creates the volume before etd starts
   dsoc-volume-init:
+    container_name: dsoc-volume-init
     image: alpine:3.20
     profiles: ["kafka"]
     user: "0:0"
@@ -356,11 +459,15 @@ services:
         chmod 775 /dsoc/incoming
 
   etr_daemon:
+    container_name: etr_daemon
     build:
       context: .
       target: etd
     profiles: ["kafka"]
     user: "33:33"   # non root user: www-data
+    ports:
+      - "${WEBSITE_DOMAIN}:4004:4004/tcp"
+      - "${WEBSITE_DOMAIN}:8008:8008/udp"
     depends_on:
       dsoc-volume-init:
         condition: service_completed_successfully
@@ -389,7 +496,11 @@ volumes:
   seaweed_data:
   dsoc_transfer:
   vlba_data:
+  portainer_data:
 
 networks:
   ngradar_website_network:
+    driver: bridge
+  proxy:
+    name: proxy
     driver: bridge
