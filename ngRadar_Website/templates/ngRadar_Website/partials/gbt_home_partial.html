@@ -33,44 +33,45 @@
 
 <!--Script to disable button and change the context in button-->
 <script>
-    function checkLockSSE()
-    {
-        const eventSource = new EventSource('/home/lock-status/')
-        eventSource.addEventListener('lock-status',function(event){
-            try {
-                const data = JSON.parse(event.data);
-                const submitBTN = document.getElementById('waveform-submit-btn');
+function checkLockSSE() {
+    const submitBTN = document.getElementById('waveform-submit-btn');
+    let eventSource = new EventSource('/home/lock-status/');
 
-                if (data.error){
-                    btn.disabled = true;
-                    btn.textContent = "Error locking button";
-                }
-                else if(data.locked){
-                    btn.disabled = true;
-                    submitBTN.textContent = "Generating ..."
-                }
-                else{
-                    submitBTN.disabled = false;
-                    submitBTN.textContent = "Submit"
-                }
-            }
-            catch (parseError)
-            {
+    eventSource.addEventListener('lock-status', function(event) {
+        try {
+            const data = JSON.parse(event.data);
+
+            if (data.error) {
                 submitBTN.disabled = true;
                 submitBTN.textContent = "Error locking button";
+            } else if (data.locked) {
+                submitBTN.disabled = true;
+                submitBTN.textContent = "Generating ...";
+            } else {
+                submitBTN.disabled = false;
+                submitBTN.textContent = "Submit";
             }
-        });
-        eventSource.onerror = () => {
+        } catch (parseError) {
             submitBTN.disabled = true;
-            submitBTN.textContent = "Lock status unavailable";
-            eventSource.close()
+            submitBTN.textContent = "Error locking button";
         }
-    }
-    window.addEventListener('beforeunload', function() {
-        if(eventSource) eventSource.close();
     });
-    checkLockSSE();
+
+    eventSource.onerror = () => {
+        submitBTN.disabled = true;
+        submitBTN.textContent = "Lock status unavailable";
+        // usually do NOT close here if you want auto-reconnect
+    };
+
+    window.addEventListener('beforeunload', function() {
+        if (eventSource) eventSource.close();
+    });
+}
+
+checkLockSSE();
+
 </script>
+
 
 
 
