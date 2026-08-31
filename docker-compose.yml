@@ -71,6 +71,8 @@ services:
       - "--certificatesresolvers.le.acme.storage=/letsencrypt/acme.json"
       - "--certificatesresolvers.le.acme.httpchallenge=true"
       - "--certificatesresolvers.le.acme.httpchallenge.entrypoint=web"
+       # STAGING CA while testing - delete when done 
+      - "--certificatesresolvers.le.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory"
       
       # API & Dashboard 
       - "--api.dashboard=true"
@@ -88,12 +90,8 @@ services:
 
       # Dashboard router
       - "traefik.http.routers.dashboard.rule=Host(`dashboard.docker.localhost`)"
-      - "traefik.http.routers.dashboard.entrypoints=websecure"
+      - "traefik.http.routers.dashboard.entrypoints=web"
       - "traefik.http.routers.dashboard.service=api@internal"
-      - "traefik.http.routers.dashboard.tls=true"
-      - "traefik.http.routers.dashboard.tls.certresolver=le"
-      # - "traefik.http.routers.dashboard.entrypoints=web"
-      # - "traefik.http.routers.dashboard.tls=true"
 
 
   ngradar_website:

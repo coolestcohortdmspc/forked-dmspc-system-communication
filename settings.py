@@ -38,6 +38,10 @@ CSRF_TRUSTED_ORIGINS = [
     ).split(",")
 ]
 
+# Traefik sets X-Forwarded-Proto; this tells Django to trust it.
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+
 # Application definition
 INSTALLED_APPS = [
     'django.contrib.admin',
