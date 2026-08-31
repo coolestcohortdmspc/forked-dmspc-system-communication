@@ -40,6 +40,7 @@ services:
       - "80:80"
       - "443:443"
       - "8080:8080"
+      - "15432:15432"
 
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -94,7 +95,7 @@ services:
       - "traefik.http.routers.dashboard.tls.certresolver=le" # may cause problems locally idk yet
       # - "traefik.http.routers.dashboard.entrypoints=web"
       # - "traefik.http.routers.dashboard.tls=true"
-
+    
 
   ngradar_website:
     container_name: ngradar_website
@@ -145,14 +146,23 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql
       - ./postgres/init:/docker-entrypoint-initdb.d
-    ports:
-      - ${WEBSITE_DOMAIN}:5432:5432
+    # ports:
+      # - 5432:5432
     environment:
-      - POSTGRES_USER=ngradar_website # Use env variables instead of exposing these!!!!
-      - POSTGRES_PASSWORD=ngradar_website
-      - POSTGRES_DB=localdev
+      - POSTGRES_USER=${WEED_DB_USER}
+      - POSTGRES_PASSWORD=${WEED_DB_PASSWORD}
+      - POSTGRES_DB=${WEED_DB_NAME}
     networks:
       - ngradar_website_network
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+
+      - "traefik.tcp.routers.postgres.entrypoints=postgres"
+      - "traefik.tcp.routers.postgres.rule=HostSNI(`*`)"
+      - "traefik.tcp.routers.postgres.service=postgres"
+      - "traefik.tcp.services.postgres.loadbalancer.server.port=5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ngradar_website -d localdev"]
       interval: 5s
