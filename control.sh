@@ -2,8 +2,6 @@
 
 set -euo pipefail
 KAFKA_PROFILES="--profile kafka"
-# KAFKA_SERVICES="zookeeper broker kafka-ui ngrok gbt seaweedfs dsoc ngrok-writer vlba"
-# KAFKA_SERVICES="zookeeper kafka-broker kafka-ui kafka-init gbt seaweedfs dsoc vlba etr_daemon"
 
 # the order of these services matter!! learned the hard way..
 KAFKA_SERVICES="zookeeper kafka-broker kafka-init kafka-ui seaweedfs dsoc-volume-init"
@@ -52,9 +50,12 @@ attach)
     docker attach ngradar_website_service
     ;;
 
-load-staging-data)
-    docker compose run --rm staging_loader
-    ;;
+# Now that our live db lives in a DO droplet, I don't think we can run this command unless we want to ssh into the 
+# dsoc droplet. but I don't think we use this command enough for it to matter since all the data in the live
+# db is dummy data anyways. 
+# load-staging-data)
+#     docker compose run --rm staging_loader
+#     ;;
 
 
 kafka-up)
@@ -184,7 +185,7 @@ droplets-down)
     echo "./control.sh shell"
     echo "./control.sh logs"
     echo "./control.sh attach"
-    echo "./control.sh load-staging-data"
+    # echo "./control.sh load-staging-data"
     echo "./control.sh hard-reset"
     echo "./control.sh testcov"
     echo "./control.sh sims-up"
