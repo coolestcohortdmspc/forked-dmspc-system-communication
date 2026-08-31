@@ -50,12 +50,14 @@ services:
       - no-new-privileges:true
 
     networks:
-     # Connect to the 'traefik_proxy' overlay network for inter-container communication across nodes
+      # Local bridge network used by Traefik to reach
+      # the Django container on the DSOC Droplet.
       - proxy
 
     ports:
+      # # - "443:443"
+      # - "8080:8080"
       - "80:80"
-      - "443:443"
       - "127.0.0.1:8080:8080"
 
     volumes:
