@@ -42,23 +42,6 @@ start)
     docker compose up -d
     ;;
 
-rebuild-old)
-    echo "Rebuilding development environment..."
-    # Take down kafka + sim containers
-    docker compose stop $KAFKA_SERVICES
-    docker compose rm -f $KAFKA_SERVICES
-    docker compose stop $SIM_SERVICES
-    docker compose rm -f $SIM_SERVICES
-    # Take down the rest of the containers
-    docker compose down
-    # --no-cache ensures code changes are baked in cleanly
-    docker compose build --no-cache
-    # --force-recreate guarantees .env variable updates  and config updates are pushed into the container upon rebuild
-    docker compose up -d --force-recreate
-    # same with kafka profiles:
-    docker compose $KAFKA_PROFILES up -d --force-recreate
-    ;;
-
 stop)
     echo "Stopping development environment..."
     docker compose down
