@@ -640,11 +640,11 @@ def test_ensure_bucket_exists_created():
 # ==============================================================================
 # 5. etc_send Test
 # ==============================================================================
-
 @patch.dict(
     "os.environ",
     {
-        "ETD_DESTINATION": "fake_path",
+        "ETD_HOST": "fake_host",
+        "ETD_COMMAND_PORT": "4004",
     },
 )
 @patch("ngRadar_Website.utils.uuid.uuid4")
@@ -668,14 +668,11 @@ def test_etc_send(mock_parse, mock_os_read, mock_select, mock_os_close, mock_pop
     mock_popen.return_value = mock_process
 
     mock_os_close.return_value = None
-
     mock_select.return_value = ([mock_master], [], [])
-
     mock_os_read.return_value = b"50% 250/500\r"
-
     mock_parse.return_value = None
 
-    #only run through the while loop twice to avoid infinite loop in test:
+    # Only run through the while loop once to avoid an infinite loop.
     mock_process.poll.side_effect = [None, 0]
     mock_process.wait.return_value = 0
     mock_process.args = ["etc", "fake_file"]
@@ -684,16 +681,29 @@ def test_etc_send(mock_parse, mock_os_read, mock_select, mock_os_close, mock_pop
 
     mock_uuid.assert_called_once()
     mock_os_open.assert_called_once()
+
     mock_popen.assert_called_once_with(
-        ["etc", str(mock_frame_path), os.environ["ETD_DESTINATION"], "--resume",],
+        [
+            "etc",
+            str(mock_frame_path),
+            "tcp://fake_host#4004:/dsoc/incoming/",
+            "--resume",
+        ],
         stdin=mock_slave,
         stdout=mock_slave,
         stderr=mock_slave,
         close_fds=True,
     )
+
     assert mock_os_close.call_count == 2
+
     mock_os_read.assert_called_once_with(mock_master, 4096)
-    mock_parse.assert_called_once_with("50% 250/500", expected_num_bytes=500, transfer_id=mock_uuid.return_value)
+
+    mock_parse.assert_called_once_with(
+        "50% 250/500",
+        expected_num_bytes=500,
+        transfer_id="fake_uuid",
+    )
 
 
 # ==============================================================================
