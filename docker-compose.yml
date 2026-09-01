@@ -220,7 +220,7 @@ services:
       - "traefik.tcp.routers.postgres.entrypoints=postgres"
       - "traefik.tcp.routers.postgres.rule=HostSNI(`*`)"
       - "traefik.tcp.routers.postgres.service=postgres"
-      - "traefik.tcp.services.postgres.loadbalancer.server.port=15432"
+      - "traefik.tcp.services.postgres.loadbalancer.server.port=5432"
     healthcheck:
       test:
         [
