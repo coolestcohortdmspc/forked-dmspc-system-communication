@@ -46,8 +46,8 @@ services:
       - "127.0.0.1:8080:8080"
       - "5432:5432/tcp"
       - "9092:9092/tcp"
-      - "4004:4004/tcp"
-      - "8008:8008/udp"
+      # - "4004:4004/tcp"
+      # - "8008:8008/udp"
 
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -59,8 +59,8 @@ services:
       - "--entrypoints.web.address=:80"
       - "--entrypoints.postgres.address=:5432"
       - "--entrypoints.kafka.address=:9092"
-      - "--entrypoints.command.address=:4004"
-      - "--entrypoints.data.address=:8008/udp"
+      # - "--entrypoints.command.address=:4004"
+      # - "--entrypoints.data.address=:8008/udp"
       # - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
       # - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
       # - "--entrypoints.web.http.redirections.entrypoint.permanent=true"
@@ -500,27 +500,27 @@ services:
       target: etd
     profiles: ["kafka"]
     user: "33:33"   # non root user: www-data
-    # ports:
-    #   - "${PUBLIC_BIND_IP:-127.0.0.1}:4004:4004/tcp"
-    #   - "${PUBLIC_BIND_IP:-127.0.0.1}:8008:8008/udp"
+    ports:
+      - "${PUBLIC_BIND_IP:-127.0.0.1}:4004:4004/tcp"
+      - "${PUBLIC_BIND_IP:-127.0.0.1}:8008:8008/udp"
     depends_on:
       dsoc-volume-init:
         condition: service_completed_successfully
     networks:
       - ngradar_website_network
-      - proxy
-    labels:
-      - "traefik.enable=true"
-      - "traefik.docker.network=proxy"
+      # - proxy
+    # labels:
+    #   - "traefik.enable=true"
+    #   - "traefik.docker.network=proxy"
       
-      - "traefik.tcp.routers.command.entrypoints=command"
-      - "traefik.tcp.routers.command.rule=HostSNI(`*`)"
-      - "traefik.tcp.routers.command.service=command"
-      - "traefik.tcp.services.command.loadbalancer.server.port=14004"
+    #   - "traefik.tcp.routers.command.entrypoints=command"
+    #   - "traefik.tcp.routers.command.rule=HostSNI(`*`)"
+    #   - "traefik.tcp.routers.command.service=command"
+    #   - "traefik.tcp.services.command.loadbalancer.server.port=14004"
 
-      - "traefik.udp.routers.data.entrypoints=data"
-      - "traefik.udp.routers.data.service=data"
-      - "traefik.udp.services.data.loadbalancer.server.port=18008"
+    #   - "traefik.udp.routers.data.entrypoints=data"
+    #   - "traefik.udp.routers.data.service=data"
+    #   - "traefik.udp.services.data.loadbalancer.server.port=18008"
     volumes:
       - dsoc_transfer:/dsoc/incoming
     command:
