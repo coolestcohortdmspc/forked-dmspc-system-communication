@@ -19,24 +19,14 @@ load_dotenv(BASE_DIR / '.env')
 
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
 DEBUG = os.environ.get('DJANGO_DEBUG', "False").lower() == "true"
-DROPLET_IP = os.environ.get('WEBSITE_DOMAIN')
 
 # Allow local Docker containers AND Render's domain depending on environment
 # This setting answers the question: "Is this Host header allowed?"
-ALLOWED_HOSTS = [
-    host.strip() 
-    for host in os.environ.get('DJANGO_ALLOWED_HOSTS', f'localhost,127.0.0.1,{DROPLET_IP}').split(',')
-]
+ALLOWED_HOSTS = [os.environ.get('DJANGO_ALLOWED_HOSTS')]
 
 # This setting answers the question: "Is this HTTPS POST allowed to originate from this site?"
 # Without it, our render csrf authentication will fail
-CSRF_TRUSTED_ORIGINS = [
-    origin.strip()
-    for origin in os.environ.get(
-        "DJANGO_CSRF_TRUSTED_ORIGINS",
-        "http://localhost:8000"
-    ).split(",")
-]
+CSRF_TRUSTED_ORIGINS = [os.environ.get( "DJANGO_CSRF_TRUSTED_ORIGINS")]
 
 # Application definition
 INSTALLED_APPS = [

@@ -18,8 +18,10 @@ services:
     security_opt:
       - no-new-privileges:true
     ports:
-      - "9000:9000"
-      - "9443:9443"
+      # - "9000:9000"
+      # - "9443:9443"
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9443:9443"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - portainer_data:/data
@@ -33,13 +35,15 @@ services:
       - no-new-privileges:true
 
     networks:
-     # Connect to the 'traefik_proxy' overlay network for inter-container communication across nodes
+      # Local bridge network used by Traefik to reach
+      # the Django container on the DSOC Droplet.
       - proxy
 
     ports:
+      # # - "443:443"
+      # - "8080:8080"
       - "80:80"
-      # - "443:443"
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
 
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -126,15 +130,20 @@ services:
       - postgres_data:/var/lib/postgresql
       - ./postgres/init:/docker-entrypoint-initdb.d
     ports:
-      - ${WEBSITE_DOMAIN}:5432:5432
+      # - ${WEBSITE_DOMAIN}:5432:5432
+      - "${PUBLIC_BIND_IP:-127.0.0.1}:5432:5432"
     environment:
-      - POSTGRES_USER=ngradar_website # Use env variables instead of exposing these!!!!
-      - POSTGRES_PASSWORD=ngradar_website
-      - POSTGRES_DB=localdev
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
     networks:
       - ngradar_website_network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ngradar_website -d localdev"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"
+        ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -215,8 +224,10 @@ services:
     restart: "no"
 
 
+
+# Commenting this out because we don't need it for local dev and we won't need it for the droplets on DO either.
+# But keeping it in case we ever do need ngrok again at some point?
   # ngrok:
-  #   container_name: ngrok
   #   image: ngrok/ngrok:latest
   #   profiles: ["kafka"]
   #   env_file:
@@ -247,13 +258,16 @@ services:
     depends_on:
       - zookeeper
     ports:
-      - ${WEBSITE_DOMAIN}:9092:9092
+      - ${PUBLIC_BIND_IP:-127.0.0.1}:9092:9092
     environment:
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka-broker:29092,EXTERNAL://${KAFKA_EXTERNAL_HOST}:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092
-      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka-broker:29092,EXTERNAL://${WEBSITE_DOMAIN}:9092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      # KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092
+      # KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka-broker:29092,EXTERNAL://${WEBSITE_DOMAIN}:9092
+      # KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
@@ -314,9 +328,8 @@ services:
       - ngradar_website_network
     profiles: ["kafka"]
     environment:
-      BOOTSTRAP_SERVER: ${WEBSITE_DOMAIN}:9092
-      # if we move this sim to a separate machine, use the below bootstrap server:
-      # BOOTSTRAP_SERVER=7.tcp.ngrok.io:26729
+      # BOOTSTRAP_SERVER: ${WEBSITE_DOMAIN}:9092
+      BOOTSTRAP_SERVER: ${BOOTSTRAP_SERVER:-kafka-broker:29092}
     entrypoint:
         - python
         - manage.py
@@ -349,9 +362,8 @@ services:
       - ngradar_website_network
     profiles: ["kafka"]
     environment:
-      BOOTSTRAP_SERVER: kafka-broker:29092
-      # if we move this sim to a separate machine, use the below bootstrap server:
-      # BOOTSTRAP_SERVER=7.tcp.ngrok.io:26729
+      # BOOTSTRAP_SERVER: kafka-broker:29092
+      BOOTSTRAP_SERVER: ${BOOTSTRAP_SERVER:-kafka-broker:29092}
     entrypoint:
         - python
         - manage.py
@@ -383,10 +395,11 @@ services:
       - ngradar_website_network
     profiles: ["kafka"]
     environment:
-      ETD_DESTINATION: "etr_daemon:/dsoc/incoming/" # NO LONGER SHARED VOLUME - GET RID OF THIS WHEN WE FIGURE OUT HOW TO DO E-TRANSFER OVER PUBLIC INTERNET
-      BOOTSTRAP_SERVER: ${WEBSITE_DOMAIN}:9092
-      # if we move this sim to a separate machine, use the below bootstrap server:
-      # BOOTSTRAP_SERVER=7.tcp.ngrok.io:26729
+      # ETD_DESTINATION: "etr_daemon:/dsoc/incoming/" # NO LONGER SHARED VOLUME - GET RID OF THIS WHEN WE FIGURE OUT HOW TO DO E-TRANSFER OVER PUBLIC INTERNET
+      # BOOTSTRAP_SERVER: ${WEBSITE_DOMAIN}:9092
+      BOOTSTRAP_SERVER: ${BOOTSTRAP_SERVER:-kafka-broker:29092}
+      ETD_HOST: ${ETD_HOST}
+      ETD_COMMAND_PORT: ${ETD_COMMAND_PORT:-4004}
     entrypoint:
       - python
       - manage.py
@@ -408,10 +421,10 @@ services:
       DATABASE_URL: ${DATABASE_URL}
       WEED_S3_ACCESS_KEY: ${WEED_S3_ACCESS_KEY}
       WEED_S3_SECRET_KEY: ${WEED_S3_SECRET_KEY}
-    ports:
-      - "8333:8333" # SeaweedFS S3 gateway (ngrok exposes this during demos for our cloud-hosted website to retrieve images)
-      - "8888:8888"
-      - "9333:9333"
+    # ports:
+    #   - "8333:8333" # SeaweedFS S3 gateway (ngrok exposes this during demos for our cloud-hosted website to retrieve images)
+    #   - "8888:8888"
+    #   - "9333:9333"
     volumes:
       - seaweed_data:/data
     depends_on:
@@ -421,7 +434,8 @@ services:
     profiles: ["kafka"]
 
 
-
+# Commenting this out because we never use this, but keeping it in case we want to? 
+# You can also visit the filer port of the seaweedfs container and view the filer there too.
   # storage-ui:
   #   image: mastertinner/s3manager:latest
   #   platform: linux/amd64
@@ -463,8 +477,8 @@ services:
     profiles: ["kafka"]
     user: "33:33"   # non root user: www-data
     ports:
-      - "${WEBSITE_DOMAIN}:4004:4004/tcp"
-      - "${WEBSITE_DOMAIN}:8008:8008/udp"
+      - "${PUBLIC_BIND_IP:-127.0.0.1}:4004:4004/tcp"
+      - "${PUBLIC_BIND_IP:-127.0.0.1}:8008:8008/udp"
     depends_on:
       dsoc-volume-init:
         condition: service_completed_successfully
