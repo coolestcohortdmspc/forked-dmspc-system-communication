@@ -44,6 +44,10 @@ services:
       # - "8080:8080"
       - "80:80"
       - "127.0.0.1:8080:8080"
+      - "15432:15432"
+      - "19092:19092"
+      - "14004:14004"
+      - "18008:18008"
 
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -53,6 +57,10 @@ services:
     command:
       # EntryPoints
       - "--entrypoints.web.address=:80"
+      - "--entrypoints.postgres.address=:15432"
+      - "--entrypoints.kafka.address=:19092"
+      - "--entrypoints.command.address=:14004"
+      - "entrypoints.data.address=:18008"
       # - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
       # - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
       # - "--entrypoints.web.http.redirections.entrypoint.permanent=true"
@@ -129,15 +137,23 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql
       - ./postgres/init:/docker-entrypoint-initdb.d
-    ports:
-      # - ${WEBSITE_DOMAIN}:5432:5432
-      - "${PUBLIC_BIND_IP:-127.0.0.1}:5432:5432"
+    # ports:
+    #   - ${WEBSITE_DOMAIN}:5432:5432
+    #   - "${PUBLIC_BIND_IP:-127.0.0.1}:5432:5432"
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=${POSTGRES_DB}
     networks:
       - ngradar_website_network
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      - "traefik.tcp.routers.postgres.entrypoints=postgres"
+      - "traefik.tcp.routers.postgres.rule=HostSNI(`*`)"
+      - "traefik.tcp.routers.postgres.service=postgres"
+      - "traefik.tcp.services.postgres.loadbalancer.server.port=5432"
     healthcheck:
       test:
         [
@@ -275,6 +291,14 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
     networks:
       - ngradar_website_network
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      - "traefik.tcp.routers.kafka.entrypoints=postgres"
+      - "traefik.tcp.routers.kafka.rule=HostSNI(`*`)"
+      - "traefik.tcp.routers.kafka.service=kafka"
+      - "traefik.tcp.services.kafka.loadbalancer.server.port=39092"
     healthcheck:
       test:
         [
@@ -476,14 +500,27 @@ services:
       target: etd
     profiles: ["kafka"]
     user: "33:33"   # non root user: www-data
-    ports:
-      - "${PUBLIC_BIND_IP:-127.0.0.1}:4004:4004/tcp"
-      - "${PUBLIC_BIND_IP:-127.0.0.1}:8008:8008/udp"
+    # ports:
+    #   - "${PUBLIC_BIND_IP:-127.0.0.1}:4004:4004/tcp"
+    #   - "${PUBLIC_BIND_IP:-127.0.0.1}:8008:8008/udp"
     depends_on:
       dsoc-volume-init:
         condition: service_completed_successfully
     networks:
       - ngradar_website_network
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      - "traefik.tcp.routers.command.entrypoints=command"
+      - "traefik.tcp.routers.command.rule=HostSNI(`*`)"
+      - "traefik.tcp.routers.command.service=command"
+      - "traefik.tcp.services.command.loadbalancer.server.port=24004"
+
+      - "traefik.udp.routers.data.entrypoints=data"
+      - "traefik.udp.routers.data.rule=HostSNI(`*`)"
+      - "traefik.udp.routers.data.service=data"
+      - "traefik.udp.services.data.loadbalancer.server.port=28008"
     volumes:
       - dsoc_transfer:/dsoc/incoming
     command:
