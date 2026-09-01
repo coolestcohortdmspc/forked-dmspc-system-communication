@@ -40,7 +40,7 @@ services:
       - proxy
 
     ports:
-      # # - "443:443"
+      - "443:443"
       # - "8080:8080"
       - "80:80"
       - "127.0.0.1:8080:8080"
@@ -51,6 +51,7 @@ services:
 
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      - ./letsencrypt:/letsencrypt
       # - ./certs:/certs:ro
       # - ./dynamic:/dynamic:ro
 
@@ -61,12 +62,15 @@ services:
       - "--entrypoints.kafka.address=:9092"
       # - "--entrypoints.command.address=:4004"
       # - "--entrypoints.data.address=:8008/udp"
-      # - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
-      # - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
-      # - "--entrypoints.web.http.redirections.entrypoint.permanent=true"
-      # - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--entrypoints.web.http.redirections.entrypoint.permanent=true"
+      - "--entrypoints.websecure.address=:443"
       # - "--entrypoints.websecure.http.tls=true"
-
+      - "--certificatesresolvers.le.acme.email=${COHORT_EMAIL}"
+      - "--certificatesresolvers.le.acme.storage=/letsencrypt/acme.json"
+      - "--certificatesresolvers.le.acme.httpchallenge=true"
+      - "--certificatesresolvers.le.acme.httpchallenge.entrypoint=web"
       # # Attach the static configuration tls.yaml file that contains the tls configuration settings
       # - "--providers.file.filename=/dynamic/tls.yml"
 
