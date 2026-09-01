@@ -303,7 +303,7 @@ droplets-down)
     echo "./control.sh system-down"
     echo "./control.sh gbt-up"
     echo "./control.sh gbt-down"
-    echo "./control.sh vlba-up VLBA_1_SERVICES"
+    echo "./control.sh vlba-up VLBA_?_SERVICES"
     echo "./control.sh vlba-down VLBA_?_SERVICES"
     echo "./control.sh dsoc-up"
     echo "./control.sh dsoc-down"
