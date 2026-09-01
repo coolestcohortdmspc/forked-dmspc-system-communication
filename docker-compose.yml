@@ -69,7 +69,7 @@ services:
 
       # API & Dashboard 
       - "--api.dashboard=true"
-      - "--api.insecure=true"
+      - "--api.insecure=true"   #turn this to true to use without username and password
 
       # Observability 
       - "--log.level=INFO"
@@ -86,6 +86,12 @@ services:
       - "traefik.http.routers.dashboard.entrypoints=web"
       - "traefik.http.routers.dashboard.service=api@internal"
       # - "traefik.http.routers.dashboard.tls=true"
+      # Add password authentication
+      #- "traefik.http.routers.traefik.middlewares=traefik-auth"
+      #- "traefik.http.middlewares.auth.basicauth.users=admin:$$2y$$05$$30p0xO0LMVDIvJblHuDYnu07yktNVqBLXRR28tJkTA2flSfqKvRsW"
+
+
+
 
 
   ngradar_website:
