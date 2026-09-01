@@ -6,6 +6,8 @@ set -a
 source .env
 set +a
 
+START="traefik portainer ngradar_website postgres"
+
 DSOC_DROPLET="root@${DSOC_DROPLET_IP}"
 VLBA_1_DROPLET="root@${VLBA_DROPLET_IP}"  # TODO remove when scaling up
 # TODO use these for scaling up AND ADD THESE IPs to .env
@@ -37,7 +39,7 @@ case "$COMMAND" in
 
 start)
     echo "Starting development environment..."
-    docker compose up -d
+    docker compose up -d $START
     ;;
 
 stop)
