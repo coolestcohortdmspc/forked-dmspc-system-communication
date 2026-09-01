@@ -25,6 +25,7 @@ KAFKA_SERVICES="zookeeper kafka-broker kafka-init kafka-ui seaweedfs dsoc-volume
 SIM_SERVICES="etr_daemon gbt vlba dsoc"
 
 PORTAINER_SERVICE="portainer"
+AGENT_SERVICE="portainer_agent"
 
 # TODO add the commented vlba sims when scaling up! (vlba9 and vlba10 should start before gbt)
 DSOC_SERVICES="traefik ngradar_website postgres zookeeper kafka-broker kafka-init kafka-ui seaweedfs dsoc-volume-init dsoc etr_daemon"  # vlba7 vlba8
@@ -149,10 +150,9 @@ portainer-up)
     docker compose up -d $PORTAINER_SERVICE
     ;;
 
-# portainer-down)
-#     docker compose stop $PORTAINER_SERVICE
-#     docker compose rm -f $PORTAINER_SERVICE
-#     ;;
+agent-up)
+    docker compose up -d $AGENT_SERVICE
+    ;;
 
 gbt-up)
     docker compose up -d $GBT_SERVICES
@@ -233,26 +233,47 @@ droplets-down)
         "cd $REMOTE_DIR && ./control.sh dsoc-down"
     ;;
 *)
-
-    echo "Usage:"
     echo
+    echo "HELP with ./control.sh usage:"
+    echo
+    echo "If developing locally, use the following commands to start/stop your environment:"
     echo "./control.sh start"
-    echo "./control.sh rebuild"
+    echo "./control.sh system-up"
+    echo "./control.sh system-down"
+    echo "./control.sh stop"
+    echo
+    echo "To make migrations and create superusers, use the shell:"
+    echo "./control.sh shell"
+    echo
+    echo "Utility commands to rebuild working environment:"
+    echo "./control.sh rebuild"   
+    echo "./control.sh hard-reset"
+    echo
+    echo "To run test coverage on this branch, run:"
+    echo "./control.sh testcov"
+    echo
+    echo "To control all droplets from a remote device, use the following commands:"
+    echo "./control.sh droplets-up"
+    echo "./control.sh droplets-down"
+    echo
+    echo "If you are currently on a droplet, use one of the following commands:"
+    echo "./control.sh dsoc-up"
+    echo "./control.sh dsoc-down"
+    echo "./control.sh gbt-up"
+    echo "./control.sh gbt-down"
+    echo "./control.sh vlba-up"
+    echo "./control.sh vlba-down"
+    echo "./control.sh portainer-up"
+    echo "./control.sh agent-up"
+    echo
+    echo "Other commands (rarely needed):"
+    echo "./control.sh sims-up"
+    echo "./control.sh sims-down"
     echo "./control.sh kafka-up"
     echo "./control.sh kafka-down"
-    echo "./control.sh stop"
-    echo "./control.sh shell"
     echo "./control.sh logs"
     echo "./control.sh attach"
     # echo "./control.sh load-staging-data"
-    echo "./control.sh hard-reset"
-    echo "./control.sh testcov"
-    echo "./control.sh sims-up"
-    echo "./control.sh sims-down"
-    echo "./control.sh system-up"
-    echo "./control.sh system-down"
-    echo "./control.sh droplets-up"
-    echo "./control.sh droplets-down"
     exit 1
     ;;
 

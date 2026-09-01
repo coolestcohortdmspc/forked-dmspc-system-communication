@@ -28,15 +28,7 @@ Run these commands in your terminal to accomplish any of the following:
 ./control.sh system-up      # Starts the Kafka (kafka-up) and sim (sims-up) services within the container, make sure the container is started before running
                             # This ensures that the containers spin up in the correct order
 
-./control.sh kafka-up       # One component of ./control.sh system-up. Starts the kafka + ngrok services within the container
-
-./control.sh sims-up        # One component of ./control.sh system-up. Starts the sims (GBT, VLBA, and DSOC) and the e-transfer daemon
-
 ./control.sh system-down    # Stops both the kafka (kafka-down) and sim (sims-down) services in the correct order; your local dev docker container will still be running
-
-./control.sh kafka-down     # Stops the kafka + ngrok services; your local dev docker container will still be running
-
-./control.sh sims-down      # Stops the sims services; your local dev docker container will still be running
 
 ./control.sh stop           # Does a `docker-compose down`
 
@@ -47,11 +39,19 @@ Run these commands in your terminal to accomplish any of the following:
 
 ./control.sh attach         # Does a `docker attach ngradar_website_service`
 
-./control.sh load-staging-data   # builds/runs a one-off container to seed demo db data to your local db
-
-./control.sh hard-reset      # (destructive) removes all containers/images/volumes for this prototype AND rebuilds + starts your docker container from scratch
+./control.sh hard-reset     # (destructive) removes all containers/images/volumes for this prototype AND rebuilds + starts your docker container from scratch
 
 ./control.sh testcov        # Calculates unit test coverage and prints the test results in the terminal
+
+./control.sh droplets-up    # Brings up all Digital Ocean droplets remotely via SSH and more control.sh commands
+
+./control.sh droplets-down  # Brings all droplets back down. Leaves the portainer services running so we can always monitor with the Portainer UI
+
+./control.sh <sim>-up       # When on a droplet, i.e. the dsoc droplet, you can run a dsoc-up to bring up exactly what that droplet needs.
+
+./control.sh portainer-up   # If the dsoc droplet's portainer service fails, start it up with run this command
+
+./control.sh agent-up       # If the gbt or vlba droplet's agent fails, start it up again with this command.
 ```
 
 
@@ -64,8 +64,7 @@ For local dev, we have the following services spun up in local Docker containers
             - ZooKeeper  
             - Kafka broker  
             - Kafka UI  
-            - Kafka topic initialization  
-            - ngrok  
+            - Kafka topic initialization
             - SeaweedFS  
     2. Sim services:  
             - E-Transfer daemon  
