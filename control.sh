@@ -22,10 +22,10 @@ KAFKA_PROFILES="--profile kafka"
 KAFKA_SERVICES="zookeeper kafka-broker kafka-init kafka-ui seaweedfs dsoc-volume-init"
 SIM_SERVICES="etr_daemon gbt vlba dsoc"
 
-DIGITAL_OCEAN_SERVICES="portainer traefik"
+PORTAINER_SERVICE="portainer"
 
 # TODO add the commented vlba sims when scaling up! (vlba9 and vlba10 should start before gbt)
-DSOC_SERVICES="ngradar_website postgres zookeeper kafka-broker kafka-init kafka-ui seaweedfs dsoc-volume-init dsoc etr_daemon"  # vlba7 vlba8
+DSOC_SERVICES="traefik ngradar_website postgres zookeeper kafka-broker kafka-init kafka-ui seaweedfs dsoc-volume-init dsoc etr_daemon"  # vlba7 vlba8
 VLBA_1_SERVICES="vlba"  # vlba2
 VLBA_2_SERVICES="vlba3 vlba4"
 VLBA_3_SERVICES="vlba5 vlba6"
@@ -143,14 +143,14 @@ hard-reset)
     docker compose build --no-cache && docker compose up -d
     ;;
 
-digital-ocean-up)
-    docker compose up -d $DIGITAL_OCEAN_SERVICES
+portainer-up)
+    docker compose up -d $PORTAINER_SERVICE
     ;;
 
-digital-ocean-down)
-    docker compose stop $DIGITAL_OCEAN_SERVICES
-    docker compose rm -f $DIGITAL_OCEAN_SERVICES
-    ;;
+# portainer-down)
+#     docker compose stop $PORTAINER_SERVICE
+#     docker compose rm -f $PORTAINER_SERVICE
+#     ;;
 
 gbt-up)
     docker compose up -d $GBT_SERVICES
