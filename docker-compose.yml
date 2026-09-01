@@ -37,13 +37,9 @@ services:
     networks:
       # Local bridge network used by Traefik to reach
       # the Django container on the DSOC Droplet.
-      # Local bridge network used by Traefik to reach
-      # the Django container on the DSOC Droplet.
       - proxy
 
     ports:
-      # # - "443:443"
-      # - "8080:8080"
       # # - "443:443"
       # - "8080:8080"
       - "80:80"
@@ -148,9 +144,6 @@ services:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=${POSTGRES_DB}
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB}
     networks:
       - ngradar_website_network
       - proxy
@@ -162,11 +155,6 @@ services:
       - "traefik.tcp.routers.postgres.service=postgres"
       - "traefik.tcp.services.postgres.loadbalancer.server.port=5432"
     healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"
-        ]
       test:
         [
           "CMD-SHELL",
@@ -255,9 +243,6 @@ services:
 
 # Commenting this out because we don't need it for local dev and we won't need it for the droplets on DO either.
 # But keeping it in case we ever do need ngrok again at some point?
-
-# Commenting this out because we don't need it for local dev and we won't need it for the droplets on DO either.
-# But keeping it in case we ever do need ngrok again at some point?
   # ngrok:
   #   image: ngrok/ngrok:latest
   #   profiles: ["kafka"]
@@ -293,13 +278,7 @@ services:
     environment:
       KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092
       KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka-broker:29092,EXTERNAL://${KAFKA_EXTERNAL_HOST}:9092
-      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka-broker:29092,EXTERNAL://${KAFKA_EXTERNAL_HOST}:9092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      # KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092
-      # KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka-broker:29092,EXTERNAL://${WEBSITE_DOMAIN}:9092
-      # KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       # KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092
