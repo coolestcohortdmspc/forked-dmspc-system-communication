@@ -57,14 +57,6 @@ attach)
     docker attach ngradar_website_service
     ;;
 
-# Now that our live db lives in a DO droplet, I don't think we can run this command unless we want to ssh into the 
-# dsoc droplet. but I don't think we use this command enough for it to matter since all the data in the live
-# db is dummy data anyways. 
-# load-staging-data)
-#     docker compose run --rm staging_loader
-#     ;;
-
-
 kafka-up)
     echo "Starting Kafka infrastructure and storage..."
     docker compose $KAFKA_PROFILES up -d $KAFKA_SERVICES
@@ -81,7 +73,6 @@ system-up)
     echo "Starting simulator services..."
     "$0" sims-up
     ;;
-
 
 kafka-down)
     echo "Stopping kafka infrastructure and storage..."
@@ -129,7 +120,6 @@ testcov)
     ;;
 
 hard-reset)
-
     read -p "This will DELETE your local database and containers. Continue? (y/N): " ANSWER
 
     if [[ "$ANSWER" != "y" && "$ANSWER" != "Y" ]]; then
@@ -144,24 +134,55 @@ hard-reset)
     ;;
 
 digital-ocean-up)
+    read -p "This will START persistent containers when run in ANY DIGITALOCEAN DROPLET. Continue? (y/N): " ANSWER
+
+    if [[ "$ANSWER" != "y" && "$ANSWER" != "Y" ]]; then
+        exit 0
+    fi
+
     docker compose up -d $DIGITAL_OCEAN_SERVICES
     ;;
 
 digital-ocean-down)
+    read -p "This will STOP persistent containers when run in ANY DIGITALOCEAN DROPLET. Continue? (y/N): " ANSWER
+
+    if [[ "$ANSWER" != "y" && "$ANSWER" != "Y" ]]; then
+        exit 0
+    fi
+
     docker compose stop $DIGITAL_OCEAN_SERVICES
     docker compose rm -f $DIGITAL_OCEAN_SERVICES
     ;;
 
 gbt-up)
+    read -p "This will START the gbt container when run in the GBT DIGITALOCEAN DROPLET. Continue? (y/N): " ANSWER
+
+    if [[ "$ANSWER" != "y" && "$ANSWER" != "Y" ]]; then
+        exit 0
+    fi
+
     docker compose up -d $GBT_SERVICES
     ;;
 
 gbt-down)
+    read -p "This will STOP the gbt container when run in the GBT DIGITALOCEAN DROPLET. Continue? (y/N): " ANSWER
+
+    if [[ "$ANSWER" != "y" && "$ANSWER" != "Y" ]]; then
+        exit 0
+    fi
+
     docker compose stop $GBT_SERVICES
     docker compose rm -f $GBT_SERVICES
     ;;
 
 vlba-up)
+    # TODO change this line when scaling up
+    read -p "This will START the vlba container when run in the VLBA DIGITALOCEAN DROPLET. Continue? (y/N): " ANSWER
+
+    if [[ "$ANSWER" != "y" && "$ANSWER" != "Y" ]]; then
+        exit 0
+    fi
+
     # TODO start all of these when scaling up!
     # Get the services that are passed as the argument to vlba-up
     SERVICES="${!2}"
@@ -169,6 +190,13 @@ vlba-up)
     ;;
 
 vlba-down)
+    # TODO change this line when scaling up
+    read -p "This will STOP the vlba container when run in the VLBA DIGITALOCEAN DROPLET. Continue? (y/N): " ANSWER
+
+    if [[ "$ANSWER" != "y" && "$ANSWER" != "Y" ]]; then
+        exit 0
+    fi
+
     # TODO remove all of these when scaling up!
     # Get the services that are passed as the argument to vlba-down
     SERVICES="${!2}"
@@ -177,15 +205,33 @@ vlba-down)
     ;;
 
 dsoc-up)
+    read -p "This will START the dsoc container when run in the DSOC DIGITALOCEAN DROPLET. Continue? (y/N): " ANSWER
+
+    if [[ "$ANSWER" != "y" && "$ANSWER" != "Y" ]]; then
+        exit 0
+    fi
+
     docker compose up -d $DSOC_SERVICES
     ;;
 
 dsoc-down)
+    read -p "This will STOP the dsoc container when run in the DSOC DIGITALOCEAN DROPLET. Continue? (y/N): " ANSWER
+
+    if [[ "$ANSWER" != "y" && "$ANSWER" != "Y" ]]; then
+        exit 0
+    fi
+
     docker compose stop $DSOC_SERVICES
     docker compose rm -f $DSOC_SERVICES
     ;;
 
 droplets-up)
+    read -p "Are you sure you want to ssh into the DIGITALOCEAN DROPLETS? This will START all of the DIGITALOCEAN DROPLETS from your LOCAL TERMINAL. Continue? (y/N): " ANSWER
+
+    if [[ "$ANSWER" != "y" && "$ANSWER" != "Y" ]]; then
+        exit 0
+    fi
+
     echo "Starting DSOC Droplet"
     ssh "$DSOC_DROPLET" \
         "cd $REMOTE_DIR && ./control.sh dsoc-up"
@@ -209,6 +255,12 @@ droplets-up)
     ;;
 
 droplets-down)
+    read -p "Are you sure you want to ssh into the DIGITALOCEAN DROPLETS? This will STOP all of the DIGITALOCEAN DROPLETS from your LOCAL TERMINAL. Continue? (y/N): " ANSWER
+
+    if [[ "$ANSWER" != "y" && "$ANSWER" != "Y" ]]; then
+        exit 0
+    fi
+
     echo "Stopping GBT Droplet"
     ssh "$GBT_DROPLET" \
         "cd $REMOTE_DIR && ./control.sh gbt-down"
