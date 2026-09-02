@@ -172,29 +172,29 @@ def serve_image(request, uuid):
 # Othere wise False  
 def lock_status(request):
     logger = logging.getLogger(__name__)
-    while True:
-        try:
-            currentStatus = None
-            # statusCode = None
-            lock_time = cache.get('submit_locked', None)
-            if lock_time is None:
-                currentStatus = ({"locked": False, "error": False})
-                # statusCode=200
-            elif dsocEvent.objects.filter(event_time__gt=lock_time).exists():
-                cache.delete('submit_locked')
-                currentStatus = ({'locked':False, "error": False})
-                # statusCode=200
-            else:
-                currentStatus = ({'locked':True, "error": False})
-                # statusCode=503
-        except Exception as e:
-            logger.error(f"Cache unavailable while checking submit lock: {e}")
-
-            currentStatus = ({"locked": True, "error": True, "message": "Unable to determine lock status."})
+    #while True:
+    try:
+        currentStatus = None
+        # statusCode = None
+        lock_time = cache.get('submit_locked', None)
+        if lock_time is None:
+            currentStatus = ({"locked": False, "error": False})
+            # statusCode=200
+        elif dsocEvent.objects.filter(event_time__gt=lock_time).exists():
+            cache.delete('submit_locked')
+            currentStatus = ({'locked':False, "error": False})
+            # statusCode=200
+        else:
+            currentStatus = ({'locked':True, "error": False})
             # statusCode=503
-            
-        yield f"event: lock-status\ndata: {json.dumps(currentStatus)}\n\n"
-        time.sleep(1)
+    except Exception as e:
+        logger.error(f"Cache unavailable while checking submit lock: {e}")
+
+        currentStatus = ({"locked": True, "error": True, "message": "Unable to determine lock status."})
+        # statusCode=503
+        
+    yield f"event: lock-status\ndata: {json.dumps(currentStatus)}\n\n"
+    time.sleep(1.5)
 
 
 def lock_status_response(request):
