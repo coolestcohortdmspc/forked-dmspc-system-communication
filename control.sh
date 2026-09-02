@@ -224,11 +224,11 @@ droplets-up)
 
     echo "Starting DSOC Droplet"
     ssh "$DSOC_DROPLET" \
-        "cd $REMOTE_DIR && ./control.sh dsoc-up"
+        "cd $REMOTE_DIR && git checkout dev && git pull && ./control.sh dsoc-up"
     
     echo "Starting VLBA 1 Droplet"
     ssh "$VLBA_1_DROPLET" \
-        "cd $REMOTE_DIR && ./control.sh vlba-up VLBA_1_SERVICES"
+        "cd $REMOTE_DIR && git checkout dev && git pull origin && ./control.sh vlba-up VLBA_1_SERVICES"
     
     # TODO use these for scaling up
     # echo "Starting VLBA 2 Droplet"
@@ -241,7 +241,7 @@ droplets-up)
     
     echo "Starting GBT Droplet"
     ssh "$GBT_DROPLET" \
-        "cd $REMOTE_DIR && ./control.sh gbt-up"
+        "cd $REMOTE_DIR && git checkout dev && git pull origin/dev && ./control.sh gbt-up"
     ;;
 
 droplets-down)
@@ -253,11 +253,11 @@ droplets-down)
 
     echo "Stopping GBT Droplet"
     ssh "$GBT_DROPLET" \
-        "cd $REMOTE_DIR && ./control.sh gbt-down"
+        "cd $REMOTE_DIR && git checkout dev && ./control.sh gbt-down"
     
     echo "Stopping VLBA 1 Droplet"
     ssh "$VLBA_1_DROPLET" \
-        "cd $REMOTE_DIR && ./control.sh vlba-down VLBA_1_SERVICES"
+        "cd $REMOTE_DIR && git checkout dev && ./control.sh vlba-down VLBA_1_SERVICES"
     
     # TODO use these for scaling up
     # echo "Stopping VLBA 2 Droplet"
@@ -270,7 +270,7 @@ droplets-down)
     
     echo "Stopping DSOC Droplet"
     ssh "$DSOC_DROPLET" \
-        "cd $REMOTE_DIR && ./control.sh dsoc-down"
+        "cd $REMOTE_DIR && git checkout dev && ./control.sh dsoc-down"
     ;;
 *)
     echo
