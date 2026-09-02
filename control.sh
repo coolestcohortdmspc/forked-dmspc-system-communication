@@ -6,6 +6,8 @@ set -a
 source .env
 set +a
 
+START="traefik portainer ngradar_website postgres"
+
 DSOC_DROPLET="root@${DSOC_DROPLET_IP}"
 VLBA_1_DROPLET="root@${VLBA_DROPLET_IP}"  # TODO remove when scaling up
 # TODO use these for scaling up AND ADD THESE IPs to .env
@@ -22,10 +24,11 @@ KAFKA_PROFILES="--profile kafka"
 KAFKA_SERVICES="zookeeper kafka-broker kafka-init kafka-ui seaweedfs dsoc-volume-init"
 SIM_SERVICES="etr_daemon gbt vlba dsoc"
 
-DIGITAL_OCEAN_SERVICES="portainer traefik"
+PORTAINER_SERVICE="portainer"
+AGENT_SERVICE="portainer_agent"
 
 # TODO add the commented vlba sims when scaling up! (vlba9 and vlba10 should start before gbt)
-DSOC_SERVICES="ngradar_website postgres zookeeper kafka-broker kafka-init kafka-ui seaweedfs dsoc-volume-init dsoc etr_daemon"  # vlba7 vlba8
+DSOC_SERVICES="traefik ngradar_website postgres zookeeper kafka-broker kafka-init kafka-ui seaweedfs dsoc-volume-init dsoc etr_daemon"  # vlba7 vlba8
 VLBA_1_SERVICES="vlba"  # vlba2
 VLBA_2_SERVICES="vlba3 vlba4"
 VLBA_3_SERVICES="vlba5 vlba6"
@@ -37,7 +40,7 @@ case "$COMMAND" in
 
 start)
     echo "Starting development environment..."
-    docker compose up -d
+    docker compose up -d $START
     ;;
 
 stop)
@@ -133,25 +136,12 @@ hard-reset)
     docker compose build --no-cache && docker compose up -d
     ;;
 
-digital-ocean-up)
-    read -p "This will START persistent containers when run in ANY DIGITALOCEAN DROPLET. Continue? (y/N): " ANSWER
-
-    if [[ "$ANSWER" != "y" && "$ANSWER" != "Y" ]]; then
-        exit 0
-    fi
-
-    docker compose up -d $DIGITAL_OCEAN_SERVICES
+portainer-up)
+    docker compose up -d $PORTAINER_SERVICE
     ;;
 
-digital-ocean-down)
-    read -p "This will STOP persistent containers when run in ANY DIGITALOCEAN DROPLET. Continue? (y/N): " ANSWER
-
-    if [[ "$ANSWER" != "y" && "$ANSWER" != "Y" ]]; then
-        exit 0
-    fi
-
-    docker compose stop $DIGITAL_OCEAN_SERVICES
-    docker compose rm -f $DIGITAL_OCEAN_SERVICES
+agent-up)
+    docker compose up -d $AGENT_SERVICE
     ;;
 
 gbt-up)
@@ -283,32 +273,47 @@ droplets-down)
         "cd $REMOTE_DIR && ./control.sh dsoc-down"
     ;;
 *)
-
-    echo "Usage:"
     echo
+    echo "HELP with ./control.sh usage:"
+    echo
+    echo "If developing locally, use the following commands to start/stop your environment:"
     echo "./control.sh start"
-    echo "./control.sh rebuild"
+    echo "./control.sh system-up"
+    echo "./control.sh system-down"
+    echo "./control.sh stop"
+    echo
+    echo "To make migrations and create superusers, use the shell:"
+    echo "./control.sh shell"
+    echo
+    echo "Utility commands to rebuild working environment:"
+    echo "./control.sh rebuild"   
+    echo "./control.sh hard-reset"
+    echo
+    echo "To run test coverage on this branch, run:"
+    echo "./control.sh testcov"
+    echo
+    echo "To control all droplets from a remote device, use the following commands:"
+    echo "./control.sh droplets-up"
+    echo "./control.sh droplets-down"
+    echo
+    echo "If you are currently on a droplet, use one of the following commands:"
+    echo "./control.sh dsoc-up"
+    echo "./control.sh dsoc-down"
+    echo "./control.sh gbt-up"
+    echo "./control.sh gbt-down"
+    echo "./control.sh vlba-up VLBA_#_SERVICES"
+    echo "./control.sh vlba-down VLBA_#_SERVICES"
+    echo "./control.sh portainer-up"
+    echo "./control.sh agent-up"
+    echo
+    echo "Other commands (rarely needed):"
+    echo "./control.sh sims-up"
+    echo "./control.sh sims-down"
     echo "./control.sh kafka-up"
     echo "./control.sh kafka-down"
-    echo "./control.sh stop"
-    echo "./control.sh shell"
     echo "./control.sh logs"
     echo "./control.sh attach"
     # echo "./control.sh load-staging-data"
-    echo "./control.sh hard-reset"
-    echo "./control.sh testcov"
-    echo "./control.sh sims-up"
-    echo "./control.sh sims-down"
-    echo "./control.sh system-up"
-    echo "./control.sh system-down"
-    echo "./control.sh gbt-up"
-    echo "./control.sh gbt-down"
-    echo "./control.sh vlba-up VLBA_?_SERVICES"
-    echo "./control.sh vlba-down VLBA_?_SERVICES"
-    echo "./control.sh dsoc-up"
-    echo "./control.sh dsoc-down"
-    echo "./control.sh droplets-up"
-    echo "./control.sh droplets-down"
     exit 1
     ;;
 
