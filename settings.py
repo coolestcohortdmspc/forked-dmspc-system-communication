@@ -27,7 +27,8 @@ ALLOWED_HOSTS = [host.strip() for host in os.environ.get('DJANGO_ALLOWED_HOSTS')
 
 # This setting answers the question: "Is this HTTPS POST allowed to originate from this site?"
 # Without it, our render csrf authentication will fail
-CSRF_TRUSTED_ORIGINS = [os.environ.get( "DJANGO_CSRF_TRUSTED_ORIGINS")]
+CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in os.environ.get('DJANGO_CSRF_TRUSTED_ORIGINS').split(',') if origin.strip()]
+
 
 # Application definition
 INSTALLED_APPS = [
