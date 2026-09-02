@@ -10,3 +10,4 @@ env/
 *.large
 mock_assets/progress.json
 .coverage
+letsencrypt
