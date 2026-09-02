@@ -6,7 +6,7 @@ set -a
 source .env
 set +a
 
-START="traefik portainer ngradar_website postgres"
+START="traefik_http portainer ngradar_website postgres"
 
 DSOC_DROPLET="root@${DSOC_DROPLET_IP}"
 VLBA_1_DROPLET="root@${VLBA_DROPLET_IP}"  # TODO remove when scaling up

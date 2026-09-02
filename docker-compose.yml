@@ -61,7 +61,6 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./letsencrypt:/letsencrypt
-      - ./certs:/certs:ro
 
     command:
       # EntryPoints
@@ -107,9 +106,9 @@ services:
   
 
 
-  traefik_local:
+  traefik_http:
     image: traefik:v3.7
-    container_name: traefik
+    container_name: traefik_http
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
