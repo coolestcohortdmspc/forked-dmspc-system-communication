@@ -145,49 +145,21 @@ agent-up)
     ;;
 
 gbt-up)
-    read -p "This will START the gbt container when run in the GBT DIGITALOCEAN DROPLET. Continue? (y/N): " ANSWER
-
-    if [[ "$ANSWER" != "y" && "$ANSWER" != "Y" ]]; then
-        exit 0
-    fi
-
     docker compose up -d $GBT_SERVICES
     ;;
 
 gbt-down)
-    read -p "This will STOP the gbt container when run in the GBT DIGITALOCEAN DROPLET. Continue? (y/N): " ANSWER
-
-    if [[ "$ANSWER" != "y" && "$ANSWER" != "Y" ]]; then
-        exit 0
-    fi
-
     docker compose stop $GBT_SERVICES
     docker compose rm -f $GBT_SERVICES
     ;;
 
 vlba-up)
-    # TODO change this line when scaling up
-    read -p "This will START the vlba container when run in the VLBA DIGITALOCEAN DROPLET. Continue? (y/N): " ANSWER
-
-    if [[ "$ANSWER" != "y" && "$ANSWER" != "Y" ]]; then
-        exit 0
-    fi
-
-    # TODO start all of these when scaling up!
     # Get the services that are passed as the argument to vlba-up
     SERVICES="${!2}"
     docker compose up -d $SERVICES
     ;;
 
 vlba-down)
-    # TODO change this line when scaling up
-    read -p "This will STOP the vlba container when run in the VLBA DIGITALOCEAN DROPLET. Continue? (y/N): " ANSWER
-
-    if [[ "$ANSWER" != "y" && "$ANSWER" != "Y" ]]; then
-        exit 0
-    fi
-
-    # TODO remove all of these when scaling up!
     # Get the services that are passed as the argument to vlba-down
     SERVICES="${!2}"
     docker compose stop $SERVICES
@@ -195,22 +167,10 @@ vlba-down)
     ;;
 
 dsoc-up)
-    read -p "This will START the dsoc container when run in the DSOC DIGITALOCEAN DROPLET. Continue? (y/N): " ANSWER
-
-    if [[ "$ANSWER" != "y" && "$ANSWER" != "Y" ]]; then
-        exit 0
-    fi
-
     docker compose up -d $DSOC_SERVICES
     ;;
 
 dsoc-down)
-    read -p "This will STOP the dsoc container when run in the DSOC DIGITALOCEAN DROPLET. Continue? (y/N): " ANSWER
-
-    if [[ "$ANSWER" != "y" && "$ANSWER" != "Y" ]]; then
-        exit 0
-    fi
-
     docker compose stop $DSOC_SERVICES
     docker compose rm -f $DSOC_SERVICES
     ;;
@@ -224,11 +184,11 @@ droplets-up)
 
     echo "Starting DSOC Droplet"
     ssh "$DSOC_DROPLET" \
-        "cd $REMOTE_DIR && ./control.sh dsoc-up"
+        "cd $REMOTE_DIR && git checkout dev && git pull && ./control.sh dsoc-up"
     
     echo "Starting VLBA 1 Droplet"
     ssh "$VLBA_1_DROPLET" \
-        "cd $REMOTE_DIR && ./control.sh vlba-up VLBA_1_SERVICES"
+        "cd $REMOTE_DIR && git checkout dev && git pull && ./control.sh vlba-up VLBA_1_SERVICES"
     
     # TODO use these for scaling up
     # echo "Starting VLBA 2 Droplet"
@@ -241,7 +201,7 @@ droplets-up)
     
     echo "Starting GBT Droplet"
     ssh "$GBT_DROPLET" \
-        "cd $REMOTE_DIR && ./control.sh gbt-up"
+        "cd $REMOTE_DIR && git checkout dev && git pull && ./control.sh gbt-up"
     ;;
 
 droplets-down)
@@ -253,11 +213,11 @@ droplets-down)
 
     echo "Stopping GBT Droplet"
     ssh "$GBT_DROPLET" \
-        "cd $REMOTE_DIR && ./control.sh gbt-down"
+        "cd $REMOTE_DIR && git checkout dev && ./control.sh gbt-down"
     
     echo "Stopping VLBA 1 Droplet"
     ssh "$VLBA_1_DROPLET" \
-        "cd $REMOTE_DIR && ./control.sh vlba-down VLBA_1_SERVICES"
+        "cd $REMOTE_DIR && git checkout dev && ./control.sh vlba-down VLBA_1_SERVICES"
     
     # TODO use these for scaling up
     # echo "Stopping VLBA 2 Droplet"
@@ -270,7 +230,7 @@ droplets-down)
     
     echo "Stopping DSOC Droplet"
     ssh "$DSOC_DROPLET" \
-        "cd $REMOTE_DIR && ./control.sh dsoc-down"
+        "cd $REMOTE_DIR && git checkout dev && ./control.sh dsoc-down"
     ;;
 *)
     echo
