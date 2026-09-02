@@ -188,7 +188,7 @@ droplets-up)
     
     echo "Starting VLBA 1 Droplet"
     ssh "$VLBA_1_DROPLET" \
-        "cd $REMOTE_DIR && git checkout dev && git pull origin && ./control.sh vlba-up VLBA_1_SERVICES"
+        "cd $REMOTE_DIR && git checkout dev && git pull && ./control.sh vlba-up VLBA_1_SERVICES"
     
     # TODO use these for scaling up
     # echo "Starting VLBA 2 Droplet"
@@ -201,7 +201,7 @@ droplets-up)
     
     echo "Starting GBT Droplet"
     ssh "$GBT_DROPLET" \
-        "cd $REMOTE_DIR && git checkout dev && git pull origin/dev && ./control.sh gbt-up"
+        "cd $REMOTE_DIR && git checkout dev && git pull && ./control.sh gbt-up"
     ;;
 
 droplets-down)
