@@ -462,11 +462,18 @@ def etc_send(frame_path):
 
     master_fd, slave_fd = os.openpty()
 
+    etd_host = os.environ["ETD_HOST"]
+    etd_command_port = os.environ.get("ETD_COMMAND_PORT", "4004")
+
+    etd_destination = (
+        f"tcp://{etd_host}#{etd_command_port}:/dsoc/incoming/"
+    )
+
     process = subprocess.Popen(
         [
             "etc",
             str(frame_path),
-            os.environ["ETD_DESTINATION"],
+            etd_destination,
             "--resume",
         ],
         stdin=slave_fd,
