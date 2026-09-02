@@ -145,49 +145,21 @@ agent-up)
     ;;
 
 gbt-up)
-    read -p "This will START the gbt container when run in the GBT DIGITALOCEAN DROPLET. Continue? (y/N): " ANSWER
-
-    if [[ "$ANSWER" != "y" && "$ANSWER" != "Y" ]]; then
-        exit 0
-    fi
-
     docker compose up -d $GBT_SERVICES
     ;;
 
 gbt-down)
-    read -p "This will STOP the gbt container when run in the GBT DIGITALOCEAN DROPLET. Continue? (y/N): " ANSWER
-
-    if [[ "$ANSWER" != "y" && "$ANSWER" != "Y" ]]; then
-        exit 0
-    fi
-
     docker compose stop $GBT_SERVICES
     docker compose rm -f $GBT_SERVICES
     ;;
 
 vlba-up)
-    # TODO change this line when scaling up
-    read -p "This will START the vlba container when run in the VLBA DIGITALOCEAN DROPLET. Continue? (y/N): " ANSWER
-
-    if [[ "$ANSWER" != "y" && "$ANSWER" != "Y" ]]; then
-        exit 0
-    fi
-
-    # TODO start all of these when scaling up!
     # Get the services that are passed as the argument to vlba-up
     SERVICES="${!2}"
     docker compose up -d $SERVICES
     ;;
 
 vlba-down)
-    # TODO change this line when scaling up
-    read -p "This will STOP the vlba container when run in the VLBA DIGITALOCEAN DROPLET. Continue? (y/N): " ANSWER
-
-    if [[ "$ANSWER" != "y" && "$ANSWER" != "Y" ]]; then
-        exit 0
-    fi
-
-    # TODO remove all of these when scaling up!
     # Get the services that are passed as the argument to vlba-down
     SERVICES="${!2}"
     docker compose stop $SERVICES
@@ -195,22 +167,10 @@ vlba-down)
     ;;
 
 dsoc-up)
-    read -p "This will START the dsoc container when run in the DSOC DIGITALOCEAN DROPLET. Continue? (y/N): " ANSWER
-
-    if [[ "$ANSWER" != "y" && "$ANSWER" != "Y" ]]; then
-        exit 0
-    fi
-
     docker compose up -d $DSOC_SERVICES
     ;;
 
 dsoc-down)
-    read -p "This will STOP the dsoc container when run in the DSOC DIGITALOCEAN DROPLET. Continue? (y/N): " ANSWER
-
-    if [[ "$ANSWER" != "y" && "$ANSWER" != "Y" ]]; then
-        exit 0
-    fi
-
     docker compose stop $DSOC_SERVICES
     docker compose rm -f $DSOC_SERVICES
     ;;
