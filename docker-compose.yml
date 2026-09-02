@@ -177,8 +177,11 @@ services:
       - "traefik.docker.network=proxy"
       # Tells Traefik to route public requests matching your domain/IP to this container
       - "traefik.http.routers.my-website.rule=Host(`${WEBSITE_DOMAIN_NAME}`)"
-      - "traefik.http.routers.my-website.entrypoints=web"
+      - "traefik.http.routers.my-website.entrypoints=${HTTP_ENTRYPOINT:-web}" 
       - "traefik.http.routers.my-website.service=my-website"
+      - "traefik.http.routers.ngradar_website.tls=${TLS:-false}" #false when local, true on droplet
+      - "${CERTRESOLVER}" # reads dummy label when local, and certificate resolver when deployed on droplets with HTTPS
+
       # Optional: Explicitly tell Traefik which port your web app container listens on internally
       - "traefik.http.services.my-website.loadbalancer.server.port=8000"
     stdin_open: true
