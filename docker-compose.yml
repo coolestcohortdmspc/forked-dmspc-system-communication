@@ -41,23 +41,19 @@ services:
 
     ports:
       # # - "443:443"
-      # - "8080:8080"
       - "80:80"
       - "127.0.0.1:8080:8080"
 
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      # - ./certs:/certs:ro
-      # - ./dynamic:/dynamic:ro
 
     command:
       # EntryPoints
       - "--entrypoints.web.address=:80"
-      # - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
-      # - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
-      # - "--entrypoints.web.http.redirections.entrypoint.permanent=true"
-      # - "--entrypoints.websecure.address=:443"
-      # - "--entrypoints.websecure.http.tls=true"
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--entrypoints.web.http.redirections.entrypoint.permanent=true"
+      - "--entrypoints.websecure.address=:443"
 
       # # Attach the static configuration tls.yaml file that contains the tls configuration settings
       # - "--providers.file.filename=/dynamic/tls.yml"
@@ -85,9 +81,9 @@ services:
       - "traefik.http.routers.dashboard.rule=Host(`dashboard.docker.localhost`)"
       - "traefik.http.routers.dashboard.entrypoints=websecure"
       - "traefik.http.routers.traefik_https.tls=true"
-      - "traefik.http.routers.traefik_https.tls.certResolver=myresolver"
+      #- "traefik.http.routers.traefik_https.tls.certResolver=myresolver"
+      #- "traefik.http.routers.dashboard.tls=true"
       - "traefik.http.routers.dashboard.service=api@internal"
-      # - "traefik.http.routers.dashboard.tls=true"
       # Add password authentication
       - "traefik.http.routers.traefik_https.middlewares=auth"
       - "traefik.http.middlewares.auth.basicauth.users=admin:$$2y$$05$$30p0xO0LMVDIvJblHuDYnu07yktNVqBLXRR28tJkTA2flSfqKvRsW"
