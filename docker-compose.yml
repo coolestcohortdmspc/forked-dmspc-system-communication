@@ -56,7 +56,6 @@ services:
     ports:
       - "80:80" # website HTTP
       - "443:443" # website HTTPS
-      - "127.0.0.1:8080:8080" # Dashboard
       - "5432:5432" # postgres
       - "9092:9092" # kafka broker
       - "4004:4004" # etransfer command port
@@ -93,7 +92,7 @@ services:
       
       # API & Dashboard 
       - "--api.dashboard=true"
-      - "--api.insecure=true"
+      - "--api.insecure=false"
 
       # Observability 
       - "--log.level=INFO"
@@ -106,9 +105,14 @@ services:
       - "traefik.enable=true"
 
       # Dashboard router
-      - "traefik.http.routers.dashboard.rule=Host(`dashboard.docker.localhost`)"
+      - "traefik.http.routers.dashboard.rule=Host(`dashboard.docker.localhost`)" # dashboard at http://dashboard.docker.localhost
       - "traefik.http.routers.dashboard.entrypoints=web"
       - "traefik.http.routers.dashboard.service=api@internal"
+      - "traefik.http.routers.dashboard.middlewares=dashboard-auth"
+
+      # Basic authentication
+      - "traefik.http.middlewares.dashboard-auth.basicauth.users=admin:$2y$05$$${BCRYPT_HASH}"
+
 
 
   traefik_http:
@@ -125,7 +129,6 @@ services:
 
     ports:
       - "80:80" # website HTTP
-      - "127.0.0.1:8080:8080" # dashboard
       - "5432:5432" # postgres
       - "9092:9092" # kafka broker
       - "4004:4004" # etransfer command port
@@ -149,7 +152,7 @@ services:
 
       # API & Dashboard 
       - "--api.dashboard=true"
-      - "--api.insecure=true"
+      - "--api.insecure=false"
 
       # Observability 
       - "--log.level=INFO"
@@ -162,9 +165,15 @@ services:
       - "traefik.enable=true"
 
       # Dashboard router
-      - "traefik.http.routers.dashboard.rule=Host(`dashboard.docker.localhost`)"
+      - "traefik.http.routers.dashboard.rule=Host(`dashboard.docker.localhost`)" # dashboard at http://dashboard.docker.localhost 
       - "traefik.http.routers.dashboard.entrypoints=web"
       - "traefik.http.routers.dashboard.service=api@internal"
+      - "traefik.http.routers.dashboard.middlewares=dashboard-auth"
+
+      # Basic authentication
+      - "traefik.http.middlewares.dashboard-auth.basicauth.users=admin:$2y$05$$${BCRYPT_HASH}" # generate hash with docker run --rm httpd:2.4-alpine htpasswd -nbB admin 'change-this-password'
+      # Save everything after the final $ in the hash to the .env file as BCRYPT_HASH. This is a security measure to avoid exposing the password in plaintext.
+
 
 
   ngradar_website:
