@@ -6,7 +6,7 @@ set -a
 source .env
 set +a
 
-START="traefik_http portainer ngradar_website postgres"
+START="traefik_http portainer ngradar_website postgres prometheus"
 
 DSOC_DROPLET="root@${DSOC_DROPLET_IP}"
 VLBA_1_DROPLET="root@${VLBA_DROPLET_IP}"  # TODO remove when scaling up
@@ -28,7 +28,7 @@ PORTAINER_SERVICE="portainer"
 AGENT_SERVICE="portainer_agent"
 
 # TODO add the commented vlba sims when scaling up! (vlba9 and vlba10 should start before gbt)
-DSOC_SERVICES="traefik ngradar_website postgres zookeeper kafka-broker kafka-init kafka-ui seaweedfs dsoc-volume-init dsoc etr_daemon"  # vlba7 vlba8
+DSOC_SERVICES="traefik ngradar_website postgres prometheus zookeeper kafka-broker kafka-init kafka-ui seaweedfs dsoc-volume-init dsoc etr_daemon"  # vlba7 vlba8
 VLBA_1_SERVICES="vlba"  # vlba2
 VLBA_2_SERVICES="vlba3 vlba4"
 VLBA_3_SERVICES="vlba5 vlba6"
@@ -101,8 +101,6 @@ system-down)
 rebuild)
     ./control.sh system-down
     ./control.sh stop
-    # Take down the rest of the containers
-    docker compose down
 
     docker volume ls -q \
         | grep -v 'postgres_data$' \
@@ -111,10 +109,24 @@ rebuild)
     # --no-cache ensures code changes are baked in cleanly
     docker compose build --no-cache
     # --force-recreate guarantees .env variable updates  and config updates are pushed into the container upon rebuild
-    docker compose up -d --force-recreate
-    # same with kafka profiles:
-    docker compose $KAFKA_PROFILES up -d --force-recreate
-    docker compose up -d --force-recreate $SIM_SERVICES
+    docker compose up -d --force-recreate $START
+
+    # Start Kafka-profile services
+    docker compose $KAFKA_PROFILES up -d --force-recreate $KAFKA_SERVICES
+
+    # Start simulator services
+    docker compose $KAFKA_PROFILES up -d --force-recreate $SIM_SERVICES
+
+    ;;
+
+
+refresh)
+    # Recreate containers so updated .env values are injected.
+    # Images are reused; no rebuild is performed.
+    docker compose up -d --force-recreate --no-build $START
+    docker compose $KAFKA_PROFILES up -d --force-recreate --no-build
+    docker compose up -d --force-recreate --no-build $SIM_SERVICES
+
     ;;
 
 testcov)
