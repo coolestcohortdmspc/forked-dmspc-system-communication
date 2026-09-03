@@ -42,6 +42,8 @@ services:
       - "9001:9001"
     restart: always
 
+
+# DSOC droplet only traefik container
   traefik:
     image: traefik:v3.7
     container_name: traefik
@@ -51,7 +53,10 @@ services:
 
     networks:
      # Connect to the 'traefik_proxy' overlay network for inter-container communication across nodes
-      - proxy
+      # - proxy
+      proxy:
+        aliases:
+          - traefik-metrics # using an alias here so prometheus won't care if local or droplet traefik container is running
 
     ports:
       - "80:80"
@@ -66,6 +71,9 @@ services:
       # EntryPoints
       - "--entrypoints.web.address=:80"
       - "--entrypoints.websecure.address=:443"
+
+      # Dedicated Prometheus metrics endpoint
+      - "--entrypoints.metrics.address=:8082"
 
       # Optional redirect HTTP to HTTPS
       - "--entrypoints.web.http.redirections.entrypoint.to=websecure" 
@@ -92,6 +100,11 @@ services:
       - "--accesslog=true"
       - "--metrics.prometheus=true"
 
+      # Prometheus
+      - "--metrics.prometheus=true"
+      - "--metrics.prometheus.entrypoint=metrics"
+      - "--metrics.prometheus.addrouterslabels=true"
+
   # Traefik Dynamic configuration via Docker labels
     labels:
       # Enable self‑routing
@@ -105,7 +118,7 @@ services:
       # - "traefik.http.routers.dashboard.tls.certresolver=le" 
   
 
-
+# Local dev traefik container
   traefik_http:
     image: traefik:v3.7
     container_name: traefik_http
@@ -116,7 +129,10 @@ services:
     networks:
       # Local bridge network used by Traefik to reach
       # the Django container on the DSOC Droplet.
-      - proxy
+      # - proxy
+      proxy:
+        aliases:
+          - traefik-metrics # using an alias here so prometheus won't care if local or droplet traefik container is running
 
     ports:
       - "80:80"
@@ -128,6 +144,9 @@ services:
     command:
       # EntryPoints
       - "--entrypoints.web.address=:80"
+
+      # Dedicated Prometheus metrics endpoint
+      - "--entrypoints.metrics.address=:8082"
 
       # Providers 
       - "--providers.docker=true"
@@ -141,7 +160,11 @@ services:
       # Observability 
       - "--log.level=INFO"
       - "--accesslog=true"
+
+      # Prometheus
       - "--metrics.prometheus=true"
+      - "--metrics.prometheus.entrypoint=metrics"
+      - "--metrics.prometheus.addrouterslabels=true"
 
   # Traefik Dynamic configuration via Docker labels
     labels:
@@ -152,6 +175,27 @@ services:
       - "traefik.http.routers.dashboard.rule=Host(`dashboard.docker.localhost`)"
       - "traefik.http.routers.dashboard.entrypoints=web"
       - "traefik.http.routers.dashboard.service=api@internal"
+
+
+  prometheus:
+    image: prom/prometheus:latest # I feel like we should pin a specific version? Rather than the latest?
+    container_name: prometheus
+    restart: unless-stopped
+
+    ports:
+      - "127.0.0.1:9090:9090"
+
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+
+    networks:
+      - proxy
+
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=15d"
 
 
   ngradar_website:
@@ -577,6 +621,7 @@ volumes:
   dsoc_transfer:
   vlba_data:
   portainer_data:
+  prometheus_data:
 
 networks:
   ngradar_website_network:
