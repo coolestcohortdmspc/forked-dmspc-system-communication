@@ -172,7 +172,7 @@ services:
 
       # Basic authentication
       - "traefik.http.middlewares.dashboard-auth.basicauth.users=admin:$2y$05$$${BCRYPT_HASH}" # generate hash with docker run --rm httpd:2.4-alpine htpasswd -nbB admin 'change-this-password'
-      # Save everything after the final $ in the hash to the .env file as BCRYPT_HASH. This is a security measure to avoid exposing the password in plaintext.
+      # copy paste the beginning of the output (the admin:$2y$05$ part) and then append the rest of the hash after the final $ to the .env file as BCRYPT_HASH. This is a security measure to avoid exposing the password in plaintext.
 
 
 
