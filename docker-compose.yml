@@ -59,6 +59,8 @@ services:
       - "127.0.0.1:8080:8080" # Dashboard
       - "5432:5432" # postgres
       - "9092:9092" # kafka broker
+      - "4004:4004" # etransfer command port
+      - "8008:8008/udp" # etransfer data port
 
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -70,6 +72,8 @@ services:
       - "--entrypoints.websecure.address=:443"
       - "--entrypoints.postgres.address=:5432"
       - "--entrypoints.kafka.address=:9092"
+      - "--entrypoints.etransfer-command.address=:4004"
+      - "--entrypoints.etransfer-data.address=:8008/udp"
 
       # Optional redirect HTTP to HTTPS
       - "--entrypoints.web.http.redirections.entrypoint.to=websecure" 
@@ -105,9 +109,6 @@ services:
       - "traefik.http.routers.dashboard.rule=Host(`dashboard.docker.localhost`)"
       - "traefik.http.routers.dashboard.entrypoints=web"
       - "traefik.http.routers.dashboard.service=api@internal"
-      # - "traefik.http.routers.dashboard.tls=true"
-      # - "traefik.http.routers.dashboard.tls.certresolver=le" 
-  
 
 
   traefik_http:
@@ -127,6 +128,8 @@ services:
       - "127.0.0.1:8080:8080" # dashboard
       - "5432:5432" # postgres
       - "9092:9092" # kafka broker
+      - "4004:4004" # etransfer command port
+      - "8008:8008/udp" # etransfer data port
 
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -136,6 +139,8 @@ services:
       - "--entrypoints.web.address=:80"
       - "--entrypoints.postgres.address=:5432"
       - "--entrypoints.kafka.address=:9092"
+      - "--entrypoints.etransfer-command.address=:4004"
+      - "--entrypoints.etransfer-data.address=:8008/udp"
 
       # Providers 
       - "--providers.docker=true"
@@ -576,16 +581,31 @@ services:
       target: etd
     profiles: ["kafka"]
     user: "33:33"   # non root user: www-data
-    ports:
-      - "${PUBLIC_BIND_IP:-127.0.0.1}:4004:4004/tcp"
-      - "${PUBLIC_BIND_IP:-127.0.0.1}:8008:8008/udp"
+    # ports:
+    #   - "${PUBLIC_BIND_IP:-127.0.0.1}:4004:4004/tcp"
+    #   - "${PUBLIC_BIND_IP:-127.0.0.1}:8008:8008/udp"
     depends_on:
       dsoc-volume-init:
         condition: service_completed_successfully
     networks:
       - ngradar_website_network
+      - proxy
     volumes:
       - dsoc_transfer:/dsoc/incoming
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+
+      # TCP traffic on port 4004
+      - "traefik.tcp.routers.etransfer-command.rule=HostSNI(`*`)"
+      - "traefik.tcp.routers.etransfer-command.entrypoints=etransfer-command"
+      - "traefik.tcp.routers.etransfer-command.service=etransfer-command"
+      - "traefik.tcp.services.etransfer-command.loadbalancer.server.port=4004"
+
+      # UDP/SRT traffic on port 8008
+      - "traefik.udp.routers.etransfer-data.entrypoints=etransfer-data"
+      - "traefik.udp.routers.etransfer-data.service=etransfer-data"
+      - "traefik.udp.services.etransfer-data.loadbalancer.server.port=8008"
     command:
       - etd
       - -f
