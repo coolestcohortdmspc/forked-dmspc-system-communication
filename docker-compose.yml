@@ -59,9 +59,13 @@ services:
           - traefik-metrics # using an alias here so prometheus won't care if local or droplet traefik container is running
 
     ports:
-      - "80:80"
-      - "443:443"
-      - "127.0.0.1:8080:8080"
+      - "80:80" # website HTTP
+      - "443:443" # website HTTPS
+      - "127.0.0.1:8080:8080" # Dashboard
+      - "5432:5432" # postgres
+      - "9092:9092" # kafka broker
+      - "4004:4004" # etransfer command port
+      - "8008:8008/udp" # etransfer data port
 
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -71,6 +75,10 @@ services:
       # EntryPoints
       - "--entrypoints.web.address=:80"
       - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.postgres.address=:5432"
+      - "--entrypoints.kafka.address=:9092"
+      - "--entrypoints.etransfer-command.address=:4004"
+      - "--entrypoints.etransfer-data.address=:8008/udp"
 
       # Dedicated Prometheus metrics endpoint
       - "--entrypoints.metrics.address=:8082"
@@ -114,9 +122,6 @@ services:
       - "traefik.http.routers.dashboard.rule=Host(`dashboard.docker.localhost`)"
       - "traefik.http.routers.dashboard.entrypoints=web"
       - "traefik.http.routers.dashboard.service=api@internal"
-      # - "traefik.http.routers.dashboard.tls=true"
-      # - "traefik.http.routers.dashboard.tls.certresolver=le" 
-  
 
 # Local dev traefik container
   traefik_http:
@@ -135,8 +140,12 @@ services:
           - traefik-metrics # using an alias here so prometheus won't care if local or droplet traefik container is running
 
     ports:
-      - "80:80"
-      - "127.0.0.1:8080:8080"
+      - "80:80" # website HTTP
+      - "127.0.0.1:8080:8080" # dashboard
+      - "5432:5432" # postgres
+      - "9092:9092" # kafka broker
+      - "4004:4004" # etransfer command port
+      - "8008:8008/udp" # etransfer data port
 
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -144,6 +153,10 @@ services:
     command:
       # EntryPoints
       - "--entrypoints.web.address=:80"
+      - "--entrypoints.postgres.address=:5432"
+      - "--entrypoints.kafka.address=:9092"
+      - "--entrypoints.etransfer-command.address=:4004"
+      - "--entrypoints.etransfer-data.address=:8008/udp"
 
       # Dedicated Prometheus metrics endpoint
       - "--entrypoints.metrics.address=:8082"
@@ -242,15 +255,27 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql
       - ./postgres/init:/docker-entrypoint-initdb.d
-    ports:
-      # - ${WEBSITE_DOMAIN}:5432:5432
-      - "${PUBLIC_BIND_IP:-127.0.0.1}:5432:5432"
+    # ports:
+    #   # - ${WEBSITE_DOMAIN}:5432:5432
+    #   - "${PUBLIC_BIND_IP:-127.0.0.1}:5432:5432"
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=${POSTGRES_DB}
     networks:
       - ngradar_website_network
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+
+      - "traefik.tcp.routers.postgres.rule=HostSNI(`*`)"
+      - "traefik.tcp.routers.postgres.entrypoints=postgres"
+      - "traefik.tcp.routers.postgres.service=postgres"
+
+      # PostgreSQL's internal container port
+      - "traefik.tcp.services.postgres.loadbalancer.server.port=5432"
+
     healthcheck:
       test:
         [
@@ -370,8 +395,8 @@ services:
     profiles: ["kafka"]
     depends_on:
       - zookeeper
-    ports:
-      - ${PUBLIC_BIND_IP:-127.0.0.1}:9092:9092
+    # ports:
+    #   - ${PUBLIC_BIND_IP:-127.0.0.1}:9092:9092
     environment:
       KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092
       KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka-broker:29092,EXTERNAL://${KAFKA_EXTERNAL_HOST}:9092
@@ -388,6 +413,17 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
     networks:
       - ngradar_website_network
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+
+      - "traefik.tcp.routers.kafka.rule=HostSNI(`*`)"
+      - "traefik.tcp.routers.kafka.entrypoints=kafka"
+      - "traefik.tcp.routers.kafka.service=kafka"
+
+      # Kafka's internal container port
+      - "traefik.tcp.services.kafka.loadbalancer.server.port=9092"
     healthcheck:
       test:
         [
@@ -589,16 +625,31 @@ services:
       target: etd
     profiles: ["kafka"]
     user: "33:33"   # non root user: www-data
-    ports:
-      - "${PUBLIC_BIND_IP:-127.0.0.1}:4004:4004/tcp"
-      - "${PUBLIC_BIND_IP:-127.0.0.1}:8008:8008/udp"
+    # ports:
+    #   - "${PUBLIC_BIND_IP:-127.0.0.1}:4004:4004/tcp"
+    #   - "${PUBLIC_BIND_IP:-127.0.0.1}:8008:8008/udp"
     depends_on:
       dsoc-volume-init:
         condition: service_completed_successfully
     networks:
       - ngradar_website_network
+      - proxy
     volumes:
       - dsoc_transfer:/dsoc/incoming
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+
+      # TCP traffic on port 4004
+      - "traefik.tcp.routers.etransfer-command.rule=HostSNI(`*`)"
+      - "traefik.tcp.routers.etransfer-command.entrypoints=etransfer-command"
+      - "traefik.tcp.routers.etransfer-command.service=etransfer-command"
+      - "traefik.tcp.services.etransfer-command.loadbalancer.server.port=4004"
+
+      # UDP/SRT traffic on port 8008
+      - "traefik.udp.routers.etransfer-data.entrypoints=etransfer-data"
+      - "traefik.udp.routers.etransfer-data.service=etransfer-data"
+      - "traefik.udp.services.etransfer-data.loadbalancer.server.port=8008"
     command:
       - etd
       - -f
