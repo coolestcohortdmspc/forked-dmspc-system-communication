@@ -60,14 +60,6 @@ attach)
     docker attach ngradar_website_service
     ;;
 
-# Now that our live db lives in a DO droplet, I don't think we can run this command unless we want to ssh into the 
-# dsoc droplet. but I don't think we use this command enough for it to matter since all the data in the live
-# db is dummy data anyways. 
-# load-staging-data)
-#     docker compose run --rm staging_loader
-#     ;;
-
-
 kafka-up)
     echo "Starting Kafka infrastructure and storage..."
     docker compose $KAFKA_PROFILES up -d $KAFKA_SERVICES
@@ -113,7 +105,7 @@ rebuild)
     docker compose down
 
     docker volume ls -q \
-        | grep -v '^dmspc-system-communication_postgres_data$' \
+        | grep -v 'postgres_data$' \
         | xargs -r docker volume rm || true
 
     # --no-cache ensures code changes are baked in cleanly
@@ -252,9 +244,9 @@ droplets-down)
     echo
     echo "To make migrations and create superusers, use the shell:"
     echo "./control.sh shell"
-    echo "./control.sh logs"
-    echo "./control.sh attach"
-    # echo "./control.sh load-staging-data"
+    echo
+    echo "Utility commands to rebuild working environment:"
+    echo "./control.sh rebuild"   
     echo "./control.sh hard-reset"
     echo
     echo "To run test coverage on this branch, run:"
