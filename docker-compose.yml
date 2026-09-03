@@ -89,8 +89,8 @@ services:
       - "traefik.http.routers.dashboard.service=api@internal"
       # - "traefik.http.routers.dashboard.tls=true"
       # Add password authentication
-      - "traefik.http.routers.traefik_https.middlewares=basic-auth-global"
-      - "traefik.http.middlewares.basic-auth-global.basicauth.users=admin:$$2y$$05$$30p0xO0LMVDIvJblHuDYnu07yktNVqBLXRR28tJkTA2flSfqKvRsW"
+      - "traefik.http.routers.traefik_https.middlewares=auth"
+      - "traefik.http.middlewares.auth.basicauth.users=admin:$$2y$$05$$30p0xO0LMVDIvJblHuDYnu07yktNVqBLXRR28tJkTA2flSfqKvRsW"
 
 
 
