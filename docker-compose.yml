@@ -83,7 +83,9 @@ services:
 
       # Dashboard router
       - "traefik.http.routers.dashboard.rule=Host(`dashboard.docker.localhost`)"
-      - "traefik.http.routers.dashboard.entrypoints=web"
+      - "traefik.http.routers.dashboard.entrypoints=websecure"
+      - "traefik.http.routers.traefik_https.tls=true"
+      - "traefik.http.routers.traefik_https.tls.certResolver=myresolver"
       - "traefik.http.routers.dashboard.service=api@internal"
       # - "traefik.http.routers.dashboard.tls=true"
       # Add password authentication
