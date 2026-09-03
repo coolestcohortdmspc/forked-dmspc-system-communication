@@ -58,6 +58,7 @@ services:
       - "443:443" # website HTTPS
       - "127.0.0.1:8080:8080" # Dashboard
       - "5432:5432" # postgres
+      - "9092:9092" # kafka broker
 
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -68,6 +69,7 @@ services:
       - "--entrypoints.web.address=:80"
       - "--entrypoints.websecure.address=:443"
       - "--entrypoints.postgres.address=:5432"
+      - "--entrypoints.kafka.address=:9092"
 
       # Optional redirect HTTP to HTTPS
       - "--entrypoints.web.http.redirections.entrypoint.to=websecure" 
@@ -124,6 +126,7 @@ services:
       - "80:80" # website HTTP
       - "127.0.0.1:8080:8080" # dashboard
       - "5432:5432" # postgres
+      - "9092:9092" # kafka broker
 
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -132,6 +135,7 @@ services:
       # EntryPoints
       - "--entrypoints.web.address=:80"
       - "--entrypoints.postgres.address=:5432"
+      - "--entrypoints.kafka.address=:9092"
 
       # Providers 
       - "--providers.docker=true"
@@ -342,8 +346,8 @@ services:
     profiles: ["kafka"]
     depends_on:
       - zookeeper
-    ports:
-      - ${PUBLIC_BIND_IP:-127.0.0.1}:9092:9092
+    # ports:
+    #   - ${PUBLIC_BIND_IP:-127.0.0.1}:9092:9092
     environment:
       KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092
       KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka-broker:29092,EXTERNAL://${KAFKA_EXTERNAL_HOST}:9092
@@ -360,6 +364,17 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
     networks:
       - ngradar_website_network
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+
+      - "traefik.tcp.routers.kafka.rule=HostSNI(`*`)"
+      - "traefik.tcp.routers.kafka.entrypoints=kafka"
+      - "traefik.tcp.routers.kafka.service=kafka"
+
+      # Kafka's internal container port
+      - "traefik.tcp.services.kafka.loadbalancer.server.port=9092"
     healthcheck:
       test:
         [
