@@ -54,9 +54,10 @@ services:
       - proxy
 
     ports:
-      - "80:80"
-      - "443:443"
-      - "127.0.0.1:8080:8080"
+      - "80:80" # website HTTP
+      - "443:443" # website HTTPS
+      - "127.0.0.1:8080:8080" # Dashboard
+      - "5432:5432" # postgres
 
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -66,6 +67,7 @@ services:
       # EntryPoints
       - "--entrypoints.web.address=:80"
       - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.postgres.address=:5432"
 
       # Optional redirect HTTP to HTTPS
       - "--entrypoints.web.http.redirections.entrypoint.to=websecure" 
@@ -119,8 +121,9 @@ services:
       - proxy
 
     ports:
-      - "80:80"
-      - "127.0.0.1:8080:8080"
+      - "80:80" # website HTTP
+      - "127.0.0.1:8080:8080" # dashboard
+      - "5432:5432" # postgres
 
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -128,6 +131,7 @@ services:
     command:
       # EntryPoints
       - "--entrypoints.web.address=:80"
+      - "--entrypoints.postgres.address=:5432"
 
       # Providers 
       - "--providers.docker=true"
@@ -198,15 +202,27 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql
       - ./postgres/init:/docker-entrypoint-initdb.d
-    ports:
-      # - ${WEBSITE_DOMAIN}:5432:5432
-      - "${PUBLIC_BIND_IP:-127.0.0.1}:5432:5432"
+    # ports:
+    #   # - ${WEBSITE_DOMAIN}:5432:5432
+    #   - "${PUBLIC_BIND_IP:-127.0.0.1}:5432:5432"
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=${POSTGRES_DB}
     networks:
       - ngradar_website_network
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+
+      - "traefik.tcp.routers.postgres.rule=HostSNI(`*`)"
+      - "traefik.tcp.routers.postgres.entrypoints=postgres"
+      - "traefik.tcp.routers.postgres.service=postgres"
+
+      # PostgreSQL's internal container port
+      - "traefik.tcp.services.postgres.loadbalancer.server.port=5432"
+
     healthcheck:
       test:
         [
