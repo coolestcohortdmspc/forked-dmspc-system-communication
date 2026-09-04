@@ -12,4 +12,19 @@ scrape_configs:
   - job_name: "traefik"
     static_configs:
       - targets:
-          - "traefik-metrics:8082"
+          - "traefik-metrics:8082"  # allow prometheus to scrape website
+
+  - job_name: "postgres"
+    static_configs:
+      - targets:
+          - "postgres_exporter:9187"  # allow prometheus to scrape postgres 
+
+  - job_name: "kafka"
+    static_configs:
+      - targets:
+          - "kafka-exporter:9308"   # allow prometheus to scrape kafka metrics such as topics / partitions / consumer groups / lag
+
+  - job_name: "kafka-jmx"
+    static_configs:
+      - targets:
+          - "kafka-broker:7071"   # allow prometheus to scrape kafka internal broker metrics between sims using Kafka JVM
