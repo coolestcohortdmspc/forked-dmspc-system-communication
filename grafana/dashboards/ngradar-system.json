@@ -390,12 +390,367 @@
     },
     {
       "type": "row",
-      "title": "Kafka exporter \u2014 topics and consumers",
+      "title": "PostgreSQL",
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
         "y": 22
+      },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "stat",
+      "title": "Postgres exporter",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 23
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max(up{job=\"postgres\"})",
+          "legendFormat": "Postgres exporter"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Database size",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 23
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(pg_database_size_bytes{datname!~\"template.*\"})",
+          "legendFormat": "Database size"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Active connections",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 23
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(pg_stat_activity_count{state=\"active\"})",
+          "legendFormat": "Active connections"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Max connections",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 23
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max(pg_settings_max_connections)",
+          "legendFormat": "Max connections"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Connections by state",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 27
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (state) (pg_stat_activity_count)",
+          "legendFormat": "{{state}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Transactions / sec",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 27
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(pg_stat_database_xact_commit{datname!~\"template.*\"}[5m]))",
+          "legendFormat": "commits"
+        },
+        {
+          "refId": "B",
+          "expr": "sum(rate(pg_stat_database_xact_rollback{datname!~\"template.*\"}[5m]))",
+          "legendFormat": "rollbacks"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Rows changed / sec",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 35
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(pg_stat_database_tup_inserted{datname!~\"template.*\"}[5m]))",
+          "legendFormat": "inserted"
+        },
+        {
+          "refId": "B",
+          "expr": "sum(rate(pg_stat_database_tup_updated{datname!~\"template.*\"}[5m]))",
+          "legendFormat": "updated"
+        },
+        {
+          "refId": "C",
+          "expr": "sum(rate(pg_stat_database_tup_deleted{datname!~\"template.*\"}[5m]))",
+          "legendFormat": "deleted"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Deadlocks",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 35
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(pg_stat_database_deadlocks{datname!~\"template.*\"}[5m]))",
+          "legendFormat": "deadlocks / 5m"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "type": "row",
+      "title": "Kafka exporter \u2014 topics and consumers",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 39
       },
       "collapsed": false,
       "panels": []
@@ -407,7 +762,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 23
+        "y": 40
       },
       "datasource": {
         "type": "prometheus",
@@ -448,7 +803,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 23
+        "y": 40
       },
       "datasource": {
         "type": "prometheus",
@@ -489,7 +844,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 31
+        "y": 48
       },
       "datasource": {
         "type": "prometheus",
@@ -520,7 +875,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 31
+        "y": 48
       },
       "datasource": {
         "type": "prometheus",
@@ -561,7 +916,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 39
+        "y": 56
       },
       "collapsed": false,
       "panels": []
@@ -573,7 +928,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 40
+        "y": 57
       },
       "datasource": {
         "type": "prometheus",
@@ -614,7 +969,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 40
+        "y": 57
       },
       "datasource": {
         "type": "prometheus",
@@ -660,7 +1015,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 48
+        "y": 65
       },
       "datasource": {
         "type": "prometheus",
@@ -703,7 +1058,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 48
+        "y": 65
       },
       "datasource": {
         "type": "prometheus",
@@ -745,7 +1100,8 @@
     "ngRadar",
     "Traefik",
     "Kafka",
-    "Prometheus"
+    "Prometheus",
+    "PostgreSQL"
   ],
   "templating": {
     "list": []
@@ -758,6 +1114,6 @@
   "timezone": "browser",
   "title": "ngRadar System",
   "uid": "ngradar-system",
-  "version": 1,
+  "version": 2,
   "weekStart": ""
 }
