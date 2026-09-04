@@ -389,19 +389,19 @@ services:
       kafka-topics --bootstrap-server kafka-broker:29092 \
         --create --if-not-exists \
         --topic GBT_data \
-        --partitions 1 \
+        --partitions 3 \
         --replication-factor 1
 
       kafka-topics --bootstrap-server kafka-broker:29092 \
         --create --if-not-exists \
         --topic VLBA_notif \
-        --partitions 1 \
+        --partitions 3 \
         --replication-factor 1
 
       kafka-topics --bootstrap-server kafka-broker:29092 \
         --create --if-not-exists \
         --topic DSOC_notif \
-        --partitions 1 \
+        --partitions 3 \
         --replication-factor 1
 
       echo "Kafka topic initialization complete."
