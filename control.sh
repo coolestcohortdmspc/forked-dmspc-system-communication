@@ -6,7 +6,7 @@ set -a
 source .env
 set +a
 
-START="traefik_http portainer ngradar_website postgres prometheus grafana"
+START="traefik_http portainer ngradar_website postgres prometheus grafana postgres_exporter"
 
 DSOC_DROPLET="root@${DSOC_DROPLET_IP}"
 VLBA_1_DROPLET="root@${VLBA_DROPLET_IP}"  # TODO remove when scaling up
@@ -21,14 +21,14 @@ REMOTE_DIR="/root/${REMOTE_REPO}"
 KAFKA_PROFILES="--profile kafka"
 
 # the order of these services matter!! learned the hard way..
-KAFKA_SERVICES="zookeeper kafka-broker kafka-init kafka-ui seaweedfs dsoc-volume-init"
+KAFKA_SERVICES="zookeeper kafka-broker kafka-init kafka-ui kafka-exporter seaweedfs dsoc-volume-init"
 SIM_SERVICES="etr_daemon gbt vlba dsoc"
 
 PORTAINER_SERVICE="portainer"
 AGENT_SERVICE="portainer_agent"
 
 # TODO add the commented vlba sims when scaling up! (vlba9 and vlba10 should start before gbt)
-DSOC_SERVICES="traefik ngradar_website postgres prometheus grafana zookeeper kafka-broker kafka-init kafka-ui seaweedfs dsoc-volume-init dsoc etr_daemon"  # vlba7 vlba8
+DSOC_SERVICES="traefik ngradar_website postgres prometheus grafana postgres_exporter zookeeper kafka-broker kafka-init kafka-ui kafka-exporter seaweedfs dsoc-volume-init dsoc etr_daemon"  # vlba7 vlba8
 VLBA_1_SERVICES="vlba"  # vlba2
 VLBA_2_SERVICES="vlba3 vlba4"
 VLBA_3_SERVICES="vlba5 vlba6"

@@ -194,16 +194,14 @@ services:
     image: prom/prometheus:latest # I feel like we should pin a specific version? Rather than the latest?
     container_name: prometheus
     restart: unless-stopped
-
     ports:
       - "127.0.0.1:9090:9090"
-
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
-
     networks:
       - proxy
+      - ngradar_website_network # Giving prometheus access to both networks for metrics monitoring
 
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
@@ -220,6 +218,7 @@ services:
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
     networks:
       - proxy
     environment:
@@ -228,6 +227,34 @@ services:
       - GF_USERS_ALLOW_SIGN_UP=false
     depends_on:
       - prometheus
+
+
+  postgres_exporter:
+    image: prometheuscommunity/postgres-exporter:latest # we should have a pinned version eventually, I feel
+    container_name: postgres_exporter
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_NAME: ${DATABASE_URL}
+    networks:
+      - ngradar_website_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  kafka-exporter:
+    image: danielqsj/kafka-exporter:v1.9.0
+    container_name: kafka-exporter
+    restart: unless-stopped
+    profiles: ["kafka"]
+    command:
+      - "--kafka.server=kafka-broker:29092"
+      - "--topic.exclude=^__.*"
+      - "--refresh.metadata=15s"
+    depends_on:
+      kafka-broker:
+        condition: service_healthy
+    networks:
+      - ngradar_website_network
 
 
   ngradar_website:
@@ -305,21 +332,21 @@ services:
       timeout: 5s
       retries: 5
 
-  staging_loader:
-    container_name: staging_loader
-    build:
-      context: .
-      target: load-staging-data
-    env_file:
-      - .env
-    networks:
-      - ngradar_website_network
-    depends_on:
-      - postgres
-    volumes:
-      - staging_dump:/dump
-    profiles:
-      - tools
+  # staging_loader:
+  #   container_name: staging_loader
+  #   build:
+  #     context: .
+  #     target: load-staging-data
+  #   env_file:
+  #     - .env
+  #   networks:
+  #     - ngradar_website_network
+  #   depends_on:
+  #     - postgres
+  #   volumes:
+  #     - staging_dump:/dump
+  #   profiles:
+  #     - tools
 
 #==========================
 # kafka related containers:
@@ -414,6 +441,8 @@ services:
     profiles: ["kafka"]
     depends_on:
       - zookeeper
+    volumes:
+       - ./jmx-exporter:/opt/jmx-exporter:ro
     # ports:
     #   - ${PUBLIC_BIND_IP:-127.0.0.1}:9092:9092
     environment:
@@ -430,6 +459,8 @@ services:
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_OPTS: >-
+        -javaagent:/opt/jmx-exporter/jmx_prometheus_javaagent-1.6.0.jar=7071:/opt/jmx-exporter/kafka.yml
     networks:
       - ngradar_website_network
       - proxy
@@ -447,7 +478,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "kafka-topics --bootstrap-server kafka-broker:29092 --list >/dev/null 2>&1",
+          "KAFKA_OPTS='' kafka-topics --bootstrap-server kafka-broker:29092 --list >/dev/null 2>&1",
         ]
       interval: 5s
       timeout: 5s
