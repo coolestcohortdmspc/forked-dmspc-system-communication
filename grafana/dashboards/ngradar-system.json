@@ -5,7 +5,7 @@
     "name": "ngradar-system",
     "namespace": "default",
     "uid": "c5b74ad4-bbf7-4bb2-9c79-85e3d9c3c7ea",
-    "resourceVersion": "1788548605721019",
+    "resourceVersion": "1788551605710983",
     "generation": 5,
     "creationTimestamp": "2026-09-04T16:39:34Z",
     "labels": {
@@ -16,9 +16,9 @@
       "grafana.app/folder": "ffx97qv3xgflsa",
       "grafana.app/managedBy": "classic-file-provisioning",
       "grafana.app/managerId": "ngRadar",
-      "grafana.app/sourceChecksum": "6df503e71ef9b55d61ff844baed2c936",
+      "grafana.app/sourceChecksum": "2735c9677522751629483b062e855fdd",
       "grafana.app/sourcePath": "/var/lib/grafana/dashboards/ngradar-system.json",
-      "grafana.app/sourceTimestamp": "1788548594000",
+      "grafana.app/sourceTimestamp": "1788551584000",
       "grafana.app/updatedBy": "access-policy:service",
       "grafana.app/updatedTimestamp": "2026-09-04T19:03:25Z",
       "grafana.app/folderTitle": "ngRadar",
@@ -2128,6 +2128,7 @@
                     "fixedColor": "blue",
                     "mode": "fixed"
                   },
+                  "displayName": "Data Transmitted",
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
