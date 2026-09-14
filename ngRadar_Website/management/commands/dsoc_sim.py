@@ -784,7 +784,7 @@ def process_msg(
                     VLBA_STATION
                 ),
 
-                message="DSOC reponded that it has enough storage. VLBAmay begin the etransfer.",
+                message="DSOC reponded that it has enough storage. VLBA may begin the etransfer.",
             )
 
             print(
