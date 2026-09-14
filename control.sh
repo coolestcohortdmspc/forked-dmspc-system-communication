@@ -9,11 +9,9 @@ set +a
 START="traefik_http portainer ngradar_website postgres prometheus grafana postgres_exporter"
 
 DSOC_DROPLET="root@${DSOC_DROPLET_IP}"
-VLBA_1_DROPLET="root@${VLBA_DROPLET_IP}"  # TODO remove when scaling up
-# TODO use these for scaling up AND ADD THESE IPs to .env
-# VLBA_1_DROPLET="root@${VLBA_1_DROPLET_IP}"
-# VLBA_2_DROPLET="root@${VLBA_2_DROPLET_IP}"
-# VLBA_3_DROPLET="root@${VLBA_3_DROPLET_IP}"
+VLBA_1_DROPLET="root@${VLBA_1_DROPLET_IP}"
+VLBA_2_DROPLET="root@${VLBA_2_DROPLET_IP}"
+VLBA_3_DROPLET="root@${VLBA_3_DROPLET_IP}"
 GBT_DROPLET="root@${GBT_DROPLET_IP}"
 
 REMOTE_DIR="/root/${REMOTE_REPO}"
@@ -231,14 +229,14 @@ droplets-down)
     ssh "$VLBA_1_DROPLET" \
         "cd $REMOTE_DIR && git checkout tm/10-vlba-sims && ./control.sh vlba-down VLBA_1_SERVICES"
     
-    TODO use these for scaling up
-    echo "Stopping VLBA 2 Droplet"
-    ssh "$VLBA_2_DROPLET" \
-        "cd $REMOTE_DIR && git checkout tm/10-vlba-sims && ./control.sh vlba-down VLBA_2_SERVICES"
+    # TODO use these for scaling up
+    # echo "Stopping VLBA 2 Droplet"
+    # ssh "$VLBA_2_DROPLET" \
+    #     "cd $REMOTE_DIR && git checkout tm/10-vlba-sims && ./control.sh vlba-down VLBA_2_SERVICES"
     
-    echo "Stopping VLBA 3 Droplet"
-    ssh "$VLBA_3_DROPLET" \
-        "cd $REMOTE_DIR && git checkout tm/10-vlba-sims && ./control.sh vlba-down VLBA_3_SERVICES"
+    # echo "Stopping VLBA 3 Droplet"
+    # ssh "$VLBA_3_DROPLET" \
+    #     "cd $REMOTE_DIR && git checkout tm/10-vlba-sims && ./control.sh vlba-down VLBA_3_SERVICES"
     
     echo "Stopping DSOC Droplet"
     ssh "$DSOC_DROPLET" \
