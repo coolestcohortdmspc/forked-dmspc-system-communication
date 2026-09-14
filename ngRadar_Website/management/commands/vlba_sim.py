@@ -37,14 +37,9 @@ FAILURE_REASONS = {
 # disk), which would otherwise retry at full speed forever.
 MAX_RESUME_ATTEMPTS = 5
 
-# STATION = Stations.HN
-# Use this constant instead once Ty's docker changes are in:
-
-STATION_NAME = os.environ.get("STATION_NAME")
-STATION = Stations[STATION_NAME]
-
 
 def process_msg(msg, producer_topic, producer_config):
+    STATION = Stations[os.environ.get("STATION_NAME")]
     incoming_key = int(msg.key().decode("utf-8"))
     raw_data_path = Path("/raw_data")
     
@@ -225,6 +220,8 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         print("Starting VLBA simulator")
+
+        STATION = Stations[os.environ.get("STATION_NAME")]
 
         producer_topic, producer_config, consumer_topic, consumer_config = bootstrap(STATION)
 

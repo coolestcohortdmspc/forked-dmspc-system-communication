@@ -32,6 +32,12 @@ with patch("pathlib.Path.read_text", return_value=mock_env_data):
 """Scenario 1: GBT_TX incoming message. Clean run, no failure cases."""
 #=====================================================================
 
+@patch.dict(
+    "os.environ",
+    {
+        "STATION_NAME": "PT",
+    },
+)
 @patch("ngRadar_Website.management.commands.vlba_sim.create_file")
 @patch("ngRadar_Website.management.commands.vlba_sim.Path")
 @patch("ngRadar_Website.management.commands.vlba_sim.send_kafka_message")
@@ -71,8 +77,7 @@ def test_process_msg_GBT_TX(
     mock_frame_path.is_file.return_value = True
     mock_frame_path.stat.return_value.st_size = 500
 
-    with patch("ngRadar_Website.management.commands.vlba_sim.STATION", Stations.PT):
-        process_msg(msg, producer_topic, producer_config)
+    process_msg(msg, producer_topic, producer_config)
 
     assert mock_uuid.call_count == 1
     mock_Thread.assert_called_once_with(target=mock_create, args=(mock_frame_path,), daemon=True)
@@ -83,7 +88,7 @@ def test_process_msg_GBT_TX(
                     station=Stations.PT,
                     status=Status.READY,
                     num_bytes=500,
-                    message="Hancock VLBA data file complete. Ready for e-transfer.",
+                    message="VLBA-PT data file complete. Ready for e-transfer.",
                 )
     mock_send_kafka_message.assert_called_once_with(
                     key = f"{Message.VLBA_REQUEST_STORAGE}",
@@ -104,6 +109,12 @@ def test_process_msg_GBT_TX(
 """Scenario 2: GBT_TX incoming message. Generated file does not exist FAILED case."""
 #=====================================================================
 
+@patch.dict(
+    "os.environ",
+    {
+        "STATION_NAME": "PT",
+    },
+)
 @patch("ngRadar_Website.management.commands.vlba_sim.create_file")
 @patch("ngRadar_Website.management.commands.vlba_sim.Path")
 @patch("ngRadar_Website.management.commands.vlba_sim.send_kafka_message")
@@ -142,8 +153,7 @@ def test_process_msg_GBT_TX_FAILED(
 
     mock_frame_path.is_file.return_value = False
 
-    with patch("ngRadar_Website.management.commands.vlba_sim.STATION", Stations.PT):
-        process_msg(msg, producer_topic, producer_config)
+    process_msg(msg, producer_topic, producer_config)
 
     assert mock_uuid.call_count == 1
     mock_Thread.assert_called_once_with(target=mock_create, args=(mock_frame_path,), daemon=True)
@@ -167,6 +177,12 @@ def test_process_msg_GBT_TX_FAILED(
 """Scenario 3: DSOC_RESPOND_STORAGE incoming message. Clean run, no failure cases."""
 #=====================================================================
 
+@patch.dict(
+    "os.environ",
+    {
+        "STATION_NAME": "PT",
+    },
+)
 @patch("ngRadar_Website.management.commands.vlba_sim.etc_send")
 @patch("ngRadar_Website.management.commands.vlba_sim.send_kafka_message")
 @patch("ngRadar_Website.management.commands.vlba_sim.record_transfer_event")
@@ -198,13 +214,12 @@ def test_process_msg_DSOC_RESPOND_STORAGE(
         "filename": str("fake_filename.png"),
         "event_time": datetime(2026, 7, 15, 12, 0, 0, tzinfo=timezone.utc),
         "message": "Yes",
-        "station": str("fake_station"),
+        "station": Stations.PT,
     }
 
     mock_json.return_value = mock_payload
 
-    with patch("ngRadar_Website.management.commands.vlba_sim.STATION", Stations.PT):
-        process_msg(msg, producer_topic, producer_config)
+    process_msg(msg, producer_topic, producer_config)
 
     assert mock_json.call_count == 1
     mock_record_transfer_event.assert_called_once_with(
@@ -213,7 +228,7 @@ def test_process_msg_DSOC_RESPOND_STORAGE(
                     station=Stations.PT,
                     status=Status.TRANSFERRING,
                     num_bytes=mock_payload["num_bytes"],
-                    message="Hancock VLBA e-transfer in progress"
+                    message="VLBA-PT e-transfer in progress"
                 )
     mock_send_kafka_message.assert_called_once_with(
                     key = f"{Message.VLBA_TRANSFERRING}",
@@ -225,7 +240,7 @@ def test_process_msg_DSOC_RESPOND_STORAGE(
                     num_bytes=2048,
                     filename="fake_filename.png",
                     station=Stations.PT,
-                    message="Hancock VLBA has started to send the data file to DSOC via e-transfer",
+                    message="VLBA-PT has started to send the data file to DSOC via e-transfer",
                 )    
     mock_etc_send.assert_called_once_with(Path("/raw_data/11111111-1111-1111-1111-111111111111.bin"))
 
@@ -235,6 +250,12 @@ def test_process_msg_DSOC_RESPOND_STORAGE(
 """Scenario 4: DSOC_RESPOND_STORAGE incoming message. etc_send raises CalledProcessError exception FAILED case."""
 #=====================================================================
 
+@patch.dict(
+    "os.environ",
+    {
+        "STATION_NAME": "PT",
+    },
+)
 @patch("ngRadar_Website.management.commands.vlba_sim.wait_for_etd")
 @patch("ngRadar_Website.management.commands.vlba_sim.etc_send")
 @patch("ngRadar_Website.management.commands.vlba_sim.send_kafka_message")
@@ -268,7 +289,7 @@ def test_process_msg_DSOC_RESPOND_STORAGE_CalledProcessError(
         "filename": str("fake_filename.png"),
         "event_time": datetime(2026, 7, 15, 12, 0, 0, tzinfo=timezone.utc),
         "message": "Yes",
-        "station": str("fake_station"),
+        "station": Stations.PT,
     }
 
     mock_json.return_value = mock_payload
@@ -280,8 +301,7 @@ def test_process_msg_DSOC_RESPOND_STORAGE_CalledProcessError(
 
     mock_wait_for_etd.return_value = True
 
-    with patch("ngRadar_Website.management.commands.vlba_sim.STATION", Stations.PT):
-        result = process_msg(msg, producer_topic, producer_config)
+    result = process_msg(msg, producer_topic, producer_config)
 
     assert result is False
     assert mock_json.call_count == 1
@@ -298,7 +318,7 @@ def test_process_msg_DSOC_RESPOND_STORAGE_CalledProcessError(
                 station=Stations.PT,
                 status=Status.TRANSFERRING,
                 num_bytes=mock_payload["num_bytes"],
-                message="Hancock VLBA e-transfer in progress",
+                message="VLBA-PT e-transfer in progress",
             ),
             call(
                 transfer_uuid=str(transfer_uuid),
@@ -321,6 +341,12 @@ def test_process_msg_DSOC_RESPOND_STORAGE_CalledProcessError(
 """Scenario 5: DSOC_RESPOND_STORAGE incoming message. etc_send raises OSError exception FAILED case."""
 #=====================================================================
 
+@patch.dict(
+    "os.environ",
+    {
+        "STATION_NAME": "PT",
+    },
+)
 @patch("ngRadar_Website.management.commands.vlba_sim.etc_send")
 @patch("ngRadar_Website.management.commands.vlba_sim.send_kafka_message")
 @patch("ngRadar_Website.management.commands.vlba_sim.record_transfer_event")
@@ -352,15 +378,14 @@ def test_process_msg_DSOC_RESPOND_STORAGE_OSError(
         "filename": str("fake_filename.png"),
         "event_time": datetime(2026, 7, 15, 12, 0, 0, tzinfo=timezone.utc),
         "message": "Yes",
-        "station": str("fake_station"),
+        "station": Stations.PT,
     }
 
     mock_json.return_value = mock_payload
 
     mock_etc_send.side_effect = OSError
 
-    with patch("ngRadar_Website.management.commands.vlba_sim.STATION", Stations.PT):
-        process_msg(msg, producer_topic, producer_config)
+    process_msg(msg, producer_topic, producer_config)
 
     assert mock_json.call_count == 1
     assert mock_record_transfer_event.call_count == 2
@@ -374,7 +399,7 @@ def test_process_msg_DSOC_RESPOND_STORAGE_OSError(
                     num_bytes=2048,
                     filename="fake_filename.png",
                     station=Stations.PT,
-                    message="Hancock VLBA has started to send the data file to DSOC via e-transfer",
+                    message="VLBA-PT has started to send the data file to DSOC via e-transfer",
                 )     
     mock_etc_send.assert_called_once_with(Path("/raw_data/11111111-1111-1111-1111-111111111111.bin"))
 
@@ -384,6 +409,12 @@ def test_process_msg_DSOC_RESPOND_STORAGE_OSError(
 """Scenario 6: DSOC_RESPOND_STORAGE incoming message. DSOC responded No, VLBA asks again."""
 #=====================================================================
 
+@patch.dict(
+    "os.environ",
+    {
+        "STATION_NAME": "PT",
+    },
+)
 @patch("ngRadar_Website.management.commands.vlba_sim.etc_send")
 @patch("ngRadar_Website.management.commands.vlba_sim.send_kafka_message")
 @patch("ngRadar_Website.management.commands.vlba_sim.time.sleep")
@@ -417,14 +448,13 @@ def test_process_msg_DSOC_RESPOND_STORAGE_No(
         "filename": str("fake_filename.png"),
         "event_time": datetime(2026, 7, 15, 12, 0, 0, tzinfo=timezone.utc),
         "message": 1, # Same as message being "No"
-        "station": str("fake_station"),
+        "station": Stations.PT,
     }
 
     mock_json.return_value = mock_payload
     mock_sleep.return_value = None # we don't want 5 seconds of sleep in test
 
-    with patch("ngRadar_Website.management.commands.vlba_sim.STATION", Stations.PT):
-        process_msg(msg, producer_topic, producer_config)
+    process_msg(msg, producer_topic, producer_config)
 
     assert mock_json.call_count == 1
     assert mock_record_transfer_event.call_count == 0
@@ -449,6 +479,12 @@ def test_process_msg_DSOC_RESPOND_STORAGE_No(
 """Scenario 7: VLBA_DELETE incoming message. VLBA deletes raw data."""
 #=====================================================================
 
+@patch.dict(
+    "os.environ",
+    {
+        "STATION_NAME": "PT",
+    },
+)
 @patch("ngRadar_Website.management.commands.vlba_sim.delete_observation_data")
 @patch("ngRadar_Website.management.commands.vlba_sim.etc_send")
 @patch("ngRadar_Website.management.commands.vlba_sim.send_kafka_message")
@@ -471,6 +507,7 @@ def test_process_msg_VLBA_DELETE(
     #The fake output of the json.loads() function:
     mock_payload = {
         "filename": str("fake_filename.png"),
+        "station": Stations.PT,
     }
 
     mock_json.return_value = mock_payload
@@ -489,6 +526,12 @@ def test_process_msg_VLBA_DELETE(
 """Scenario 8: Incoming message has invalid value."""
 #=====================================================================
 
+@patch.dict(
+    "os.environ",
+    {
+        "STATION_NAME": "PT",
+    },
+)
 @patch("ngRadar_Website.management.commands.vlba_sim.etc_send")
 @patch("ngRadar_Website.management.commands.vlba_sim.send_kafka_message")
 @patch("ngRadar_Website.management.commands.vlba_sim.record_transfer_event")
