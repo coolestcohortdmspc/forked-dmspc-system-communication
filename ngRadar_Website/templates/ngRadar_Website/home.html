@@ -17,10 +17,9 @@
 <!-- Row 2: Obs Status & Input Waveform -->
 <div class="row justify-content-center g-3 mb-4">
     <!-- Obs Status -->
-    <div id="home-status-partial" 
-        hx-get="{% url 'status' %}" 
-        hx-trigger="every 1s" 
-        hx-target="#home-status-partial"
+    <div  
+        hx-ext="ws"
+        ws-connect="/ws/status"
         class="col-12 col-md-6 col-lg-5">
         {% include 'ngRadar_Website/partials/status_partial.html' %}
     </div>
