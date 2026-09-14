@@ -1,42 +1,23 @@
-from datetime import datetime, timezone
-
 import json
 import time
 import uuid
 
+from datetime import datetime, timezone
+
 from django.core.management.base import BaseCommand
 
-from ngRadar_Website.enums import Stations, Message
-from ngRadar_Website.utils import (
-    latency_calc,
-    bootstrap,
-    consume,
-    produce,
+from ngRadar_Website.enums import (
+    Stations,
+    Status,
+    Message,
 )
 
-
-def set_payload_dict(
-    waveform,
-    ui_event_time,
-):
-    return {
-        "object_id": "30104",
-        "target": "Moretus",
-        "tx_waveform": waveform,
-        "rec_waveform": waveform,
-        "event_time": datetime.now(
-            timezone.utc
-        ),
-        "latency_ms": latency_calc(
-            ui_event_time,
-            Stations.GBT,
-        ),
-    }
-
-
-def turn_off_transmitter():
-    print("GBT transmitter OFF")
-    time.sleep(5)
+from ngRadar_Website.utils import (
+    bootstrap,
+    consume,
+    latency_calc,
+    send_kafka_message,
+)
 
 
 def process_msg(
@@ -48,103 +29,142 @@ def process_msg(
         msg.key().decode("utf-8")
     )
 
-    if incoming_key != Message.UI_EVENT.value:
+    # GBT only reacts to waveform requests
+    # submitted by the UI.
+    if (
+        incoming_key
+        != Message.UI_EVENT.value
+    ):
         return True
 
     payload = json.loads(
         msg.value().decode("utf-8")
     )
 
-    waveform = payload["tx_waveform"]
+    waveform = payload[
+        "tx_waveform"
+    ]
 
-    ui_event_time = datetime.fromisoformat(
-        payload["event_time"]
+    ui_event_time = (
+        datetime.fromisoformat(
+            payload["event_time"]
+        )
     )
 
     print(
-        f"GBT received waveform request: "
+        "GBT received waveform request: "
         f"{waveform}"
     )
 
-    turn_off_transmitter()
-
-    gbt_payload = set_payload_dict(
-        waveform,
-        ui_event_time,
-    )
-
-    # Correlates the whole observation sequence.
+    # One ID correlates both the OFF and ON
+    # events with the same observation.
     gbt_uuid = uuid.uuid4()
 
-    # Uniquely identifies this specific
-    # ObservatoryEvent.
-    event_uuid = uuid.uuid4()
+    # -------------------------------------------------
+    # 1. Turn transmitter OFF
+    # -------------------------------------------------
 
-    kafka_payload = {
-        "event_uuid": str(event_uuid),
-
-        "gbt_uuid": str(gbt_uuid),
-
-        "transfer_uuid": None,
-
-        "station": int(Stations.GBT),
-        "station_name": Stations.GBT.label,
-
-        "object_id": gbt_payload[
-            "object_id"
-        ],
-        "target": gbt_payload[
-            "target"
-        ],
-
-        "tx_waveform": gbt_payload[
-            "tx_waveform"
-        ],
-        "rec_waveform": gbt_payload[
-            "rec_waveform"
-        ],
-
-        "product_type": None,
-        "product_id": None,
-
-        "status": None,
-
-        "xmit_station": int(
-            Stations.GBT
-        ),
-        "rcvr_station": None,
-
-        "image_key": None,
-        "num_bytes": 0,
-
-        "latency_ms": gbt_payload[
-            "latency_ms"
-        ],
-
-        "message": (
-            f"GBT transmitting waveform "
-            f"{waveform}."
-        ),
-
-        "event_time": (
-            gbt_payload["event_time"]
-            .isoformat()
-        ),
-        "gbt_event_time": (
-            gbt_payload["event_time"]
-            .isoformat()
-        ),
-    }
-
-    produce(
-        producer_topic,
-        producer_config,
-        str(Message.GBT_TX.value),
-        json.dumps(kafka_payload),
+    off_event_time = datetime.now(
+        timezone.utc
     )
 
     print(
-        f"GBT published event "
+        "GBT transmitter OFF"
+    )
+
+    send_kafka_message(
+        message_type=(
+            Message.STATUS_UPDATE
+        ),
+
+        producer_topic=producer_topic,
+        producer_config=producer_config,
+
+        station=Stations.GBT,
+
+        gbt_uuid=gbt_uuid,
+
+        object_id="30104",
+        target="Moretus",
+
+        tx_waveform="TX_OFF",
+        rec_waveform="TX_OFF",
+
+        status=None,
+
+        xmit_station=Stations.GBT,
+        rcvr_station=None,
+
+        latency_ms=latency_calc(
+            ui_event_time,
+            Stations.GBT,
+        ),
+
+        message=(
+            "GBT transmitter turned OFF "
+            "for waveform change."
+        ),
+    )
+
+    # -------------------------------------------------
+    # 2. Remain OFF for five seconds
+    # -------------------------------------------------
+
+    time.sleep(5)
+
+    # -------------------------------------------------
+    # 3. Turn transmitter ON with new waveform
+    # -------------------------------------------------
+
+    gbt_event_time = datetime.now(
+        timezone.utc
+    )
+
+    print(
+        "GBT transmitter ON with "
+        f"waveform {waveform}"
+    )
+
+    event_uuid = send_kafka_message(
+        message_type=(
+            Message.GBT_TX
+        ),
+
+        producer_topic=producer_topic,
+        producer_config=producer_config,
+
+        station=Stations.GBT,
+
+        gbt_uuid=gbt_uuid,
+
+        gbt_event_time=(
+            gbt_event_time.isoformat()
+        ),
+
+        object_id="30104",
+        target="Moretus",
+
+        tx_waveform=waveform,
+        rec_waveform=waveform,
+
+        status=None,
+
+        xmit_station=Stations.GBT,
+        rcvr_station=None,
+
+        latency_ms=latency_calc(
+            ui_event_time,
+            Stations.GBT,
+        ),
+
+        message=(
+            "GBT transmitting waveform "
+            f"{waveform}."
+        ),
+    )
+
+    print(
+        "GBT published TX event "
         f"{event_uuid}"
     )
 

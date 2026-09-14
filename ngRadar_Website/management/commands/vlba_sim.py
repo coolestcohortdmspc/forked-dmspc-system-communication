@@ -148,35 +148,38 @@ def process_msg(
                 frame_path.stat().st_size
             )
 
-            # This ONE Kafka message:
-            #
-            # 1. tells DSOC to check storage
-            # 2. describes the VLBA READY state
-            # 3. is consumed by db_consumer and saved
-            #    as an ObservatoryEvent
             send_kafka_message(
                 producer_topic=producer_topic,
                 producer_config=producer_config,
+
                 message_type=(
                     Message.VLBA_REQUEST_STORAGE
                 ),
+
                 transfer_uuid=transfer_uuid,
                 gbt_uuid=gbt_uuid,
                 gbt_event_time=gbt_event_time,
+
                 station=VLBA_STATION,
-                status=Status.READY,
+
+                status=Status.QUEUED,
+
                 object_id=object_id,
                 target=target,
+
                 tx_waveform=tx_waveform,
                 rec_waveform=rec_waveform,
+
                 num_bytes=num_bytes,
                 filename=frame_path.name,
+
                 xmit_station=VLBA_STATION,
                 rcvr_station=Stations.DSOC,
+
                 message=(
-                    "VLBA requesting DSOC "
-                    "storage availability."
-                ),
+                    "VLBA requested a storage "
+                    "check at DSOC."
+                )
             )
 
             print(
@@ -283,13 +286,14 @@ def process_msg(
             )
         )
 
+        response_status = int(
+            payload["status"]
+        )
+
         # =====================================================
         # DSOC storage check permanently failed
         # =====================================================
-        if (
-            payload["status"]
-            == Status.FAILED.value
-        ):
+        if (response_status == Status.FAILED.value):
             print(
                 "DSOC storage request "
                 f"failed: {payload['message']}"
@@ -300,8 +304,7 @@ def process_msg(
         # =====================================================
         # DSOC HAS STORAGE
         # =====================================================
-        elif payload["message"] == "Yes":
-            attempts = 0
+        elif (response_status == Status.READY.value):
 
             while True:
                 try:
