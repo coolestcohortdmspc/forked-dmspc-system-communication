@@ -47,7 +47,7 @@
 
             <span id="system-status">
 
-                {% if latest_event.status == 7 %}
+                {% if latest_event.status == 8 %}
 
                     <strong class="fw-bold">
                         ❗ System Failure:
@@ -236,31 +236,6 @@
                 {{ gbt_event.object_id|default:"-" }}
             </p>
         </div>
-
-
-        <div
-            class="
-                border rounded p-3
-                bg-white d-flex align-items-center
-            "
-            style="min-height: 5rem;"
-        >
-            <h5 class="fw-bold me-3 mb-0">
-                GBT Status:
-            </h5>
-
-            <p
-                id="gbt-status"
-                class="fs-5 mb-0"
-            >
-                {% if gbt_event.status %}
-                    {{ gbt_event.get_status_display }}
-                {% else %}
-                    -
-                {% endif %}
-            </p>
-        </div>
-
     </div>
 
 
@@ -305,27 +280,6 @@
                 {{ gbt_event.rec_waveform|default:"-" }}
             </p>
         </div>
-
-
-        <div
-            class="
-                border rounded p-3
-                bg-white d-flex align-items-center
-            "
-            style="min-height: 5rem;"
-        >
-            <h5 class="fw-bold me-3 mb-0">
-                Message:
-            </h5>
-
-            <p
-                id="gbt-message"
-                class="fs-6 mb-0"
-            >
-                {{ gbt_event.message|default:"-" }}
-            </p>
-        </div>
-
     </div>
 
 </div>
