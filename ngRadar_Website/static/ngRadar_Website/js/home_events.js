@@ -1,6 +1,3 @@
-const eventSource = window.eventSource;
-
-
 function dispatchRadarEvent(
     browserEventName,
     event
@@ -11,7 +8,6 @@ function dispatchRadarEvent(
         data = JSON.parse(
             event.data || "{}"
         );
-
     } catch (error) {
         console.error(
             `[SSE] Could not parse ${event.type}:`,
@@ -67,7 +63,7 @@ for (
         browserEvent
     ] of Object.entries(HOME_EVENTS)
 ) {
-    eventSource.addEventListener(
+    window.eventSource.addEventListener(
         sseEvent,
         (event) => {
             dispatchRadarEvent(

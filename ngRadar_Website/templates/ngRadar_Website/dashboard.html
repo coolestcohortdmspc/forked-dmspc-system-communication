@@ -21,22 +21,9 @@
 
         <div
             id="dashboard-content"
-
-            hx-get="{% url 'event_table_update' %}"
-
-            hx-trigger="
-                observatoryEventCreated from:body
-            "
-
-            hx-target="#dashboard-content"
-
-            hx-swap="innerHTML"
-
             class="w-100"
         >
-
             {% include 'ngRadar_Website/partials/dashboard_updates.html' %}
-
         </div>
 
     </main>
@@ -85,9 +72,21 @@
         "{% url 'latency_data' %}";
 </script>
 
-<script
-    src="{% static 'ngRadar_Website/js/history_events.js' %}"
-></script>
+<script>
+    document.body.addEventListener(
+        "observatoryEventCreated",
+        () => {
+            htmx.ajax(
+                "GET",
+                "{% url 'event_table_update' %}",
+                {
+                    target: "#dashboard-content",
+                    swap: "innerHTML"
+                }
+            );
+        }
+    );
+</script>
 
 <script
     src="{% static 'ngRadar_Website/js/latency_chart.js' %}"

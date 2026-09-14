@@ -14,6 +14,13 @@ _consumer_started = False
 _consumer_lock = threading.Lock()
 
 
+TOPIC_TO_UI_EVENT = {
+    "GBT_notif": "gbt_changed",
+    "VLBA_notif": "vlba_changed",
+    "DSOC_notif": "dsoc_changed",
+}
+
+
 def consume_ui_events():
     topics = os.getenv(
         "UI_KAFKA_TOPICS",
@@ -72,39 +79,95 @@ def consume_ui_events():
                 msg.key().decode("utf-8")
             )
 
-            if incoming_key != Message.DB_COMMITTED.value:
-                continue
+            topic = msg.topic()
 
             try:
                 payload = json.loads(
                     msg.value().decode("utf-8")
                 )
+
             except (
                 UnicodeDecodeError,
                 json.JSONDecodeError,
             ):
                 logger.exception(
-                    "Invalid DB committed message"
+                    "Invalid Kafka message"
                 )
                 continue
 
-            event_type = payload.get(
-                "ui_event_type"
+
+            # =====================================================
+            # DATABASE COMMIT NOTIFICATION
+            #
+            # This event means ObservatoryEvent has already been
+            # committed and the Dashboard may safely refresh.
+            # =====================================================
+
+            if (
+                incoming_key
+                == Message.DB_COMMITTED.value
+            ):
+                committed_payload = payload.get(
+                    "data",
+                    {},
+                )
+
+                logger.info(
+                    "Publishing "
+                    "observatory_event_created "
+                    "for event %s",
+                    committed_payload.get(
+                        "event_uuid"
+                    ),
+                )
+
+                sse_broker.publish(
+                    {
+                        "type": (
+                            "observatory_event_created"
+                        ),
+                        "data": committed_payload,
+                    }
+                )
+
+                continue
+
+
+            # =====================================================
+            # LIVE DOMAIN EVENT
+            #
+            # These events update Home immediately without waiting
+            # for the database consumer.
+            # =====================================================
+
+            event_type = (
+                TOPIC_TO_UI_EVENT.get(
+                    topic
+                )
             )
 
-            if not event_type:
+            if event_type is None:
                 logger.warning(
-                    "DB committed event missing ui_event_type"
+                    "No UI event mapping "
+                    "for topic %s",
+                    topic,
                 )
                 continue
+
+
+            logger.info(
+                "Publishing live UI event "
+                "%s for event %s",
+                event_type,
+                payload.get(
+                    "event_uuid"
+                ),
+            )
 
             sse_broker.publish(
                 {
                     "type": event_type,
-                    "data": payload.get(
-                        "data",
-                        {},
-                    ),
+                    "data": payload,
                 }
             )
 

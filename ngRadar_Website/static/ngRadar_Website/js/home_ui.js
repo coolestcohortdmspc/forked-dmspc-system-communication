@@ -143,18 +143,23 @@ function updateDsocPanel(event) {
     updateSystemStatus(
         data
     );
-
-    // If this DSOC event represents a newly available
-    // image, show it immediately.
-    if (
-        data.event_uuid
-        && data.image_key
-    ) {
-        showDsocImage(
-            data
-        );
-    }
 }
+
+document.body.addEventListener(
+    "observatoryEventCreated",
+    (event) => {
+        const data = event.detail;
+
+        if (
+            data.station_name ===
+                "DSOC (Domenici Socorro Operations Center)" &&
+            data.image_key &&
+            data.event_uuid
+        ) {
+            showDsocImage(data);
+        }
+    }
+);
 
 
 function showDsocImage(data) {
@@ -305,16 +310,6 @@ document.body.addEventListener(
 );
 
 
-document.body.addEventListener(
-    "imageReady",
-    (event) => {
-        showDsocImage(
-            event.detail
-        );
-    }
-);
-
-
 // A waveform submission starts a new operation.
 // GBT activity confirms that processing has begun.
 
@@ -326,19 +321,20 @@ document.body.addEventListener(
 );
 
 
-// Unlock once DSOC reports completion or failure.
-
+// Unlock submit_waveform button once DSOC reports completion or failure.
 document.body.addEventListener(
     "dsocChanged",
     (event) => {
-        const data =
-            event.detail;
+        const data = event.detail;
+
+        console.log(
+            "[Home] DSOC event:",
+            data
+        );
 
         if (
-            data.status_name === "COMPLETED"
-            || data.status_name === "FAILED"
-            || data.status === 8
-            || data.status === 7
+            data.status_name === "COMPLETED" ||
+            data.status_name === "FAILED"
         ) {
             unlockSubmitButton();
         }

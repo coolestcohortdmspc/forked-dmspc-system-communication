@@ -392,46 +392,6 @@ def serve_image(request, uuid):
             "from SeaweedFS."
         )
 
-        (
-            producer_topic,
-            producer_config,
-            _,
-            _,
-        ) = bootstrap(
-            Stations.DSOC
-        )
-
-        send_kafka_message(
-            message_type=Message.STATUS_UPDATE,
-            producer_topic=producer_topic,
-            producer_config=producer_config,
-
-            station=Stations.DSOC,
-            status=Status.FAILED,
-
-            gbt_uuid=event.gbt_uuid,
-            transfer_uuid=event.transfer_uuid,
-
-            object_id=event.object_id,
-            target=event.target,
-
-            tx_waveform=event.tx_waveform,
-            rec_waveform=event.rec_waveform,
-
-            product_type=event.product_type,
-            product_id=event.product_id,
-
-            image_key=event.image_key,
-
-            xmit_station=event.xmit_station,
-            rcvr_station=event.rcvr_station,
-
-            message=(
-                "Failed to retrieve DDM image "
-                f"from SeaweedFS: {exc}"
-            ),
-        )
-
         return HttpResponse(
             "Unable to retrieve image.",
             status=503,

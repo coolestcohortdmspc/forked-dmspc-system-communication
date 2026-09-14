@@ -10,13 +10,6 @@ from django.db import transaction
 from django.core.management.base import BaseCommand
 
 
-
-TOPIC_TO_UI_EVENT = {
-    "GBT_notif": "gbt_changed",
-    "VLBA_notif": "vlba_changed",
-    "DSOC_notif": "dsoc_changed",
-}
-
 def process_msg(
     msg,
     producer_topic,
@@ -27,7 +20,12 @@ def process_msg(
             msg.key().decode("utf-8")
         )
 
-        if incoming_key == Message.DB_COMMITTED.value:
+        # Do not persist our own
+        # database acknowledgements.
+        if (
+            incoming_key
+            == Message.DB_COMMITTED.value
+        ):
             return True
 
         topic = msg.topic()
@@ -36,22 +34,18 @@ def process_msg(
             msg.value().decode("utf-8")
         )
 
-        ui_event_type = TOPIC_TO_UI_EVENT.get(
-            topic
-        )
-
-        if ui_event_type is None:
-            return True
-
         with transaction.atomic():
-            record_obs_event(payload)
+            record_obs_event(
+                payload
+            )
 
             transaction.on_commit(
                 lambda: publish_db_committed(
                     topic=topic,
-                    producer_config=producer_config,
+                    producer_config=(
+                        producer_config
+                    ),
                     payload=payload,
-                    ui_event_type=ui_event_type,
                 )
             )
 
@@ -59,21 +53,28 @@ def process_msg(
 
     except json.JSONDecodeError as error:
         print(
-            f"DB consumer received invalid JSON: "
+            "DB consumer received "
+            "invalid JSON: "
             f"{error}"
         )
         return False
 
-    except (KeyError, TypeError, ValueError) as error:
+    except (
+        KeyError,
+        TypeError,
+        ValueError,
+    ) as error:
         print(
-            f"DB consumer received invalid payload: "
+            "DB consumer received "
+            "invalid payload: "
             f"{error}"
         )
         return False
 
     except Exception as error:
         print(
-            f"DB consumer failed to process message: "
+            "DB consumer failed to "
+            "process message: "
             f"{error}"
         )
         return False
@@ -149,18 +150,18 @@ def publish_db_committed(
     topic,
     producer_config,
     payload,
-    ui_event_type,
 ):
     notification = {
         "event_type": "db_committed",
-        "ui_event_type": ui_event_type,
         "data": payload,
     }
 
     produce(
         topic,
         producer_config,
-        str(Message.DB_COMMITTED.value),
+        str(
+            Message.DB_COMMITTED.value
+        ),
         json.dumps(notification),
     )
 
