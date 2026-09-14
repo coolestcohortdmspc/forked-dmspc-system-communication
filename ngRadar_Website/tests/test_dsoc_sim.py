@@ -120,8 +120,9 @@ def test_publish_dsocEvents_exception(mock_dsoc_event):
 
 def test_create_img_output():
     """Ensure the function returns a BytesIO object with non-zero content."""
+    station = 94
     tx_waveform = "SineWave"
-    img_file, num_bytes = create_img(tx_waveform)
+    img_file, num_bytes = create_img(station, tx_waveform)
     
     assert isinstance(img_file, bytes)
     assert num_bytes > 0
@@ -585,7 +586,7 @@ def test_process_msg_VLBA_TRANSFERRING(
     mock_DB_import.assert_called_once_with(str(uuid.UUID("22222222-2222-2222-2222-222222222222")))
     mock_latency_calc.assert_called_once_with(datetime(2026, 7, 15, 12, 0, 0, tzinfo=timezone.utc))
     mock_DB_columns.assert_called_once_with(mock_gbt_data)
-    mock_create_img.assert_called_once_with("SineWave")
+    mock_create_img.assert_called_once_with(mock_payload["station"], "SineWave")
     mock_uuid.assert_called_once()
     mock_save_image_to_seaweedfs.assert_called_once_with(
                     "Venus",
@@ -779,7 +780,7 @@ def test_process_msg_VLBA_TRANSFERRING_processingFAILED(
     mock_DB_import.assert_called_once_with(str(uuid.UUID("22222222-2222-2222-2222-222222222222")))
     mock_latency_calc.assert_called_once_with(datetime(2026, 7, 15, 12, 0, 0, tzinfo=timezone.utc))
     mock_DB_columns.assert_called_once_with(mock_gbt_data)
-    mock_create_img.assert_called_once_with("SineWave")
+    mock_create_img.assert_called_once_with(mock_payload["station"], "SineWave")
     mock_uuid.assert_called_once()
     mock_save_image_to_seaweedfs.assert_called_once_with(
                 "Venus",
@@ -952,7 +953,7 @@ def test_process_msg_VLBA_TRANSFERRING_image_falseFAILED(
     mock_DB_import.assert_called_once_with(str(uuid.UUID("22222222-2222-2222-2222-222222222222")))
     mock_latency_calc.assert_called_once_with(datetime(2026, 7, 15, 12, 0, 0, tzinfo=timezone.utc))
     mock_DB_columns.assert_called_once_with(mock_gbt_data)
-    mock_create_img.assert_called_once_with("SineWave")
+    mock_create_img.assert_called_once_with(mock_payload["station"], "SineWave")
     mock_uuid.assert_called_once()
     mock_save_image_to_seaweedfs.assert_called_once_with(
                 "Venus",

@@ -83,7 +83,7 @@ def publish_dsocEvents(
           return None  # <-- Return None if something broke
 
 
-def create_img(tx_waveform):
+def create_img(station, tx_waveform):
     #generate a random image payload to simulate the DSOC's DDM product: 
     matplotlib.use('Agg')  # Use a non-interactive backend for matplotlib
         
@@ -94,7 +94,7 @@ def create_img(tx_waveform):
     plt.scatter(x_data, y_data, color='red')
     plt.axhline(0, color='black', linewidth=0.5)
     plt.axvline(0, color='black', linewidth=0.5)
-    plt.title(f"DDM for {tx_waveform}", size=20)
+    plt.title(f"[Station {Stations(station).name}] DDM for {tx_waveform}", size=20)
     plt.xlabel("Doppler Freq (Hz)")
     plt.ylabel("Range (km)")
     plt.grid(True)
@@ -367,7 +367,7 @@ def process_msg(msg, producer_topic, producer_config):
             data["latency_ms"] = dsoc_latency
 
             object_id, target, tx_waveform, event_time = gbt_data
-            image_file, image_num_bytes = create_img(tx_waveform)
+            image_file, image_num_bytes = create_img(station, tx_waveform)
             dsoc_uuid = str(uuid.uuid4())
 
             image_key = save_image_to_seaweedfs(
