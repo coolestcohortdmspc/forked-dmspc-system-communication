@@ -198,12 +198,23 @@ def verify_incoming_transfer(
     *,
     incoming_file,
     expected_num_bytes,
+    producer_topic,
+    producer_config,
+    gbt_event_time,
+    gbt_uuid,
+    object_id,
+    target,
+    tx_waveform,
+    rec_waveform,
+    filename,
+    transfer_uuid,
     attempts=10,
     delay_seconds=0.5,
 ):
     """
-    Verify that the incoming file exists and matches the
-    expected byte count supplied by VLBA.
+    Verify that the incoming file exists, matches the
+    expected byte count supplied by VLBA, and sends a
+    kafka message if successful.
     """
 
     expected_num_bytes = int(
@@ -218,10 +229,55 @@ def verify_incoming_transfer(
                 .st_size
             )
 
-            if (
-                actual_num_bytes
-                == expected_num_bytes
-            ):
+            if (actual_num_bytes == expected_num_bytes):
+                send_kafka_message(
+                    producer_topic=(
+                        producer_topic
+                    ),
+                    producer_config=(
+                        producer_config
+                    ),
+        
+                    message_type=(
+                        Message.STATUS_UPDATE
+                    ),
+        
+                    transfer_uuid=(
+                        transfer_uuid
+                    ),
+                    gbt_uuid=gbt_uuid,
+        
+                    gbt_event_time=(
+                        gbt_event_time
+                    ),
+        
+                    station=Stations.DSOC,
+                    status=Status.VERIFIED,
+        
+                    object_id=object_id,
+                    target=target,
+        
+                    tx_waveform=tx_waveform,
+                    rec_waveform=(
+                        rec_waveform
+                    ),
+        
+                    num_bytes=expected_num_bytes,
+                    filename=filename,  
+        
+                    xmit_station=(
+                        VLBA_STATION
+                    ),
+                    rcvr_station=(
+                        Stations.DSOC
+                    ),
+        
+                    message=(
+                        f"Verified incoming transfer of "
+                        f"{filename} with "
+                        f"{actual_num_bytes} bytes."
+                    ),
+                )
                 return actual_num_bytes
 
         time.sleep(
@@ -873,15 +929,24 @@ def process_msg(
         # -----------------------------------------------------
 
         try:
-            actual_num_bytes = (
-                verify_incoming_transfer(
-                    incoming_file=(
-                        incoming_file
-                    ),
-                    expected_num_bytes=(
-                        num_bytes
-                    ),
-                )
+            actual_num_bytes = verify_incoming_transfer(
+                incoming_file=incoming_file,
+                expected_num_bytes=num_bytes,
+
+                producer_topic=producer_topic,
+                producer_config=producer_config,
+
+                gbt_event_time=gbt_event_time,
+                gbt_uuid=gbt_uuid,
+
+                object_id=object_id,
+                target=target,
+
+                tx_waveform=tx_waveform,
+                rec_waveform=rec_waveform,
+
+                filename=filename,
+                transfer_uuid=transfer_uuid,
             )
 
         except Exception as exc:

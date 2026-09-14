@@ -42,7 +42,7 @@
                         </th>
 
                         <th class="py-3">
-                            Payload
+                            Image
                         </th>
 
                         <th class="py-3">
@@ -145,8 +145,8 @@
 
 
                         <td>
-
-                            {% if latest_event.status == 1 %}
+                            <!-- Green Status: 1, 6, 7, 9 (Ready, Transferred, Verified, Completed) -->
+                            {% if latest_event.status == 1 or latest_event.status == 6 or latest_event.status == 7 or latest_event.status == 9 %}
 
                                 <span
                                     class="badge rounded-pill bg-success"
@@ -155,7 +155,8 @@
                                 >
                                     {{ latest_event.get_status_display }}
                                 </span>
-
+                            
+                            <!-- Gray Status: 2, 3 (Queued, Blocked) -->
                             {% elif latest_event.status == 2 or latest_event.status == 3 %}
 
                                 <span
@@ -166,6 +167,7 @@
                                     {{ latest_event.get_status_display }}
                                 </span>
 
+                            <!-- Blue Status: 4, 5 (Transferring, Verifying) -->
                             {% elif latest_event.status == 4 or latest_event.status == 5 %}
 
                                 <span
@@ -176,17 +178,8 @@
                                     {{ latest_event.get_status_display }}
                                 </span>
 
-                            {% elif latest_event.status == 6 or latest_event.status == 8 %}
-
-                                <span
-                                    class="badge rounded-pill bg-success"
-                                    data-bs-toggle="tooltip"
-                                    title="{{ latest_event.message }}"
-                                >
-                                    {{ latest_event.get_status_display }}
-                                </span>
-
-                            {% elif latest_event.status == 7 %}
+                            <!-- Red Status: 8 (Failed) -->
+                            {% elif latest_event.status == 8 %}
 
                                 <span
                                     class="badge rounded-pill bg-danger"
@@ -196,7 +189,8 @@
                                     {{ latest_event.get_status_display }}
                                 </span>
 
-                            {% elif latest_event.status == 9 or latest_event.status == 10 %}
+                            <!-- Yellow Status: 10, 11 (Polling SeaweedFS, Retrying storage check) -->
+                            {% elif latest_event.status == 10 or latest_event.status == 11 %}
 
                                 <span
                                     class="badge rounded-pill bg-warning text-dark"

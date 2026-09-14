@@ -25,10 +25,11 @@ class Status(models.IntegerChoices):
     TRANSFERRING = 4, "Transferring"    # Used when the e-transfer is actively in progress. 
     VERIFYING = 5, "Verifying"          # Will verify the number of bytes received at DSOC matches the expected number of bytes being sent from VLBA. 
     TRANSFERRED = 6, "Transferred"      # This status would be used when the e-transfer has completed from etc -> etd successfully, will be the status sent by kafka to DSOC to begin DSOC workflow.
-    FAILED = 7, "Failed"        
-    COMPLETED = 8, "Completed"          # This status would be used when the e-transfer has completed successfully and the data has been verified, processed, and stored appropriately.
-    POLLING = 9, "Polling SeaweedFS"    # Used during failure testing for transparency
-    RETRYING = 10, "Retrying storage check" # Used the first time DSOC has to retry a storage check
+    VERIFIED = 7, "Verified"            # This status would be used when the e-transfer has completed successfully and the data has been verified, processed, and stored appropriately.
+    FAILED = 8, "Failed"        
+    COMPLETED = 9, "Completed"          # This status would be used when the e-transfer has completed successfully and the data has been verified, processed, and stored appropriately.
+    POLLING = 10, "Polling SeaweedFS"    # Used during failure testing for transparency
+    RETRYING = 11, "Retrying storage check" # Used the first time DSOC has to retry a storage check
 
 
 class Message(models.IntegerChoices):
