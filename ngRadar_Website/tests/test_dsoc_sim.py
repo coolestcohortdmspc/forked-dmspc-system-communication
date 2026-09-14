@@ -547,7 +547,7 @@ def test_process_msg_VLBA_TRANSFERRING(
             "filename": str("fake_filename.png"),
             "event_time": datetime(2026, 7, 15, 12, 0, 0, tzinfo=timezone.utc),
             "message": 2,
-            "station": str("fake_station"),
+            "station": Stations.PT,
         }
     
     #pretend that, given the fake uuid, this data is extracted from the DB:
@@ -597,7 +597,7 @@ def test_process_msg_VLBA_TRANSFERRING(
                     num_bytes=500,
                     data=mock_data,
                     xmit_station=Stations.GBT,
-                    rcvr_station="fake_station",
+                    rcvr_station=Stations.PT,
                     transfer_uuid="11111111-1111-1111-1111-111111111111",
                 )
     mock_send_kafka_message.assert_called_once_with(
@@ -609,7 +609,7 @@ def test_process_msg_VLBA_TRANSFERRING(
                     status=1,
                     num_bytes=2048,
                     filename="fake_filename.png",
-                    station=str("fake_station"),
+                    station=Stations.PT,
                     message="Processing complete. Delete your raw data.",
                 )
 #=====================================================================
@@ -665,7 +665,7 @@ def test_process_msg_VLBA_TRANSFERRING_verificationFAILED(
             "filename": str("fake_filename.png"),
             "event_time": datetime(2026, 7, 15, 12, 0, 0, tzinfo=timezone.utc),
             "message": 2,
-            "station": str("fake_station"),
+            "station": Stations.PT,
         }
 
     mock_json.return_value = mock_payload
@@ -742,7 +742,7 @@ def test_process_msg_VLBA_TRANSFERRING_processingFAILED(
             "filename": str("fake_filename.png"),
             "event_time": datetime(2026, 7, 15, 12, 0, 0, tzinfo=timezone.utc),
             "message": 2,
-            "station": str("fake_station"),
+            "station": Stations.PT,
         }
     
     #pretend that, given the fake uuid, this data is extracted from the DB:
@@ -841,7 +841,7 @@ def test_process_msg_VLBA_TRANSFERRING_trackingFAILED(
             "filename": str("fake_filename.png"),
             "event_time": datetime(2026, 7, 15, 12, 0, 0, tzinfo=timezone.utc),
             "message": 2,
-            "station": str("fake_station"),
+            "station": Stations.PT,
         }
 
     mock_json.return_value = mock_payload
@@ -915,7 +915,7 @@ def test_process_msg_VLBA_TRANSFERRING_image_falseFAILED(
             "filename": str("fake_filename.png"),
             "event_time": datetime(2026, 7, 15, 12, 0, 0, tzinfo=timezone.utc),
             "message": 2,
-            "station": str("fake_station"),
+            "station": Stations.PT,
         }
     
     #pretend that, given the fake uuid, this data is extracted from the DB:
