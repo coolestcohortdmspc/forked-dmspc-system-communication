@@ -51,11 +51,8 @@
     </div>
 </div>
 
-<!-- Row 3: HTMX GBT Partial - HTMX: 1 second refresh -->
+<!-- Row 3: HTMX GBT Partial - made switch to WebSockets -->
 <div id="home-gbt-partial" 
-     hx-get="{% url 'gbt_events' %}" 
-     hx-trigger="every 1s" 
-     hx-target="#home-gbt-partial"
      class="w-100 mb-4">
     {% include 'ngRadar_Website/partials/gbt_home_partial.html' %}
 </div>
@@ -66,11 +63,8 @@
 </div>
 
 
-<!-- Row 4: DSOC Partial - HTMX: 1 second refresh -->
+<!-- Row 4: DSOC Partial - made switch to WebSockets -->
 <div id="home-dsoc-partial" 
-     hx-get="{% url 'dsoc_events' %}" 
-     hx-trigger="every 5s" 
-     hx-target="#home-dsoc-partial"
      class="w-100">
     {% include 'ngRadar_Website/partials/dsoc_home_partial.html' %}
 </div>

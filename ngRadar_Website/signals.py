@@ -88,7 +88,8 @@ def notify_obsevent_update(sender, instance, created, **kwargs):
     if not created:
         return
 
-    html = render_to_string("ngRadar_Website/partials/status_partial.html", get_obs_events())
+    context = get_obs_events()
+    html = render_to_string("ngRadar_Website/partials/status_partial.html", context) + render_to_string("ngRadar_Website/partials/gbt_home_partial.html", context) + render_to_string("ngRadar_Website/partials/dsoc_home_partial.html", context)+ render_to_string("ngRadar_Website/partials/dashboard_updates.html", context) 
 
     # init topic and config
     topic = "obs_status_update"
