@@ -32,11 +32,7 @@ function dispatchRadarEvent(
     );
 }
 
-
 const HOME_EVENTS = {
-    status_changed:
-        "statusChanged",
-
     gbt_changed:
         "gbtChanged",
 
@@ -45,16 +41,8 @@ const HOME_EVENTS = {
 
     dsoc_changed:
         "dsocChanged",
-
-    transfer_changed:
-        "transferChanged",
-
-    latency_changed:
-        "latencyChanged",
-
-    image_ready:
-        "imageReady",
 };
+
 
 
 for (

@@ -117,10 +117,12 @@ function updateGbtPanel(event) {
 
 function updateVlbaState(event) {
     const data = event.detail;
-
+    // @nicole:
     // There is currently no dedicated VLBA panel
     // on home.html, but VLBA state still changes
     // the overall system status.
+    // But maybe we could add a VLBA panel like for the progress of each etransfer?
+    // And this would be where we SSE the VLBA state to update that panel.
     updateSystemStatus(
         data
     );
@@ -145,24 +147,18 @@ function updateDsocPanel(event) {
     );
 }
 
-document.body.addEventListener(
-    "observatoryEventCreated",
-    (event) => {
-        const data = event.detail;
-
-        if (
-            data.station_name ===
-                "DSOC (Domenici Socorro Operations Center)" &&
-            data.image_key &&
-            data.event_uuid
-        ) {
-            showDsocImage(data);
-        }
-    }
-);
-
 
 function showDsocImage(data) {
+    // TODO:
+    // Home receives the live DSOC COMPLETED event before the
+    // DB consumer is guaranteed to have persisted ObservatoryEvent.
+    //
+    // The image already exists in SeaweedFS, but serve_image()
+    // currently looks up image_key through ObservatoryEvent first.
+    // This creates a race between the live UI path and DB persistence.
+    //
+    // Home should eventually retrieve the DDM independently of the
+    // ObservatoryEvent persistence path.
     const image =
         document.getElementById(
             "dsoc-image"
