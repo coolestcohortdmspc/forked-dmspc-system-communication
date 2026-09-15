@@ -1,7 +1,10 @@
-from fastapi import FastAPI
-app = FastAPI()
-
 # auth imports
+import os
+import django
+
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
+django.setup()
+
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect, render, get_object_or_404
@@ -19,17 +22,15 @@ from ngRadar_Website.enums import Stations, Message, Status
 from django.core.cache import cache
 
 from ngRadar_Website.models.models import ObservatoryEvent, uiEvent, gbtEvent, dsocEvent, ETransferEvent
-from ngRadar_Website.models.models import ObservatoryEvent, uiEvent, gbtEvent, dsocEvent, ETransferEvent
 from django.contrib import messages
-from django.contrib.auth import authenticate, login, logout, logout
 from django.db.models import Avg
 from datetime import datetime, timezone
 import logging
 
-from ngRadar_Website.utils import produce
-
 import json, uuid, os, time
 
+from fastapi import FastAPI
+app = FastAPI()
 
 #program constants
 RECORDS_TO_DISPLAY=30
