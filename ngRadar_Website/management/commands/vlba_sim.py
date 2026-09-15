@@ -96,6 +96,7 @@ def process_msg(
 
         # An observation-wide correlation ID.
         gbt_uuid = payload["gbt_uuid"]
+        station = payload["station"]
 
         # Preserve the original GBT timestamp for
         # end-to-end latency calculation at DSOC.
@@ -173,7 +174,7 @@ def process_msg(
                 num_bytes=num_bytes,
                 filename=frame_path.name,
 
-                xmit_station=VLBA_STATION,
+                xmit_station=STATION,
                 rcvr_station=Stations.DSOC,
 
                 message=(
@@ -231,8 +232,9 @@ def process_msg(
         incoming_key
         == Message.DSOC_RESPOND_STORAGE.value
     ):
+        station = payload["station"]
          # Check if the Kafka message is for this station
-        if payload["station"] != STATION:
+        if station != STATION:
             return
         
         print(
@@ -636,8 +638,10 @@ def process_msg(
             msg.value().decode("utf-8")
         )
 
+        station = payload["station"]
+
         # Check if the Kafka message is for this station
-        if payload["station"] != STATION:
+        if station != STATION:
             return
 
         file_name = payload[
@@ -704,7 +708,6 @@ class Command(BaseCommand):
         ) * 1000
 
         consume(
-            STATION,
             consumer_topic,
             consumer_config,
             process_msg,

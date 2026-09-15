@@ -1217,4 +1217,4 @@ class Command(BaseCommand):
             Stations.DSOC
         )
 
-        consume(Stations.DSOC, consumer_topic, consumer_config, process_msg, producer_topic=producer_topic, producer_config=producer_config)
+        consume(consumer_topic, consumer_config, process_msg, producer_topic=producer_topic, producer_config=producer_config)

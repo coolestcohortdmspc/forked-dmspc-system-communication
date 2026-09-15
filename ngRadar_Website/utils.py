@@ -263,12 +263,10 @@ def bootstrap(sim):
 # =============================================================
 
 def produce(
-    station,
     topic,
     config,
     key,
-    value,
-    report_failure=True,
+    value
 ):
     """
     Produce one Kafka message.
@@ -340,7 +338,6 @@ def produce(
 
 
 def consume(
-    station,
     topic,
     config,
     process_msg,
