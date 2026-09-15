@@ -193,23 +193,23 @@ droplets-up)
 
     echo "Starting DSOC Droplet"
     ssh "$DSOC_DROPLET" \
-        "cd $REMOTE_DIR && git checkout nd/kafka-kraft-scaleup && git pull && ./control.sh dsoc-up"
+        "cd $REMOTE_DIR && git checkout dev && git pull && ./control.sh dsoc-up"
 
     echo "Starting VLBA 1 Droplet"
     ssh "$VLBA_1_DROPLET" \
-        "cd $REMOTE_DIR && git checkout nd/kafka-kraft-scaleup && git pull && ./control.sh vlba-up VLBA_1_SERVICES"
+        "cd $REMOTE_DIR && git checkout dev && git pull && ./control.sh vlba-up VLBA_1_SERVICES"
 
     echo "Starting VLBA 2 Droplet"
     ssh "$VLBA_2_DROPLET" \
-        "cd $REMOTE_DIR && git checkout nd/kafka-kraft-scaleup && git pull && ./control.sh vlba-up VLBA_2_SERVICES"
+        "cd $REMOTE_DIR && git checkout dev && git pull && ./control.sh vlba-up VLBA_2_SERVICES"
 
     echo "Starting VLBA 3 Droplet"
     ssh "$VLBA_3_DROPLET" \
-        "cd $REMOTE_DIR && git checkout nd/kafka-kraft-scaleup && git pull && ./control.sh vlba-up VLBA_3_SERVICES"
+        "cd $REMOTE_DIR && git checkout dev && git pull && ./control.sh vlba-up VLBA_3_SERVICES"
 
     echo "Starting GBT Droplet"
     ssh "$GBT_DROPLET" \
-        "cd $REMOTE_DIR && git checkout nd/kafka-kraft-scaleup && git pull && ./control.sh gbt-up"
+        "cd $REMOTE_DIR && git checkout dev && git pull && ./control.sh gbt-up"
     ;;
 
 droplets-down)
@@ -221,23 +221,23 @@ droplets-down)
 
     echo "Stopping GBT Droplet"
     ssh "$GBT_DROPLET" \
-        "cd $REMOTE_DIR && git checkout nd/kafka-kraft-scaleup && ./control.sh gbt-down"
+        "cd $REMOTE_DIR && git checkout dev && ./control.sh gbt-down"
 
     echo "Stopping VLBA 1 Droplet"
     ssh "$VLBA_1_DROPLET" \
-        "cd $REMOTE_DIR && git checkout nd/kafka-kraft-scaleup && ./control.sh vlba-down VLBA_1_SERVICES"
+        "cd $REMOTE_DIR && git checkout dev && ./control.sh vlba-down VLBA_1_SERVICES"
 
     echo "Stopping VLBA 2 Droplet"
     ssh "$VLBA_2_DROPLET" \
-        "cd $REMOTE_DIR && git checkout nd/kafka-kraft-scaleup && ./control.sh vlba-down VLBA_2_SERVICES"
+        "cd $REMOTE_DIR && git checkout dev && ./control.sh vlba-down VLBA_2_SERVICES"
 
     echo "Stopping VLBA 3 Droplet"
     ssh "$VLBA_3_DROPLET" \
-        "cd $REMOTE_DIR && git checkout nd/kafka-kraft-scaleup && ./control.sh vlba-down VLBA_3_SERVICES"
+        "cd $REMOTE_DIR && git checkout dev && ./control.sh vlba-down VLBA_3_SERVICES"
 
     echo "Stopping DSOC Droplet"
     ssh "$DSOC_DROPLET" \
-        "cd $REMOTE_DIR && git checkout nd/kafka-kraft-scaleup && ./control.sh dsoc-down"
+        "cd $REMOTE_DIR && git checkout dev && ./control.sh dsoc-down"
     ;;
 *)
     echo

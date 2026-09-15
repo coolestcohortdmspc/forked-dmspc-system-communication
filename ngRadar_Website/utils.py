@@ -121,7 +121,6 @@ def config_func(sim, bootstrap):
             # Consumer failover/recovery
             "session.timeout.ms": 45000,
             "heartbeat.interval.ms": 15000,
-            "request.timeout.ms": 30000,
             "socket.timeout.ms": 30000,
             "reconnect.backoff.ms": 100,
             "reconnect.backoff.max.ms": 10000,
@@ -217,7 +216,7 @@ def consume(station, topic, config, process_msg, producer_topic=None, producer_c
                 publish_status_obsEvents(
                     station=station,
                     status=Status.FAILED,
-                    msg="Failed to connect to Kafka.",
+                    msg="Waiting to recover Kafka connection...",
                 )
 
                 break
@@ -231,7 +230,7 @@ def consume(station, topic, config, process_msg, producer_topic=None, producer_c
         publish_status_obsEvents(
             station=station,
             status=Status.FAILED,
-            msg="Failed to connect to Kafka!",
+            msg="Waiting to recover Kafka connection...",
         )
         raise
 
