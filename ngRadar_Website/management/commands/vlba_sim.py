@@ -2,7 +2,7 @@ import json
 import subprocess
 import time
 import uuid
-
+import os
 from pathlib import Path
 from threading import Thread
 
@@ -54,7 +54,6 @@ FAILURE_REASONS = {
 
 MAX_RESUME_ATTEMPTS = 5
 
-VLBA_STATION = Stations.HN
 
 
 def process_msg(
@@ -62,6 +61,7 @@ def process_msg(
     producer_topic,
     producer_config,
 ):
+    STATION = Stations[os.environ.get("STATION_NAME")]
     incoming_key = int(
         msg.key().decode("utf-8")
     )
@@ -160,7 +160,7 @@ def process_msg(
                 gbt_uuid=gbt_uuid,
                 gbt_event_time=gbt_event_time,
 
-                station=VLBA_STATION,
+                station=STATION,
 
                 status=Status.QUEUED,
 
@@ -200,7 +200,6 @@ def process_msg(
                 transfer_uuid=transfer_uuid,
                 gbt_uuid=gbt_uuid,
                 gbt_event_time=gbt_event_time,
-                station=VLBA_STATION,
                 status=Status.FAILED,
                 object_id=object_id,
                 target=target,
@@ -208,7 +207,8 @@ def process_msg(
                 rec_waveform=rec_waveform,
                 num_bytes=0,
                 filename=frame_path.name,
-                xmit_station=VLBA_STATION,
+                station=STATION,
+                xmit_station=STATION,
                 rcvr_station=Stations.DSOC,
                 message=(
                     "VLBA source file "
@@ -231,6 +231,10 @@ def process_msg(
         incoming_key
         == Message.DSOC_RESPOND_STORAGE.value
     ):
+         # Check if the Kafka message is for this station
+        if payload["station"] != STATION:
+            return
+        
         print(
             "Received DSOC's storage "
             "check response!"
@@ -334,7 +338,7 @@ def process_msg(
                         gbt_event_time=(
                             gbt_event_time
                         ),
-                        station=VLBA_STATION,
+                        station=STATION,
                         status=(
                             Status.TRANSFERRING
                         ),
@@ -347,7 +351,7 @@ def process_msg(
                         num_bytes=num_bytes,
                         filename=filename,
                         xmit_station=(
-                            VLBA_STATION
+                            STATION
                         ),
                         rcvr_station=(
                             Stations.DSOC
@@ -399,7 +403,7 @@ def process_msg(
                         gbt_event_time=(
                             gbt_event_time
                         ),
-                        station=VLBA_STATION,
+                        station=STATION,
                         status=(
                             Status.TRANSFERRED
                         ),
@@ -412,16 +416,13 @@ def process_msg(
                         num_bytes=num_bytes,
                         filename=filename,
                         xmit_station=(
-                            VLBA_STATION
+                            STATION
                         ),
                         rcvr_station=(
                             Stations.DSOC
                         ),
-                        message=(
-                            "Hancock VLBA "
-                            "completed the "
-                            "e-transfer to DSOC."
-                        ),
+                        message=f"VLBA-{STATION.name} has started to send the data file to DSOC via e-transfer",
+
                     )
 
                     break
@@ -468,7 +469,7 @@ def process_msg(
                         gbt_event_time=(
                             gbt_event_time
                         ),
-                        station=VLBA_STATION,
+                        station=STATION,
                         status=Status.FAILED,
                         object_id=object_id,
                         target=target,
@@ -479,7 +480,7 @@ def process_msg(
                         num_bytes=num_bytes,
                         filename=filename,
                         xmit_station=(
-                            VLBA_STATION
+                            STATION
                         ),
                         rcvr_station=(
                             Stations.DSOC
@@ -550,7 +551,7 @@ def process_msg(
                         gbt_event_time=(
                             gbt_event_time
                         ),
-                        station=VLBA_STATION,
+                        station=STATION,
                         status=Status.FAILED,
                         object_id=object_id,
                         target=target,
@@ -561,7 +562,7 @@ def process_msg(
                         num_bytes=num_bytes,
                         filename=filename,
                         xmit_station=(
-                            VLBA_STATION
+                            STATION
                         ),
                         rcvr_station=(
                             Stations.DSOC
@@ -606,7 +607,7 @@ def process_msg(
                 transfer_uuid=transfer_uuid,
                 gbt_uuid=gbt_uuid,
                 gbt_event_time=gbt_event_time,
-                station=VLBA_STATION,
+                station=STATION,
                 status=Status.BLOCKED,
                 object_id=object_id,
                 target=target,
@@ -614,7 +615,7 @@ def process_msg(
                 rec_waveform=rec_waveform,
                 num_bytes=num_bytes,
                 filename=filename,
-                xmit_station=VLBA_STATION,
+                xmit_station=STATION,
                 rcvr_station=Stations.DSOC,
                 message=(
                     "Waiting for DSOC "
@@ -634,6 +635,10 @@ def process_msg(
         payload = json.loads(
             msg.value().decode("utf-8")
         )
+
+        # Check if the Kafka message is for this station
+        if payload["station"] != STATION:
+            return
 
         file_name = payload[
             "filename"
@@ -672,13 +677,14 @@ class Command(BaseCommand):
             "Starting VLBA simulator"
         )
 
+        STATION = Stations[os.environ.get("STATION_NAME")]
         (
             producer_topic,
             producer_config,
             consumer_topic,
             consumer_config,
         ) = bootstrap(
-            VLBA_STATION
+            STATION
         )
 
         # process_msg can remain blocked while
@@ -698,6 +704,7 @@ class Command(BaseCommand):
         ) * 1000
 
         consume(
+            STATION,
             consumer_topic,
             consumer_config,
             process_msg,

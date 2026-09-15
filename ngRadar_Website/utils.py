@@ -153,20 +153,12 @@ def config_func(
             "GBT_notif",
         ]
 
-    elif sim == Stations.HN:
-        producer_topic = "VLBA_notif"
-
-        consumer_topic = [
-            "GBT_notif",
-            "DSOC_notif",
-        ]
-
     elif sim == Stations.DSOC:
-        producer_topic = "DSOC_notif"
-
-        consumer_topic = [
-            "VLBA_notif",
-        ]
+            producer_topic = "DSOC_notif"
+    
+            consumer_topic = [
+                "VLBA_notif",
+            ]
 
     elif sim == Stations.UI:
         producer_topic = "GBT_notif"
@@ -189,6 +181,14 @@ def config_func(
             producer_topic,
             producer_config,
         )
+
+    elif sim in [Stations.SC, Stations.HN, Stations.NL, Stations.FD, Stations.LA, Stations.PT, Stations.KP, Stations.OV, Stations.BR, Stations.MK]:
+        producer_topic = "VLBA_notif"
+
+        consumer_topic = [
+            "GBT_notif",
+            "DSOC_notif",
+        ]
 
     else:
         raise ValueError(
@@ -263,6 +263,7 @@ def bootstrap(sim):
 # =============================================================
 
 def produce(
+    station,
     topic,
     config,
     key,
@@ -339,6 +340,7 @@ def produce(
 
 
 def consume(
+    station,
     topic,
     config,
     process_msg,
@@ -624,7 +626,7 @@ def consumer_group_has_members(
 # SEAWEEDFS / S3
 # =============================================================
 
-def create_s3_client():
+def create_s3_client(station):
     """
     Create a boto3 S3 client and wait for the SeaweedFS
     S3 gateway to become available.
@@ -977,6 +979,8 @@ def etc_send(frame_path):
         f"#{etd_command_port}"
         ":/dsoc/incoming/"
     )
+
+    os.environ["ETD_DESTINATION"] = etd_destination
 
     process = subprocess.Popen(
         [

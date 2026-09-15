@@ -189,6 +189,7 @@ class Command(BaseCommand):
         ) = bootstrap(Stations.GBT)
 
         consume(
+            Stations.GBT,
             consumer_topic,
             consumer_config,
             process_msg,

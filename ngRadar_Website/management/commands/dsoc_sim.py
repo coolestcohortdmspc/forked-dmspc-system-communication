@@ -69,7 +69,7 @@ VLBA_STATION = Stations.HN
 # DDM IMAGE GENERATION
 # =============================================================
 
-def create_img(tx_waveform):
+def create_img(station, tx_waveform):
     """
     Generate a simulated DSOC DDM product.
     """
@@ -107,7 +107,7 @@ def create_img(tx_waveform):
     )
 
     plt.title(
-        f"DDM for {tx_waveform}",
+        f"[Station {Stations(station).name}] DDM for {tx_waveform}",
         size=20,
     )
 
@@ -168,7 +168,7 @@ def save_image_to_seaweedfs(
     )
 
     try:
-        s3 = create_s3_client()
+        s3 = create_s3_client(station=Stations.DSOC)
 
         image_key = upload_seaweedfs(
             s3,
@@ -280,9 +280,7 @@ def verify_incoming_transfer(
                 )
                 return actual_num_bytes
 
-        time.sleep(
-            delay_seconds
-        )
+            time.sleep(delay_seconds)
 
     raise RuntimeError(
         "Transfer verification failed for "
@@ -311,6 +309,8 @@ def track_etransfer_progress(
         "transfer_uuid"
     ]
 
+    station = payload["station"]
+
     num_bytes = int(
         payload["num_bytes"]
     )
@@ -321,6 +321,7 @@ def track_etransfer_progress(
             "be greater than zero."
         )
 
+    station = payload["station"] # make this an int?
     received_bytes = 0
 
     # Reset the progress display.
@@ -416,8 +417,9 @@ def track_etransfer_progress(
                 )
 
             else:
+                vlba_station = Stations(station)
                 raise RuntimeError(
-                    f"{VLBA_STATION.label} "
+                    f"{vlba_station.label} "
                     "went offline "
                     "mid-transfer. "
                     "Transfer interrupted."
@@ -516,6 +518,10 @@ def process_msg(
             0,
         )
     )
+
+    station = payload.get("station")
+
+    vlba_station = Stations(station)
 
     retry_count = int(
         payload.get(
@@ -643,8 +649,8 @@ def process_msg(
                     ),
 
                     message=(
-                        "DSOC does not have "
-                        "enough storage. "
+                        f"{vlba_station.name} requested a storage check at DSOC. "
+                        f"DSOC responded that it does not have enough storage and cannot begin the etransfer."
                         f"Failed after "
                         f"{next_retry_count} "
                         "storage checks."
@@ -716,7 +722,7 @@ def process_msg(
                     VLBA_STATION
                 ),
 
-                message="VLBA requested a storage check at DSOC. DSOC reponded that it does not have enough storage and cannot begin the etransfer.",
+                message=f"{vlba_station.name} requested a storage check at DSOC. DSOC responded that it does not have enough storage and cannot begin the etransfer.",
             )
 
             print(
@@ -784,7 +790,7 @@ def process_msg(
                     VLBA_STATION
                 ),
 
-                message="DSOC reponded that it has enough storage. VLBA may begin the etransfer.",
+                message=f"DSOC reponded that it has enough storage. {vlba_station.name} may begin the etransfer.",
             )
 
             print(
@@ -1024,6 +1030,7 @@ def process_msg(
 
             image_file, image_num_bytes = (
                 create_img(
+                    station,
                     tx_waveform
                 )
             )
@@ -1130,7 +1137,7 @@ def process_msg(
                 gbt_event_time
             ),
 
-            station=Stations.DSOC,
+            station=station,
             status=Status.COMPLETED,
 
             object_id=object_id,
@@ -1210,14 +1217,4 @@ class Command(BaseCommand):
             Stations.DSOC
         )
 
-        consume(
-            consumer_topic,
-            consumer_config,
-            process_msg,
-            producer_topic=(
-                producer_topic
-            ),
-            producer_config=(
-                producer_config
-            ),
-        )
+        consume(Stations.DSOC, consumer_topic, consumer_config, process_msg, producer_topic=producer_topic, producer_config=producer_config)

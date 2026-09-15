@@ -371,7 +371,10 @@ def serve_image(request, uuid):
             "WEED_S3_BUCKET"
         ]
 
-        s3 = create_s3_client()
+        s3 = create_s3_client(station=Stations.DSOC)
+
+        # presigned_url = get_presigned_url(s3, event)
+        # return redirect(presigned_url)
 
         obj = s3.get_object(
             Bucket=bucket,
