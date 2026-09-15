@@ -22,13 +22,12 @@
     </script>
     <main class="flex-grow-0 container-fluid px-4 pt-4 pb-10">
         
-        <!-- Polls the Django views every 3 seconds to refresh partial -->
-        <div id="dashboard-content" 
-             hx-get="{% url 'event_table_update' %}" 
-             hx-trigger="every 3s" 
-             hx-target="#dashboard-content"
-             class="w-100">
-            {% include 'ngRadar_Website/partials/dashboard_updates.html' %}
+        <!--swtich to WebSockets-->
+        <div hx-ext="ws" ws-connect="/ws/status">
+            <div id="dashboard-content" 
+                class="w-100">
+                {% include 'ngRadar_Website/partials/dashboard_updates.html' %}
+            </div>
         </div>
 
     </main>

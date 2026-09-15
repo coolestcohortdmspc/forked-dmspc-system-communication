@@ -10,6 +10,10 @@ from ngRadar_Website.models.models import (
     ETransferEvent,
     ObservatoryEvent,
 )
+from django.template.loader import render_to_string
+from ngRadar_Website.views.views import get_obs_events 
+import os
+from ngRadar_Website.utils import produce, MAX_BYTES
 
 @receiver(post_save, sender=gbtEvent)
 def create_obsevent_from_gbt(sender, instance, created, **kwargs):
@@ -83,3 +87,31 @@ def create_obsevent_from_etransfer(sender, instance, created, **kwargs):
         status=instance.status,
         message=instance.message,
     )
+
+@receiver(post_save, sender=ObservatoryEvent)
+def notify_obsevent_update(sender, instance, created, **kwargs):
+    if not created:
+        return
+
+    context = get_obs_events()
+    html = render_to_string("ngRadar_Website/partials/status_partial.html", context) + render_to_string("ngRadar_Website/partials/gbt_home_partial.html", context) + render_to_string("ngRadar_Website/partials/dsoc_home_partial.html", context)+ render_to_string("ngRadar_Website/partials/dashboard_updates.html", context) 
+
+    # init topic and config
+    topic = "obs_status_update"
+    config = {
+        "bootstrap.servers": os.environ.get("BOOTSTRAP_SERVERS", "kafka-broker:29092"),
+        "message.max.bytes": MAX_BYTES, 
+        "message.timeout.ms": 2000,
+        "client.id": "status-notify-producer",
+    }
+
+    # use constant key   
+    key = "status_update"
+
+    # avoid recursive signal triggering by disconnecting the signal before producing the message
+    post_save.disconnect(notify_obsevent_update, sender=ObservatoryEvent)
+
+    try:
+        produce(topic, config, key, html)
+    finally:
+        post_save.connect(notify_obsevent_update, sender=ObservatoryEvent)
