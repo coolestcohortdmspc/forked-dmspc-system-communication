@@ -83,7 +83,7 @@ def publish_dsocEvents(
           return None  # <-- Return None if something broke
 
 
-def create_img(tx_waveform):
+def create_img(station, tx_waveform):
     #generate a random image payload to simulate the DSOC's DDM product: 
     matplotlib.use('Agg')  # Use a non-interactive backend for matplotlib
         
@@ -94,7 +94,7 @@ def create_img(tx_waveform):
     plt.scatter(x_data, y_data, color='red')
     plt.axhline(0, color='black', linewidth=0.5)
     plt.axvline(0, color='black', linewidth=0.5)
-    plt.title(f"DDM for {tx_waveform}", size=20)
+    plt.title(f"[Station {Stations(station).name}] DDM for {tx_waveform}", size=20)
     plt.xlabel("Doppler Freq (Hz)")
     plt.ylabel("Range (km)")
     plt.grid(True)
@@ -200,13 +200,14 @@ def track_etransfer_progress(payload, incoming_file: Path):
                 # vlba is alive, the transfer is just slow. Start the clock over.
                 last_progress_at = time.monotonic()
             else:
+                vlba_station = Stations(station)
                 record_transfer_event(
                     transfer_uuid=transfer_uuid,
                     gbt_uuid=payload["gbt_uuid"],
                     station=Stations.DSOC,
                     status=Status.FAILED,
                     num_bytes=num_bytes,
-                    message="Hancock VLBA went offline mid-transfer. Transfer interrupted.",
+                    message=f"VLBA-{vlba_station.name} went offline mid-transfer. Transfer interrupted.",
                 )
                 break
 
@@ -315,6 +316,8 @@ def process_msg(msg, producer_topic, producer_config):
         key = f"{Message.VLBA_DELETE}"
         incoming_file = volume_folder / f"{payload['transfer_uuid']}.bin"
 
+        vlba_station = Stations(station)
+
         try:
             track_etransfer_progress(payload, incoming_file)
 
@@ -324,7 +327,7 @@ def process_msg(msg, producer_topic, producer_config):
                 station=station,
                 status=Status.TRANSFERRED,
                 num_bytes=payload["num_bytes"],
-                message="Hancock VLBA e-transfer complete",
+                message=f"VLBA-{vlba_station.name} e-transfer complete",
             )
             record_transfer_event(
                 transfer_uuid=payload["transfer_uuid"],
@@ -364,7 +367,7 @@ def process_msg(msg, producer_topic, producer_config):
             data["latency_ms"] = dsoc_latency
 
             object_id, target, tx_waveform, event_time = gbt_data
-            image_file, image_num_bytes = create_img(tx_waveform)
+            image_file, image_num_bytes = create_img(station, tx_waveform)
             dsoc_uuid = str(uuid.uuid4())
 
             image_key = save_image_to_seaweedfs(
