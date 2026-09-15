@@ -221,7 +221,7 @@ droplets-down)
 
     echo "Stopping GBT Droplet"
     ssh "$GBT_DROPLET" \
-        "cd $REMOTE_DIR && git checkout tm/10-vlba-sims && ./control.sh gbt-down"
+        "cd $REMOTE_DIR && git checkout dev && ./control.sh gbt-down"
     
     echo "Stopping VLBA 1 Droplet"
     ssh "$VLBA_1_DROPLET" \
