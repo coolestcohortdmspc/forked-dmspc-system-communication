@@ -39,6 +39,7 @@ MAX_RESUME_ATTEMPTS = 5
 
 
 def process_msg(msg, producer_topic, producer_config):
+    STATION = Stations[os.environ.get("STATION_NAME")]
     incoming_key = int(msg.key().decode("utf-8"))
     raw_data_path = Path("/raw_data")
     
@@ -60,10 +61,10 @@ def process_msg(msg, producer_topic, producer_config):
             record_transfer_event(
                     transfer_uuid=transfer_uuid,
                     gbt_uuid=gbt_uuid,
-                    station=Stations.HN,
+                    station=STATION,
                     status=Status.READY,
                     num_bytes=num_bytes,
-                    message="Hancock VLBA data file complete. Ready for e-transfer.",
+                    message=f"VLBA-{STATION.name} data file complete. Ready for e-transfer.",
                 )
             send_kafka_message(
                 key = key,
@@ -74,6 +75,7 @@ def process_msg(msg, producer_topic, producer_config):
                 status=Status.READY,
                 num_bytes=num_bytes,
                 filename=frame_path.name,
+                station=STATION,
                 message=1,
             )
             print("VLBA requesting DSOC check storage...")
@@ -88,6 +90,7 @@ def process_msg(msg, producer_topic, producer_config):
                 status=Status.FAILED,
                 num_bytes=0,
                 filename=frame_path.name,
+                station=STATION,
                 message="Source file does not exist",
             )
             print("Source file does not exist.")
@@ -97,9 +100,14 @@ def process_msg(msg, producer_topic, producer_config):
 
     
     elif incoming_key == Message.DSOC_RESPOND_STORAGE.value:
-        print("Received DSOC's storage check response!")
         key = f"{Message.VLBA_TRANSFERRING}"
         payload = json.loads(msg.value().decode("utf-8"))
+
+        # Check if the Kafka message is for this station
+        if payload["station"] != STATION:
+            return
+
+        print("Received DSOC's storage check response!")
 
         if payload["message"] == "Yes":
 
@@ -113,10 +121,10 @@ def process_msg(msg, producer_topic, producer_config):
                     record_transfer_event(
                         transfer_uuid=payload["transfer_uuid"],
                         gbt_uuid=payload["gbt_uuid"],
-                        station=Stations.HN,
+                        station=STATION,
                         status=Status.TRANSFERRING,
                         num_bytes=payload["num_bytes"],
-                        message="Hancock VLBA e-transfer in progress",
+                        message=f"VLBA-{STATION.name} e-transfer in progress",
                     )
 
                     send_kafka_message(
@@ -128,7 +136,8 @@ def process_msg(msg, producer_topic, producer_config):
                         status=Status.TRANSFERRING,
                         num_bytes=payload["num_bytes"],
                         filename=payload["filename"],
-                        message="Hancock VLBA has started to send the data file to DSOC via e-transfer",
+                        station=STATION,
+                        message=f"VLBA-{STATION.name} has started to send the data file to DSOC via e-transfer",
                     )
                     frame_path = raw_data_path / f"{payload['transfer_uuid']}.bin"
 
@@ -141,7 +150,7 @@ def process_msg(msg, producer_topic, producer_config):
                     record_transfer_event(
                         transfer_uuid=payload["transfer_uuid"],
                         gbt_uuid=payload["gbt_uuid"],
-                        station=Stations.HN,
+                        station=STATION,
                         status=Status.FAILED,
                         num_bytes=payload["num_bytes"],
                         message=(
@@ -166,7 +175,7 @@ def process_msg(msg, producer_topic, producer_config):
                     record_transfer_event(
                         transfer_uuid=payload["transfer_uuid"],
                         gbt_uuid=payload["gbt_uuid"],
-                        station=Stations.HN,
+                        station=STATION,
                         status=Status.FAILED,
                         num_bytes=payload["num_bytes"],
                         message=f"The e-transfer failed unexpectedly mid-transfer. Transfer interrupted. ({exc})",
@@ -186,11 +195,17 @@ def process_msg(msg, producer_topic, producer_config):
                 status=Status.READY,
                 num_bytes=payload["num_bytes"],
                 filename=payload["filename"],
+                station=STATION,
                 message=payload["message"],
             )
 
     elif incoming_key == Message.VLBA_DELETE.value:
         payload = json.loads(msg.value().decode("utf-8"))
+
+        # Check if the Kafka message is for this station
+        if payload["station"] != STATION:
+            return
+
         file_name = payload["filename"]
         delete_observation_data(file_name)
 
@@ -206,7 +221,9 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         print("Starting VLBA simulator")
 
-        producer_topic, producer_config, consumer_topic, consumer_config = bootstrap(Stations.HN)
+        STATION = Stations[os.environ.get("STATION_NAME")]
+
+        producer_topic, producer_config, consumer_topic, consumer_config = bootstrap(STATION)
 
         # process_msg blocks while wait_for_etd() waits for etr_daemon to come back
         consumer_config["max.poll.interval.ms"] = (
@@ -214,6 +231,7 @@ class Command(BaseCommand):
         ) * 1000
 
         consume(
+            STATION,
             consumer_topic,
             consumer_config,
             process_msg,
