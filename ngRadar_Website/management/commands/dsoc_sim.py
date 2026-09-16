@@ -62,8 +62,6 @@ STALL_TIMEOUT_SECONDS = 15
 
 MAX_STORAGE_RETRIES = 15
 
-VLBA_STATION = Stations.HN
-
 
 # =============================================================
 # DDM IMAGE GENERATION

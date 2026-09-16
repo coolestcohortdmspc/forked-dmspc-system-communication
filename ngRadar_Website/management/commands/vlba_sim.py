@@ -233,12 +233,6 @@ def process_msg(
         == Message.DSOC_RESPOND_STORAGE.value
     ):
 
-        
-        print(
-            "Received DSOC's storage "
-            "check response!"
-        )
-
         payload = json.loads(
             msg.value().decode("utf-8")
         )
@@ -246,8 +240,13 @@ def process_msg(
         station = payload["station"]
 
         # Check if the Kafka message is for this station
-        if station != STATION:
+        if Stations(station) != STATION:
             return
+
+        print(
+            "Received DSOC's storage "
+            "check response!"
+        )
 
         transfer_uuid = payload[
             "transfer_uuid"
@@ -650,7 +649,7 @@ def process_msg(
         station = payload["station"]
 
         # Check if the Kafka message is for this station
-        if station != STATION:
+        if Stations(station) != STATION:
             return
 
         file_name = payload[

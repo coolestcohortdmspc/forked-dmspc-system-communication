@@ -1095,7 +1095,7 @@ def etc_send(frame_path):
 
 def create_file(
     file_path,
-    file_mb=200,
+    file_mb=20,
 ):
     """
     Create a random binary file for simulated VLBA data.
