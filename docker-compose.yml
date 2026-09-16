@@ -269,8 +269,9 @@ services:
           condition: service_healthy
     volumes:
       - .:/service
-    # ports:
+    ports:
     #   - 8000:8000
+      - "5678:5678"  # Expose the debugging port
     networks:
       - ngradar_website_network
       - proxy

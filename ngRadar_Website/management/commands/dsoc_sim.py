@@ -264,7 +264,7 @@ def verify_incoming_transfer(
                     filename=filename,  
         
                     xmit_station=(
-                        VLBA_STATION
+                        Stations.GBT
                     ),
                     rcvr_station=(
                         Stations.DSOC
@@ -308,6 +308,7 @@ def track_etransfer_progress(
     ]
 
     station = payload["station"]
+    vlba_station = Stations(station)
 
     num_bytes = int(
         payload["num_bytes"]
@@ -319,7 +320,6 @@ def track_etransfer_progress(
             "be greater than zero."
         )
 
-    station = payload["station"] # make this an int?
     received_bytes = 0
 
     # Reset the progress display.
@@ -401,7 +401,7 @@ def track_etransfer_progress(
             > STALL_TIMEOUT_SECONDS
         ):
             vlba_consumer_group = (
-                f"{VLBA_STATION.name.lower()}"
+                f"{vlba_station.name.lower()}"
                 "-consumer-group"
             )
 
@@ -643,7 +643,7 @@ def process_msg(
                         Stations.DSOC
                     ),
                     rcvr_station=(
-                        VLBA_STATION
+                        vlba_station
                     ),
 
                     message=(
@@ -717,7 +717,7 @@ def process_msg(
                     Stations.DSOC
                 ),
                 rcvr_station=(
-                    VLBA_STATION
+                    vlba_station
                 ),
 
                 message=f"{vlba_station.name} requested a storage check at DSOC. DSOC responded that it does not have enough storage and cannot begin the etransfer.",
@@ -785,7 +785,7 @@ def process_msg(
                     Stations.DSOC
                 ),
                 rcvr_station=(
-                    VLBA_STATION
+                    vlba_station
                 ),
 
                 message=f"DSOC reponded that it has enough storage. {vlba_station.name} may begin the etransfer.",
@@ -865,7 +865,7 @@ def process_msg(
                 filename=filename,
 
                 xmit_station=(
-                    VLBA_STATION
+                    vlba_station
                 ),
                 rcvr_station=(
                     Stations.DSOC
@@ -916,7 +916,7 @@ def process_msg(
             filename=filename,  
 
             xmit_station=(
-                VLBA_STATION
+                vlba_station
             ),
             rcvr_station=(
                 Stations.DSOC
@@ -990,7 +990,7 @@ def process_msg(
                 filename=filename,
 
                 xmit_station=(
-                    VLBA_STATION
+                    vlba_station
                 ),
                 rcvr_station=(
                     Stations.DSOC
@@ -1090,7 +1090,7 @@ def process_msg(
                 filename=filename,
 
                 xmit_station=(
-                    VLBA_STATION
+                    vlba_station
                 ),
                 rcvr_station=(
                     Stations.DSOC
@@ -1166,7 +1166,7 @@ def process_msg(
             ),
 
             xmit_station=(
-                VLBA_STATION
+                vlba_station
             ),
             rcvr_station=(
                 Stations.DSOC
