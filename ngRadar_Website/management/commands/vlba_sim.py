@@ -232,10 +232,7 @@ def process_msg(
         incoming_key
         == Message.DSOC_RESPOND_STORAGE.value
     ):
-        station = payload["station"]
-         # Check if the Kafka message is for this station
-        if station != STATION:
-            return
+
         
         print(
             "Received DSOC's storage "
@@ -245,6 +242,12 @@ def process_msg(
         payload = json.loads(
             msg.value().decode("utf-8")
         )
+
+        station = payload["station"]
+
+        # Check if the Kafka message is for this station
+        if station != STATION:
+            return
 
         transfer_uuid = payload[
             "transfer_uuid"
@@ -311,6 +314,8 @@ def process_msg(
         # DSOC HAS STORAGE
         # =====================================================
         elif (response_status == Status.READY.value):
+
+            attempts = 0
 
             while True:
                 try:
@@ -423,7 +428,11 @@ def process_msg(
                         rcvr_station=(
                             Stations.DSOC
                         ),
-                        message=f"VLBA-{STATION.name} has started to send the data file to DSOC via e-transfer",
+                        message=(
+                            f"VLBA-{STATION.name} completed "
+                            "sending the data file to DSOC "
+                            "via e-transfer."
+                        ),
 
                     )
 
