@@ -97,19 +97,39 @@ def config_func(sim, bootstrap):
         producer_topic = topic2  # NOTE The topic to which the messages will be sent, rename accordingly to whatever topic you want to send to
         producer_config = {
             "bootstrap.servers": bootstrap,
-            "message.max.bytes": MAX_BYTES,# NOTE can make this constant
-            "message.timeout.ms": 2000,
+            # "message.max.bytes": MAX_BYTES,# NOTE can make this constant
+            # "message.timeout.ms": 2000,
             "client.id": f"{sim.name.lower()}-producer",
+
+            "acks": "all",
+            "enable.idempotence": True,
+            "retries": 10,
+            "delivery.timeout.ms": 120000,
+            "request.timeout.ms": 30000,
+            "reconnect.backoff.ms": 100,
+            "reconnect.backoff.max.ms": 10000,
         }
 
         consumer_topic = topic1
         consumer_config = {
             "bootstrap.servers": bootstrap,
-            "fetch.max.bytes": MAX_BYTES,
-            "session.timeout.ms": SESSION_TIMEOUT_MS,
+            # "fetch.max.bytes": MAX_BYTES,
+            # "session.timeout.ms": SESSION_TIMEOUT_MS,
             "client.id": f"{sim.name.lower()}-consumer",
             "group.id": f"{sim.name.lower()}-consumer-group",
-            "auto.offset.reset": "earliest",
+            # "auto.offset.reset": "earliest",
+            # Consumer failover/recovery
+            "session.timeout.ms": 45000,
+            "heartbeat.interval.ms": 15000,
+            "socket.timeout.ms": 30000,
+            "reconnect.backoff.ms": 100,
+            "reconnect.backoff.max.ms": 10000,
+
+            # Usually useful for clients that must discover changed leaders
+            "topic.metadata.refresh.interval.ms": 300000,
+            "metadata.max.age.ms": 300000,
+
+            "enable.auto.commit": False,
         }  # TODO make sure this works
         return producer_topic, producer_config, consumer_topic, consumer_config
     # elif type == "consumer": #NOTE Not being used right now. Commented out to help testcov
@@ -127,9 +147,17 @@ def config_func(sim, bootstrap):
         # config for just producer
         config = {
             "bootstrap.servers": bootstrap,
-            "message.max.bytes": MAX_BYTES,
-            "message.timeout.ms": 2000,
+            # "message.max.bytes": MAX_BYTES,
+            # "message.timeout.ms": 2000,
             "client.id": f"{sim.name.lower()}-producer",
+
+            "acks": "all",
+            "enable.idempotence": True,
+            "retries": 10,
+            "delivery.timeout.ms": 120000,
+            "request.timeout.ms": 30000,
+            "reconnect.backoff.ms": 100,
+            "reconnect.backoff.max.ms": 10000,
         }
 
     return topic, config
@@ -137,21 +165,16 @@ def config_func(sim, bootstrap):
 
 def bootstrap(sim):
     """
-    Description: Extracts bootstrap info from .env and ngrok, then uses config_func to generate outputs
+    Description: Extracts bootstrap info from .env, then uses config_func to generate outputs
     Inputs: sim = the sim file in use (GBT, DSOC, or VLBA)
     Returns: topic(s) and config(s) variables
     """
     load_dotenv()  # Load environment variables from .env file
 
-    bootstrap = os.getenv("BOOTSTRAP_SERVER", "kafka-broker:29092")
-
+    bootstrap = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka-broker:29092")
+    
     return config_func(sim, bootstrap)
     
-
-# def views_bootstrap():
-#     from dotenv import load_dotenv
-#     load_dotenv(override=True)
-
 
 def consume(station, topic, config, process_msg, producer_topic=None, producer_config=None, manual_commit=False):
     """
@@ -193,7 +216,7 @@ def consume(station, topic, config, process_msg, producer_topic=None, producer_c
                 publish_status_obsEvents(
                     station=station,
                     status=Status.FAILED,
-                    msg="Failed to connect to Kafka.",
+                    msg="Waiting to recover Kafka connection...",
                 )
 
                 break
@@ -207,7 +230,7 @@ def consume(station, topic, config, process_msg, producer_topic=None, producer_c
         publish_status_obsEvents(
             station=station,
             status=Status.FAILED,
-            msg="Failed to connect to Kafka!",
+            msg="Waiting to recover Kafka connection...",
         )
         raise
 
