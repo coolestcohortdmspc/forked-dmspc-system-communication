@@ -43,8 +43,7 @@ logger = logging.getLogger(__name__)
 # Constants
 # ============================================================
 
-RECORDS_TO_DISPLAY = 30
-LAST_RECORDS = 5
+RECORDS_TO_DISPLAY = 10
 
 PROGRESS_JSON_PATH = "/service/mock_assets/progress.json"
 
@@ -131,11 +130,14 @@ def get_dashboard_context():
 
     ObservatoryEvent is the only source of truth here.
     """
+    message_number = int(request.POST.get("message_number", RECORDS_TO_DISPLAY))
+    print("Message Number")
+    print(message_number)
 
     latest_events = list(
         ObservatoryEvent.objects
         .order_by("-event_time", "-uuid")
-        [:RECORDS_TO_DISPLAY]
+        [:message_number]
     )
 
     avg_latency = (
