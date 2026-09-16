@@ -760,7 +760,7 @@ def process_msg(
                     gbt_event_time
                 ),
 
-                station=Stations.DSOC,
+                station=vlba_station,
                 status=Status.READY,
 
                 object_id=object_id,
