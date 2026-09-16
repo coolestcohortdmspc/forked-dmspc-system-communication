@@ -451,6 +451,8 @@ def send_kafka_message(
     to ObservatoryEvent.
     """
 
+    station_name = Stations(station)
+
     event_uuid = (
         uuid.uuid4()
     )
@@ -521,7 +523,7 @@ def send_kafka_message(
             int(station)
         ),
         "station_name": (
-            station.label   # Needed for UI.
+            station_name.label   # Needed for UI.
         ),
         "status": (
             int(status)

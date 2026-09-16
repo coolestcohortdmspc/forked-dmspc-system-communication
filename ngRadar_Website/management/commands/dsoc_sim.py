@@ -74,85 +74,35 @@ def create_img(station, tx_waveform):
 
     matplotlib.use("Agg")
 
-    x_data = np.random.uniform(
-        -30,
-        30,
-        40,
-    )
-
-    y_data = np.random.uniform(
-        -300,
-        300,
-        40,
-    )
-
-    plt.scatter(
-        x_data,
-        y_data,
-        color="red",
-    )
-
-    plt.axhline(
-        0,
-        color="black",
-        linewidth=0.5,
-    )
-
-    plt.axvline(
-        0,
-        color="black",
-        linewidth=0.5,
-    )
-
-    plt.title(
-        f"[Station {Stations(station).name}] DDM for {tx_waveform}",
-        size=20,
-    )
-
-    plt.xlabel(
-        "Doppler Freq (Hz)"
-    )
-
-    plt.ylabel(
-        "Range (km)"
-    )
-
+    x_data = np.random.uniform(-30,30,40)
+    y_data = np.random.uniform(-300,300,40)
+    plt.scatter(x_data,y_data,color="red")
+    plt.axhline(0,color="black",linewidth=0.5)
+    plt.axvline(0,color="black",linewidth=0.5)
+    plt.title(f"[Station {Stations(station).name}] DDM for {tx_waveform}",size=20)
+    plt.xlabel("Doppler Freq (Hz)")
+    plt.ylabel("Range (km)")
     plt.grid(True)
 
     byte_buffer = io.BytesIO()
 
-    plt.savefig(
-        byte_buffer,
-        format="png",
-    )
+    plt.savefig(byte_buffer,format="png")
 
     byte_buffer.seek(0)
 
-    image_file = (
-        byte_buffer.getvalue()
-    )
+    image_file = (byte_buffer.getvalue())
 
     plt.close()
 
-    num_bytes = len(
-        image_file
-    )
+    num_bytes = len(image_file)
 
-    return (
-        image_file,
-        num_bytes,
-    )
-
+    return (image_file,num_bytes)
 
 # =============================================================
 # SEAWEEDFS
 # =============================================================
 
-def save_image_to_seaweedfs(
-    target,
-    image_file,
-    product_uuid,
-):
+def save_image_to_seaweedfs(target,image_file,product_uuid):
     """
     Save the generated DDM image to SeaweedFS.
 
@@ -168,11 +118,7 @@ def save_image_to_seaweedfs(
     try:
         s3 = create_s3_client(station=Stations.DSOC)
 
-        image_key = upload_seaweedfs(
-            s3,
-            image_key,
-            image_file,
-        )
+        image_key = upload_seaweedfs(s3,image_key,image_file)
 
         print(
             "Success: Image saved to "
@@ -206,6 +152,7 @@ def verify_incoming_transfer(
     rec_waveform,
     filename,
     transfer_uuid,
+    vlba_station,
     attempts=10,
     delay_seconds=0.5,
 ):
@@ -215,61 +162,30 @@ def verify_incoming_transfer(
     kafka message if successful.
     """
 
-    expected_num_bytes = int(
-        expected_num_bytes
-    )
+    expected_num_bytes = int(expected_num_bytes)
 
     for _ in range(attempts):
         if incoming_file.is_file():
-            actual_num_bytes = (
-                incoming_file
-                .stat()
-                .st_size
-            )
+            actual_num_bytes = (incoming_file.stat().st_size)
 
             if (actual_num_bytes == expected_num_bytes):
                 send_kafka_message(
-                    producer_topic=(
-                        producer_topic
-                    ),
-                    producer_config=(
-                        producer_config
-                    ),
-        
-                    message_type=(
-                        Message.STATUS_UPDATE
-                    ),
-        
-                    transfer_uuid=(
-                        transfer_uuid
-                    ),
-                    gbt_uuid=gbt_uuid,
-        
-                    gbt_event_time=(
-                        gbt_event_time
-                    ),
-        
+                    producer_topic=(producer_topic),
+                    producer_config=(producer_config),     
+                    message_type=(Message.STATUS_UPDATE),       
+                    transfer_uuid=(transfer_uuid),
+                    gbt_uuid=gbt_uuid,      
+                    gbt_event_time=(gbt_event_time),       
                     station=Stations.DSOC,
-                    status=Status.VERIFIED,
-        
+                    status=Status.VERIFIED,        
                     object_id=object_id,
-                    target=target,
-        
+                    target=target,       
                     tx_waveform=tx_waveform,
-                    rec_waveform=(
-                        rec_waveform
-                    ),
-        
+                    rec_waveform=(rec_waveform),       
                     num_bytes=expected_num_bytes,
-                    filename=filename,  
-        
-                    xmit_station=(
-                        VLBA_STATION
-                    ),
-                    rcvr_station=(
-                        Stations.DSOC
-                    ),
-        
+                    filename=filename,          
+                    xmit_station=(Stations.GBT),
+                    rcvr_station=(vlba_station),        
                     message=(
                         f"Verified incoming transfer of "
                         f"{filename} with "
@@ -291,10 +207,7 @@ def verify_incoming_transfer(
 # E-TRANSFER PROGRESS
 # =============================================================
 
-def track_etransfer_progress(
-    payload,
-    incoming_file: Path,
-):
+def track_etransfer_progress(payload,incoming_file: Path):
     """
     Track bytes arriving from VLBA.
 
@@ -303,15 +216,12 @@ def track_etransfer_progress(
     incoming file are now the source of truth.
     """
 
-    transfer_uuid = payload[
-        "transfer_uuid"
-    ]
+    transfer_uuid = payload["transfer_uuid"]
 
     station = payload["station"]
+    vlba_station = Stations(station)
 
-    num_bytes = int(
-        payload["num_bytes"]
-    )
+    num_bytes = int(payload["num_bytes"])
 
     if num_bytes <= 0:
         raise ValueError(
@@ -319,7 +229,6 @@ def track_etransfer_progress(
             "be greater than zero."
         )
 
-    station = payload["station"] # make this an int?
     received_bytes = 0
 
     # Reset the progress display.
@@ -327,61 +236,32 @@ def track_etransfer_progress(
         received_bytes=0,
         total_bytes=num_bytes,
         percent=0,
-        transfer_id=str(
-            transfer_uuid
-        ),
+        transfer_id=str(transfer_uuid),
     )
 
-    print(
-        "Transfer in progress..."
-    )
+    print("Transfer in progress...")
 
-    last_progress_at = (
-        time.monotonic()
-    )
+    last_progress_at = (time.monotonic())
 
     while True:
-
         if incoming_file.exists():
-            current_bytes = (
-                incoming_file
-                .stat()
-                .st_size
-            )
+            current_bytes = (incoming_file.stat().st_size)
 
-            if (
-                current_bytes
-                > received_bytes
-            ):
-                last_progress_at = (
-                    time.monotonic()
-                )
+            if (current_bytes > received_bytes):
+                last_progress_at = (time.monotonic())
 
-            received_bytes = (
-                current_bytes
-            )
+            received_bytes = (current_bytes)
 
-            percent = (
-                received_bytes
-                / num_bytes
-                * 100
-            )
+            percent = (received_bytes / num_bytes * 100)
 
             write_transfer_progress(
-                received_bytes=(
-                    received_bytes
-                ),
+                received_bytes=(received_bytes),
                 total_bytes=num_bytes,
                 percent=f"{percent:.1f}",
-                transfer_id=str(
-                    transfer_uuid
-                ),
+                transfer_id=str(transfer_uuid),
             )
 
-        if (
-            received_bytes
-            >= num_bytes
-        ):
+        if (received_bytes >= num_bytes):
             print(
                 "Transfer of "
                 f"<{transfer_uuid}.bin> "
@@ -395,24 +275,16 @@ def track_etransfer_progress(
         #
         # Ask Kafka whether the VLBA consumer is still alive.
         # -----------------------------------------------------
-        if (
-            time.monotonic()
-            - last_progress_at
-            > STALL_TIMEOUT_SECONDS
-        ):
+        if (time.monotonic() - last_progress_at > STALL_TIMEOUT_SECONDS):
             vlba_consumer_group = (
-                f"{VLBA_STATION.name.lower()}"
+                f"{vlba_station.name.lower()}"
                 "-consumer-group"
             )
 
-            if consumer_group_has_members(
-                vlba_consumer_group
-            ):
+            if consumer_group_has_members(vlba_consumer_group):
                 # VLBA is alive. The transfer may
                 # simply be slow.
-                last_progress_at = (
-                    time.monotonic()
-                )
+                last_progress_at = (time.monotonic())
 
             else:
                 vlba_station = Stations(station)
@@ -425,10 +297,7 @@ def track_etransfer_progress(
 
         time.sleep(0.5)
 
-    if (
-        received_bytes
-        != num_bytes
-    ):
+    if (received_bytes != num_bytes):
         raise ValueError(
             "Transfer progress halted "
             "before all expected bytes "
@@ -447,68 +316,41 @@ def process_msg(
     producer_topic,
     producer_config,
 ):
-    incoming_key = int(
-        msg.key().decode("utf-8")
-    )
+    
+    incoming_key = int(msg.key().decode("utf-8"))
 
     # DB_COMMITTED is intended for the website/UI consumer.
-    if (
-        incoming_key
-        == Message.DB_COMMITTED.value
-    ):
+    if (incoming_key == Message.DB_COMMITTED.value):
         return True
 
     # Generic status events do not instruct DSOC
     # to perform workflow actions.
-    if (
-        incoming_key
-        == Message.STATUS_UPDATE.value
-    ):
+    if (incoming_key == Message.STATUS_UPDATE.value):
         return True
 
-    payload = json.loads(
-        msg.value().decode("utf-8")
-    )
+    payload = json.loads(msg.value().decode("utf-8"))
 
-    volume_folder = Path(
-        "/dsoc/incoming"
-    )
+    volume_folder = Path("/dsoc/incoming")
 
     # ---------------------------------------------------------
     # Context propagated from GBT -> VLBA -> DSOC
     # ---------------------------------------------------------
 
-    transfer_uuid = payload.get(
-        "transfer_uuid"
-    )
+    transfer_uuid = payload.get("transfer_uuid")
 
-    gbt_uuid = payload.get(
-        "gbt_uuid"
-    )
+    gbt_uuid = payload.get("gbt_uuid")
 
-    object_id = payload.get(
-        "object_id"
-    )
+    object_id = payload.get("object_id")
 
-    target = payload.get(
-        "target"
-    )
+    target = payload.get("target")
 
-    tx_waveform = payload.get(
-        "tx_waveform"
-    )
+    tx_waveform = payload.get("tx_waveform")
 
-    rec_waveform = payload.get(
-        "rec_waveform"
-    )
+    rec_waveform = payload.get("rec_waveform")
 
-    gbt_event_time = payload.get(
-        "gbt_event_time"
-    )
+    gbt_event_time = payload.get("gbt_event_time")
 
-    filename = payload.get(
-        "filename"
-    )
+    filename = payload.get("filename")
 
     num_bytes = int(
         payload.get(
@@ -534,13 +376,8 @@ def process_msg(
     # VLBA requests a storage check.
     # =========================================================
 
-    if (
-        incoming_key
-        == Message.VLBA_REQUEST_STORAGE.value
-    ):
-        expected_num_bytes = (
-            num_bytes
-        )
+    if (incoming_key == Message.VLBA_REQUEST_STORAGE.value):
+        expected_num_bytes = (num_bytes)
 
         storage_limit = (
             int(
@@ -557,16 +394,8 @@ def process_msg(
             "GB of storage total."
         )
 
-        storage_used = int(
-            get_folder_size(
-                volume_folder
-            )
-        )
-
-        space_remaining = (
-            storage_limit
-            - storage_used
-        )
+        storage_used = int(get_folder_size(volume_folder))
+        space_remaining = (storage_limit - storage_used)
 
         print(
             "DSOC has "
@@ -578,74 +407,32 @@ def process_msg(
         # NOT ENOUGH STORAGE
         # -----------------------------------------------------
 
-        if (
-            storage_used
-            + expected_num_bytes
-            >= storage_limit
-        ):
-            next_retry_count = (
-                retry_count + 1
-            )
+        if (storage_used + expected_num_bytes >= storage_limit):
+            next_retry_count = (retry_count + 1)
 
             # -------------------------------------------------
             # Maximum retries reached
             # -------------------------------------------------
 
-            if (
-                next_retry_count
-                >= MAX_STORAGE_RETRIES
-            ):
+            if (next_retry_count >= MAX_STORAGE_RETRIES):
                 send_kafka_message(
-                    producer_topic=(
-                        producer_topic
-                    ),
-                    producer_config=(
-                        producer_config
-                    ),
-
-                    message_type=(
-                        Message.DSOC_RESPOND_STORAGE
-                    ),
-
-                    transfer_uuid=(
-                        transfer_uuid
-                    ),
+                    producer_topic=(producer_topic),
+                    producer_config=(producer_config),
+                    message_type=(Message.DSOC_RESPOND_STORAGE),
+                    transfer_uuid=(transfer_uuid),
                     gbt_uuid=gbt_uuid,
-
-                    gbt_event_time=(
-                        gbt_event_time
-                    ),
-
+                    gbt_event_time=(gbt_event_time),
                     station=Stations.DSOC,
                     status=Status.FAILED,
-
                     object_id=object_id,
                     target=target,
-
-                    tx_waveform=(
-                        tx_waveform
-                    ),
-                    rec_waveform=(
-                        rec_waveform
-                    ),
-
-                    num_bytes=(
-                        expected_num_bytes
-                    ),
-
+                    tx_waveform=(tx_waveform),
+                    rec_waveform=(rec_waveform),
+                    num_bytes=(expected_num_bytes),
                     filename=filename,
-
-                    retry_count=(
-                        next_retry_count
-                    ),
-
-                    xmit_station=(
-                        Stations.DSOC
-                    ),
-                    rcvr_station=(
-                        VLBA_STATION
-                    ),
-
+                    retry_count=(next_retry_count),
+                    xmit_station=(Stations.GBT),
+                    rcvr_station=(vlba_station),
                     message=(
                         f"{vlba_station.name} requested a storage check at DSOC. "
                         f"DSOC responded that it does not have enough storage and cannot begin the etransfer."
@@ -672,53 +459,23 @@ def process_msg(
             # -------------------------------------------------
 
             send_kafka_message(
-                producer_topic=(
-                    producer_topic
-                ),
-                producer_config=(
-                    producer_config
-                ),
-
-                message_type=(
-                    Message.DSOC_RESPOND_STORAGE
-                ),
-
-                transfer_uuid=(
-                    transfer_uuid
-                ),
+                producer_topic=(producer_topic),
+                producer_config=(producer_config),
+                message_type=(Message.DSOC_RESPOND_STORAGE),
+                transfer_uuid=(transfer_uuid),
                 gbt_uuid=gbt_uuid,
-
-                gbt_event_time=(
-                    gbt_event_time
-                ),
-
+                gbt_event_time=(gbt_event_time),
                 station=Stations.DSOC,
                 status=Status.RETRYING,
-
                 object_id=object_id,
                 target=target,
-
                 tx_waveform=tx_waveform,
-                rec_waveform=(
-                    rec_waveform
-                ),
-
-                num_bytes=(
-                    expected_num_bytes
-                ),
-
+                rec_waveform=(rec_waveform),
+                num_bytes=(expected_num_bytes),
                 filename=filename,
-
-                retry_count=(
-                    next_retry_count
-                ),
-
-                xmit_station=(
-                    Stations.DSOC
-                ),
-                rcvr_station=(
-                    VLBA_STATION
-                ),
+                retry_count=(next_retry_count),
+                xmit_station=(Stations.GBT),
+                rcvr_station=(vlba_station),
 
                 message=f"{vlba_station.name} requested a storage check at DSOC. DSOC responded that it does not have enough storage and cannot begin the etransfer.",
             )
@@ -740,53 +497,23 @@ def process_msg(
 
         else:
             send_kafka_message(
-                producer_topic=(
-                    producer_topic
-                ),
-                producer_config=(
-                    producer_config
-                ),
-
-                message_type=(
-                    Message.DSOC_RESPOND_STORAGE
-                ),
-
-                transfer_uuid=(
-                    transfer_uuid
-                ),
+                producer_topic=(producer_topic),
+                producer_config=(producer_config),
+                message_type=(Message.DSOC_RESPOND_STORAGE),
+                transfer_uuid=(transfer_uuid),
                 gbt_uuid=gbt_uuid,
-
-                gbt_event_time=(
-                    gbt_event_time
-                ),
-
-                station=Stations.DSOC,
+                gbt_event_time=(gbt_event_time),
+                station=vlba_station,
                 status=Status.READY,
-
                 object_id=object_id,
                 target=target,
-
                 tx_waveform=tx_waveform,
-                rec_waveform=(
-                    rec_waveform
-                ),
-
-                num_bytes=(
-                    expected_num_bytes
-                ),
-
+                rec_waveform=(rec_waveform),
+                num_bytes=(expected_num_bytes),
                 filename=filename,
-
-                retry_count=(
-                    retry_count
-                ),
-
-                xmit_station=(
-                    Stations.DSOC
-                ),
-                rcvr_station=(
-                    VLBA_STATION
-                ),
+                retry_count=(retry_count),
+                xmit_station=(Stations.GBT),
+                rcvr_station=(vlba_station),
 
                 message=f"DSOC reponded that it has enough storage. {vlba_station.name} may begin the etransfer.",
             )
@@ -804,14 +531,8 @@ def process_msg(
     # VLBA has started the e-transfer.
     # =========================================================
 
-    elif (
-        incoming_key
-        == Message.VLBA_TRANSFERRING.value
-    ):
-        incoming_file = (
-            volume_folder
-            / f"{transfer_uuid}.bin"
-        )
+    elif (incoming_key == Message.VLBA_TRANSFERRING.value):
+        incoming_file = (volume_folder / f"{transfer_uuid}.bin")
 
         # -----------------------------------------------------
         # Track incoming bytes
@@ -830,47 +551,22 @@ def process_msg(
             )
 
             send_kafka_message(
-                producer_topic=(
-                    producer_topic
-                ),
-                producer_config=(
-                    producer_config
-                ),
-
-                message_type=(
-                    Message.STATUS_UPDATE
-                ),
-
-                transfer_uuid=(
-                    transfer_uuid
-                ),
+                producer_topic=(producer_topic),
+                producer_config=(producer_config),
+                message_type=(Message.STATUS_UPDATE),
+                transfer_uuid=(transfer_uuid),
                 gbt_uuid=gbt_uuid,
-
-                gbt_event_time=(
-                    gbt_event_time
-                ),
-
+                gbt_event_time=(gbt_event_time),
                 station=Stations.DSOC,
                 status=Status.FAILED,
-
                 object_id=object_id,
                 target=target,
-
                 tx_waveform=tx_waveform,
-                rec_waveform=(
-                    rec_waveform
-                ),
-
+                rec_waveform=(rec_waveform),
                 num_bytes=num_bytes,
                 filename=filename,
-
-                xmit_station=(
-                    VLBA_STATION
-                ),
-                rcvr_station=(
-                    Stations.DSOC
-                ),
-
+                xmit_station=(Stations.GBT),
+                rcvr_station=(vlba_station),
                 message=str(exc),
             )
 
@@ -881,47 +577,22 @@ def process_msg(
         # -----------------------------------------------------
 
         send_kafka_message(
-            producer_topic=(
-                producer_topic
-            ),
-            producer_config=(
-                producer_config
-            ),
-
-            message_type=(
-                Message.STATUS_UPDATE
-            ),
-
-            transfer_uuid=(
-                transfer_uuid
-            ),
+            producer_topic=(producer_topic),
+            producer_config=(producer_config),
+            message_type=(Message.STATUS_UPDATE),
+            transfer_uuid=(transfer_uuid),
             gbt_uuid=gbt_uuid,
-
-            gbt_event_time=(
-                gbt_event_time
-            ),
-
+            gbt_event_time=(gbt_event_time),
             station=Stations.DSOC,
             status=Status.VERIFYING,
-
             object_id=object_id,
             target=target,
-
             tx_waveform=tx_waveform,
-            rec_waveform=(
-                rec_waveform
-            ),
-
+            rec_waveform=(rec_waveform),
             num_bytes=num_bytes,
             filename=filename,  
-
-            xmit_station=(
-                VLBA_STATION
-            ),
-            rcvr_station=(
-                Stations.DSOC
-            ),
-
+            xmit_station=(Stations.GBT),
+            rcvr_station=(vlba_station),
             message=(
                 f"Verifying "
                 f"{filename}."
@@ -951,51 +622,27 @@ def process_msg(
 
                 filename=filename,
                 transfer_uuid=transfer_uuid,
+                vlba_station=vlba_station,
             )
 
         except Exception as exc:
             send_kafka_message(
-                producer_topic=(
-                    producer_topic
-                ),
-                producer_config=(
-                    producer_config
-                ),
-
-                message_type=(
-                    Message.STATUS_UPDATE
-                ),
-
-                transfer_uuid=(
-                    transfer_uuid
-                ),
+                producer_topic=(producer_topic),
+                producer_config=(producer_config),
+                message_type=(Message.STATUS_UPDATE),
+                transfer_uuid=(transfer_uuid),
                 gbt_uuid=gbt_uuid,
-
-                gbt_event_time=(
-                    gbt_event_time
-                ),
-
+                gbt_event_time=(gbt_event_time),
                 station=Stations.DSOC,
                 status=Status.FAILED,
-
                 object_id=object_id,
                 target=target,
-
                 tx_waveform=tx_waveform,
-                rec_waveform=(
-                    rec_waveform
-                ),
-
+                rec_waveform=(rec_waveform),
                 num_bytes=0,
                 filename=filename,
-
-                xmit_station=(
-                    VLBA_STATION
-                ),
-                rcvr_station=(
-                    Stations.DSOC
-                ),
-
+                xmit_station=(Stations.GBT),
+                rcvr_station=(vlba_station),
                 message=str(exc),
             )
 
@@ -1013,37 +660,19 @@ def process_msg(
                     "Kafka payload."
                 )
 
-            original_gbt_time = (
-                datetime.fromisoformat(
-                    gbt_event_time
-                )
-            )
+            original_gbt_time = datetime.fromisoformat(gbt_event_time)
 
-            dsoc_latency = (
-                latency_calc(
-                    original_gbt_time,
-                    Stations.DSOC,
-                )
-            )
+            dsoc_latency = latency_calc(original_gbt_time,Stations.DSOC,)
 
-            image_file, image_num_bytes = (
-                create_img(
-                    station,
-                    tx_waveform
-                )
-            )
+            image_file, image_num_bytes = create_img(station,tx_waveform)
 
-            product_uuid = (
-                uuid.uuid4()
-            )
+            product_uuid = uuid.uuid4()
 
-            image_key = (
-                save_image_to_seaweedfs(
+            image_key = save_image_to_seaweedfs(
                     target,
                     image_file,
                     product_uuid,
                 )
-            )
 
         except Exception as exc:
             print(
@@ -1052,50 +681,22 @@ def process_msg(
             )
 
             send_kafka_message(
-                producer_topic=(
-                    producer_topic
-                ),
-                producer_config=(
-                    producer_config
-                ),
-
-                message_type=(
-                    Message.STATUS_UPDATE
-                ),
-
-                transfer_uuid=(
-                    transfer_uuid
-                ),
+                producer_topic=(producer_topic),
+                producer_config=(producer_config),
+                message_type=(Message.STATUS_UPDATE),
+                transfer_uuid=(transfer_uuid),
                 gbt_uuid=gbt_uuid,
-
-                gbt_event_time=(
-                    gbt_event_time
-                ),
-
+                gbt_event_time=(gbt_event_time),
                 station=Stations.DSOC,
                 status=Status.FAILED,
-
                 object_id=object_id,
                 target=target,
-
                 tx_waveform=tx_waveform,
-                rec_waveform=(
-                    rec_waveform
-                ),
-
-                num_bytes=(
-                    actual_num_bytes
-                ),
-
+                rec_waveform=(rec_waveform),
+                num_bytes=(actual_num_bytes),
                 filename=filename,
-
-                xmit_station=(
-                    VLBA_STATION
-                ),
-                rcvr_station=(
-                    Stations.DSOC
-                ),
-
+                xmit_station=(Stations.GBT),
+                rcvr_station=(vlba_station),
                 message=(
                     "DSOC image processing "
                     f"failed: {exc}"
@@ -1115,63 +716,28 @@ def process_msg(
         # -----------------------------------------------------
 
         send_kafka_message(
-            producer_topic=(
-                producer_topic
-            ),
-            producer_config=(
-                producer_config
-            ),
-
-            message_type=(
-                Message.VLBA_DELETE
-            ),
-
-            transfer_uuid=(
-                transfer_uuid
-            ),
+            producer_topic=(producer_topic),
+            producer_config=(producer_config),
+            message_type=(Message.VLBA_DELETE),
+            transfer_uuid=(transfer_uuid),
             gbt_uuid=gbt_uuid,
-
-            gbt_event_time=(
-                gbt_event_time
-            ),
-
+            gbt_event_time=(gbt_event_time),
             station=station,
             status=Status.COMPLETED,
-
             object_id=object_id,
             target=target,
-
             tx_waveform=tx_waveform,
-            rec_waveform=(
-                rec_waveform
-            ),
-
+            rec_waveform=(rec_waveform),
             product_type="DDM",
-            product_id=str(
-                product_uuid
-            ),
-
+            product_id=str(product_uuid),
             image_key=image_key,
-
             # The final DSOC product row describes
             # the generated DDM product size.
-            num_bytes=(
-                image_num_bytes
-            ),
-
+            num_bytes=(image_num_bytes),
             filename=filename,
-
-            latency_ms=(
-                dsoc_latency
-            ),
-
-            xmit_station=(
-                VLBA_STATION
-            ),
-            rcvr_station=(
-                Stations.DSOC
-            ),
-
+            latency_ms=(dsoc_latency),
+            xmit_station=(Stations.GBT),
+            rcvr_station=(vlba_station),
             message=(
                 "DSOC verified the "
                 "e-transfer, generated "
@@ -1182,14 +748,10 @@ def process_msg(
             ),
         )
 
-        print(
-            "DSOC processing COMPLETE."
-        )
+        print("DSOC processing COMPLETE.")
 
     else:
-        print(
-            "Invalid Kafka Message Key!"
-        )
+        print("Invalid Kafka Message Key!")
 
     return True
 
