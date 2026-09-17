@@ -190,8 +190,8 @@ def config_func(
             "DSOC_notif",
         ]
 
-    elif sim == Stations.PW:
-        producer_topic = "progress_tracking"
+    elif sim == Stations.PTW:
+        producer_topic = "VLBA_notif"
 
         consumer_topic = [
             "progress_tracking",

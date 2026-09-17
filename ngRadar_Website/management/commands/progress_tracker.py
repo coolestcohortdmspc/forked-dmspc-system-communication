@@ -246,6 +246,7 @@ def get_transfer_progress(payload, producer_topic, producer_config):
         last_received_bytes = current_bytes
 
         percent = (last_received_bytes / total_bytes  * 100)
+        print(f"Transfer of <{transfer_uuid}.bin> is {percent:.2f}% complete. ({last_received_bytes}/{total_bytes} bytes)")
 
         if last_received_bytes >= total_bytes:
             print(
@@ -264,7 +265,7 @@ def get_transfer_progress(payload, producer_topic, producer_config):
                 transfer_uuid=transfer_uuid,
                 gbt_uuid=payload["gbt_uuid"],
                 gbt_event_time=payload["gbt_event_time"],
-                station=payload["station"],
+                station=Stations(payload["station"]),
                 status=Status.TRANSFERRED,
                 object_id=payload["object_id"],
                 target=payload["target"],
@@ -275,7 +276,7 @@ def get_transfer_progress(payload, producer_topic, producer_config):
                 xmit_station=payload["xmit_station"],
                 rcvr_station=Stations.DSOC,
                 message=(
-                    f"VLBA-{payload['station'].name} completed "
+                    f"VLBA-{Stations(payload['station']).name} completed "
                     "sending the data file to DSOC "
                     "via e-transfer."
                 ),
@@ -309,11 +310,10 @@ def get_transfer_progress(payload, producer_topic, producer_config):
         payload["last_progress_at"] = last_progress_at
         payload["last_received_bytes"] = last_received_bytes
 
-    if last_received_bytes != total_bytes:
-        raise ValueError(
-            "Transfer progress halted "
-            "before all expected bytes "
-            "were received."
+    else:
+        print(
+            f"Transfer file <{filename}> "
+            "not found in DSOC incoming folder."
         )
 
     return False
@@ -322,176 +322,8 @@ def get_transfer_progress(payload, producer_topic, producer_config):
 
 
 
-
-
-
-
-
-
-# =============================================================
-# KAFKA PROCESSING
-# =============================================================
-
-def process_msg(
-    msg,
-    producer_topic,
-    producer_config,
-):
-    incoming_key = int(
-        msg.key().decode("utf-8")
-    )
-
-    payload = json.loads(
-        msg.value().decode("utf-8")
-    )
-
-    volume_folder = Path(
-        "/dsoc/incoming"
-    )
-
-    # ---------------------------------------------------------
-    # Context propagated from GBT -> VLBA -> DSOC
-    # ---------------------------------------------------------
-
-    transfer_uuid = payload.get(
-        "transfer_uuid"
-    )
-
-    gbt_uuid = payload.get(
-        "gbt_uuid"
-    )
-
-    object_id = payload.get(
-        "object_id"
-    )
-
-    target = payload.get(
-        "target"
-    )
-
-    tx_waveform = payload.get(
-        "tx_waveform"
-    )
-
-    rec_waveform = payload.get(
-        "rec_waveform"
-    )
-
-    gbt_event_time = payload.get(
-        "gbt_event_time"
-    )
-
-    filename = payload.get(
-        "filename"
-    )
-
-    num_bytes = int(
-        payload.get(
-            "num_bytes",
-            0,
-        )
-    )
-
-    station = payload.get("station")
-
-    vlba_station = Stations(station)
-
-    retry_count = int(
-        payload.get(
-            "retry_count",
-            0,
-        )
-    )
-
-    # =========================================================
-    # VLBA -> worker
-    #
-    # VLBA has started an e-transfer.
-    # =========================================================
-
-    if (
-        incoming_key
-        == Message.VLBA_TRANSFERRING.value
-    ):
-        incoming_file = (
-            volume_folder
-            / f"{transfer_uuid}.bin"
-        )
-
-        # -----------------------------------------------------
-        # Track incoming bytes
-        # -----------------------------------------------------
-
-        try:
-            track_etransfer_progress(
-                payload,
-                incoming_file,
-            )
-
-        except Exception as exc:
-            print(
-                "Incoming data progress "
-                f"interrupted: {exc}"
-            )
-
-            send_kafka_message(
-                producer_topic=(
-                    producer_topic
-                ),
-                producer_config=(
-                    producer_config
-                ),
-
-                message_type=(
-                    Message.STATUS_UPDATE
-                ),
-
-                transfer_uuid=(
-                    transfer_uuid
-                ),
-                gbt_uuid=gbt_uuid,
-
-                gbt_event_time=(
-                    gbt_event_time
-                ),
-
-                station=Stations.DSOC,
-                status=Status.FAILED,
-
-                object_id=object_id,
-                target=target,
-
-                tx_waveform=tx_waveform,
-                rec_waveform=(
-                    rec_waveform
-                ),
-
-                num_bytes=num_bytes,
-                filename=filename,
-
-                xmit_station=(
-                    vlba_station
-                ),
-                rcvr_station=(
-                    Stations.DSOC
-                ),
-
-                message=str(exc),
-            )
-
-            return True
-
-
-    else:
-        print(
-            "Invalid Kafka Message Key!"
-        )
-
-    return True
-
-
 class Command(BaseCommand):
-    help = "Runs the DSOC simulator"
+    help = "Runs the e-transfer progress tracking simulator"
 
     def handle(
         self,
@@ -499,7 +331,7 @@ class Command(BaseCommand):
         **options,
     ):
         print(
-            "Starting DSOC simulator"
+            "Starting e-transfer progress tracking simulator"
         )
 
         (
@@ -508,7 +340,7 @@ class Command(BaseCommand):
             consumer_topic,
             consumer_config,
         ) = bootstrap(
-            Stations.PW
+            Stations.PTW
         )
 
         progress_consume(consumer_topic, consumer_config, producer_topic=producer_topic, producer_config=producer_config)

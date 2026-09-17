@@ -20,12 +20,12 @@ KAFKA_PROFILES="--profile kafka"
 
 # the order of these services matter!! learned the hard way..
 KAFKA_SERVICES="zookeeper kafka-broker kafka-init kafka-ui kafka-exporter seaweedfs dsoc-volume-init db_consumer"
-SIM_SERVICES="etr_daemon gbt vlba-sc vlba-hn vlba-nl vlba-fd vlba-la vlba-pt vlba-kp vlba-ov vlba-br vlba-mk dsoc"
+SIM_SERVICES="etr_daemon gbt vlba-sc vlba-hn vlba-nl vlba-fd vlba-la vlba-pt vlba-kp vlba-ov vlba-br vlba-mk dsoc progress_tracker"
 
 PORTAINER_SERVICE="portainer"
 AGENT_SERVICE="portainer_agent"
 
-DSOC_SERVICES="traefik ngradar_website postgres prometheus grafana postgres_exporter zookeeper kafka-broker kafka-init kafka-ui kafka-exporter seaweedfs dsoc-volume-init dsoc etr_daemon db_consumer vlba-kp vlba-ov"
+DSOC_SERVICES="traefik ngradar_website postgres prometheus grafana postgres_exporter zookeeper kafka-broker kafka-init kafka-ui kafka-exporter seaweedfs dsoc-volume-init dsoc etr_daemon progress_tracker db_consumer vlba-kp vlba-ov"
 VLBA_1_SERVICES="vlba-sc vlba-hn"
 VLBA_2_SERVICES="vlba-nl vlba-fd"
 VLBA_3_SERVICES="vlba-la vlba-pt"
