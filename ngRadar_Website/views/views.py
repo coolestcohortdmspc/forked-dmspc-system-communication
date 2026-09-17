@@ -124,20 +124,22 @@ def get_home_context():
     }
 
 
-def get_dashboard_context():
+def get_dashboard_context(message_number=None):
     """
     Persisted history for dashboard.html.
 
     ObservatoryEvent is the only source of truth here.
     """
-    message_number = int(request.POST.get("message_number", RECORDS_TO_DISPLAY))
-    print("Message Number")
-    print(message_number)
+
+    if(message_number):
+        records_to_display=message_number
+    elif(message_number==None):
+        records_to_display=RECORDS_TO_DISPLAY
 
     latest_events = list(
         ObservatoryEvent.objects
         .order_by("-event_time", "-uuid")
-        [:message_number]
+        [:RECORDS_TO_DISPLAY]
     )
 
     avg_latency = (
@@ -636,11 +638,20 @@ def dashboard_view(request):
     """
     Dashboard represents persisted ObservatoryEvent history.
     """
+    if request.method == 'POST':
+        message_number = int(request.POST.get('message_number',RECORDS_TO_DISPLAY))
+        request.session['message_number'] = message_number
+    else:
+        message_number = int(request.session.get('message_number', RECORDS_TO_DISPLAY))
+
+    context = get_dashboard_context(message_number=message_number)
+
+    context['selected_number'] = message_number
 
     return render(
         request,
         "ngRadar_Website/dashboard.html",
-        get_dashboard_context(),
+        context,
     )
 
 
@@ -648,13 +659,14 @@ def dashboard_view(request):
 # HTMX partials
 # ============================================================
 
-@require_GET
+# @require_GET
 def event_table_partial(request):
     """
     Refresh after observatory_event_created SSE event.
 
     This reads committed ObservatoryEvent rows only.
     """
+
 
     return render(
         request,
