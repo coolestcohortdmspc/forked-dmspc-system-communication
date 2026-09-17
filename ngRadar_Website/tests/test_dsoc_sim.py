@@ -17,9 +17,6 @@ import pytest
 mock_env_data = "BOOTSTRAP_SERVER=localhost:9092\nSOME_OTHER_VAR=value" 
 with patch("pathlib.Path.read_text", return_value=mock_env_data):
     from ngRadar_Website.management.commands.dsoc_sim import (
-        DB_import,
-        DB_columns,
-        publish_dsocEvents,
         create_img,
         save_image_to_seaweedfs,
         verify_incoming_transfer,
@@ -27,95 +24,9 @@ with patch("pathlib.Path.read_text", return_value=mock_env_data):
         process_msg,
     )
 
-    
-# ==============================================================================
-# 1. DB_import Test
-# ==============================================================================
-
-@patch("ngRadar_Website.management.commands.dsoc_sim.gbtEvent")
-def test_db_import_success(mock_gbt_event):
-    """Scenario 1: Successfully retrieve and format data matching a UUID."""
-    mock_record = ("obj_123", "Mars", "SineWave", datetime(2026, 1, 1, tzinfo=timezone.utc))
-    
-    # Mocking Django chain query syntax: .filter().values_list().first()
-    mock_query = mock_gbt_event.objects.filter.return_value
-    mock_values = mock_query.values_list.return_value
-    mock_values.first.return_value = mock_record
-
-    result = DB_import("9c85a7c7-0506-44f3-9792-63b1867c6f97") # random uuid I pulled from render DB to test with
-    
-    assert result == mock_record
-    mock_gbt_event.objects.filter.assert_called_once_with(uuid="9c85a7c7-0506-44f3-9792-63b1867c6f97")
-
-
-@patch("ngRadar_Website.management.commands.dsoc_sim.gbtEvent") # fake a gbtEvent record, let's you bypass having to connect to postres to test logic
-def test_db_import_empty_result(mock_gbt_event):
-    """Scenario 2: Returns None when no matching UUID exists in the table."""
-    mock_gbt_event.objects.filter.return_value.values_list.return_value.first.return_value = None
-
-    result = DB_import("non-existent-uuid")
-    
-    assert result is None
 
 # ==============================================================================
-# 2. DB_columns Test
-# ==============================================================================
-
-@patch("ngRadar_Website.management.commands.dsoc_sim.datetime")
-def test_db_columns_mapping(mock_datetime):
-    """Scenario 1: Verify correct structural mapping of tuple elements into fields."""
-    fixed_now = datetime(2026, 7, 15, 12, 0, 0, tzinfo=timezone.utc)
-    mock_datetime.now.return_value = fixed_now
-    
-    gbt_data = ("obj_999", "Jupiter", "SquareWave", fixed_now)
-    
-    result = DB_columns(gbt_data)
-    
-    assert result["object_id"] == "obj_999"
-    assert result["target"] == "Jupiter"
-    assert result["event_time"] == fixed_now
-
-# ==============================================================================
-# 3. publish_dsocEvents COMPONENT TESTS
-# ==============================================================================
-
-@patch("ngRadar_Website.management.commands.dsoc_sim.dsocEvent") # fake a dsocEvent record, let's you bypass having to connect to postres to test logic
-def test_publish_dsocEvents(mock_dsoc_event):
-    """Scenario 1: Valid payload correctly creates and outputs the model instance."""
-    mock_instance = MagicMock()
-    mock_dsoc_event.objects.create.return_value = mock_instance
-
-    image_key = "fake_key/img.png"
-    num_bytes = 2048
-    data = {}
-    xmit_station = "XMIT_STATION"
-    rcvr_station = "RCVR_STATION"
-    transfer_uuid = "TRANSFER_UUID"
-
-    record = publish_dsocEvents(image_key=image_key, num_bytes=num_bytes, data=data, xmit_station=xmit_station, rcvr_station=rcvr_station, transfer_uuid=transfer_uuid)
-
-    assert record == mock_instance
-    mock_dsoc_event.objects.create.assert_called_once_with(image_key='fake_key/img.png', num_bytes=2048, xmit_station='XMIT_STATION', rcvr_station='RCVR_STATION', transfer_uuid='TRANSFER_UUID', status=Status.COMPLETED)
-
-
-@patch("ngRadar_Website.management.commands.dsoc_sim.dsocEvent")
-def test_publish_dsocEvents_exception(mock_dsoc_event):
-    """Scenario 2: Handled database crash returns None instead of crashing runtime."""
-    mock_dsoc_event.objects.create.side_effect = Exception("DB Connection Timeout")
-
-    image_key = "fake_key/img.png"
-    num_bytes = 2048
-    data = {}
-    xmit_station = "XMIT_STATION"
-    rcvr_station = "RCVR_STATION"
-    transfer_uuid = "TRANSFER_UUID"
-
-    record = publish_dsocEvents(image_key=image_key, num_bytes=num_bytes, data=data, xmit_station=xmit_station, rcvr_station=rcvr_station, transfer_uuid=transfer_uuid)
-
-    assert record is None
-
-# ==============================================================================
-# 4. create_img Test
+# 1. create_img Test
 # ==============================================================================
 
 def test_create_img_output():
@@ -131,7 +42,7 @@ def test_create_img_output():
 
 
 # ==============================================================================
-# 5. save_image_to_seaweedfs Test
+# 2. save_image_to_seaweedfs Test
 # ==============================================================================
 
 @patch.dict(
@@ -167,8 +78,8 @@ def test_save_image_to_seaweedfs_success(mock_upload, mock_s3):
 
 
 @patch("ngRadar_Website.management.commands.dsoc_sim.create_s3_client")
-@patch("ngRadar_Website.management.commands.dsoc_sim.publish_status_obsEvents")
-def test_save_image_to_seaweedfs_error(mock_publish, mock_s3):
+@patch("ngRadar_Website.management.commands.dsoc_sim.upload_seaweedfs")
+def test_save_image_to_seaweedfs_error(mock_upload, mock_s3):
     """Scenario 2: error"""
     #function inputs:
     target = "Venus"
@@ -177,65 +88,106 @@ def test_save_image_to_seaweedfs_error(mock_publish, mock_s3):
 
     mock_s3.side_effect = Exception("Failed to connect.")
 
-    output = save_image_to_seaweedfs(target, image_file, dsoc_uuid)
+    with pytest.raises(RuntimeError) as exc_info:
+        save_image_to_seaweedfs(target, image_file, dsoc_uuid)
 
-    assert output == False
     mock_s3.assert_called_once()
-    mock_publish.assert_called_once_with(
-            station=Stations.DSOC,
-            status=Status.FAILED,
-            msg="Failed to connect to SeaweedFS.",
-        )
+    mock_upload.assert_not_called()
 
 
 # ==============================================================================
-# 6. verify_incoming_transfer Test
+# 3. verify_incoming_transfer Test
 # ==============================================================================
 
+@patch("ngRadar_Website.management.commands.dsoc_sim.send_kafka_message")
 @patch("ngRadar_Website.management.commands.dsoc_sim.time.sleep")
-def test_verify_incoming_transfer_success(mock_sleep):
+def test_verify_incoming_transfer_success(mock_sleep, mock_kafka):
     """Scenario 1: file is there, correct size"""
     incoming_file = MagicMock()
     incoming_file.is_file.return_value = True
     incoming_file.stat.return_value.st_size = 500
     expected_num_bytes = 500
 
+    producer_topic = "topic"
+    producer_config = "config"
+    gbt_event_time = "2023-01-01T00:00:00Z"
+    gbt_uuid = "gbt uuid"
+    object_id = "object_id"
+    target = "target"
+    tx_waveform = "SineWave"
+    rec_waveform = "SineWave"
+    filename = "fake_filename.png"
+    transfer_uuid = "12345"
+
     mock_sleep.return_value = None
 
     result = verify_incoming_transfer(
         incoming_file=incoming_file,
-        expected_num_bytes=expected_num_bytes)
+        expected_num_bytes=expected_num_bytes,
+        producer_topic=producer_topic,
+        producer_config=producer_config,
+        gbt_event_time=gbt_event_time,
+        gbt_uuid=gbt_uuid,
+        object_id=object_id,
+        target=target,
+        tx_waveform=tx_waveform,
+        rec_waveform=rec_waveform,
+        filename=filename,
+        transfer_uuid=transfer_uuid)
 
     assert result == expected_num_bytes
     mock_sleep.assert_not_called()
+    mock_kafka.assert_called_once()
 
 @patch("ngRadar_Website.management.commands.dsoc_sim.time.sleep")
 def test_verify_incoming_transfer_nofile(mock_sleep):
     """Scenario 2: file not found"""
     incoming_file = MagicMock()
-    incoming_file.is_file.return_value = False
-    expected_num_bytes = 500
+    incoming_file.is_file.return_value = True
+    incoming_file.stat.return_value.st_size = 500
+    expected_num_bytes = 400
+
+    producer_topic = "topic"
+    producer_config = "config"
+    gbt_event_time = "2023-01-01T00:00:00Z"
+    gbt_uuid = "gbt uuid"
+    object_id = "object_id"
+    target = "target"
+    tx_waveform = "SineWave"
+    rec_waveform = "SineWave"
+    filename = "fake_filename.png"
+    transfer_uuid = "12345"
 
     mock_sleep.return_value = None
 
     with pytest.raises(RuntimeError) as exc_info:
         verify_incoming_transfer(
             incoming_file=incoming_file,
-            expected_num_bytes=expected_num_bytes)
+            expected_num_bytes=expected_num_bytes,
+            producer_topic=producer_topic,
+            producer_config=producer_config,
+            gbt_event_time=gbt_event_time,
+            gbt_uuid=gbt_uuid,
+            object_id=object_id,
+            target=target,
+            tx_waveform=tx_waveform,
+            rec_waveform=rec_waveform,
+            filename=filename,
+            transfer_uuid=transfer_uuid)
 
     assert mock_sleep.call_count == 10
-    assert str(exc_info.value) == (f"Transfer verification failed for {incoming_file}. ""Expected 500 bytes.")
-
+    assert str(exc_info.value) == ("Transfer verification failed for "
+            f"{incoming_file}. Expected "
+            f"{expected_num_bytes} bytes.")
 
 
 # ==============================================================================
-# 8. process_msg Tests
+# 4. process_msg Tests
 # ==============================================================================
 
 """Scenario 1: VLBA_REQUEST_STORAGE incoming message. Clean run, no failure cases. Respond YES to storage check."""
 #=====================================================================
 
-@patch("ngRadar_Website.management.commands.dsoc_sim.record_transfer_event")
 @patch("ngRadar_Website.management.commands.dsoc_sim.send_kafka_message")
 @patch("ngRadar_Website.management.commands.dsoc_sim.get_folder_size")
 @patch("ngRadar_Website.management.commands.dsoc_sim.json.loads")
@@ -243,7 +195,6 @@ def test_process_msg_VLBA_REQUEST_STORAGE(
     mock_json,
     mock_get_folder_size,
     mock_send_kafka_message,
-    mock_record_transfer_event,
     monkeypatch,
 ):
     
@@ -265,6 +216,8 @@ def test_process_msg_VLBA_REQUEST_STORAGE(
     mock_payload = {
             "transfer_uuid": str(transfer_uuid),
             "gbt_uuid": str(gbt_uuid),
+            "object_id": str("fake_object_id"),
+            "target": str("fake_target"),
             "status": 1,
             "status_label": "READY",
             "num_bytes": 2048,
