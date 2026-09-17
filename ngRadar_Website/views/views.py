@@ -369,9 +369,9 @@ def serve_image(request, uuid):
    
 
     try:
-        s3 = create_s3_client(station=Stations.DSOC)
-        
-        presigned_url = create_presigned_url(s3, event)
+        create_s3_client(station=Stations.DSOC)
+
+        presigned_url = create_presigned_url(event)
         return redirect(presigned_url)
 
     except Exception as exc:

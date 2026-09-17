@@ -749,14 +749,22 @@ def ensure_bucket_exists(s3):
     )
 
 # generate a presigned URL for downloading an object from SeaweedFS S3.
-def create_presigned_url(s3,event):
+def create_presigned_url(event):
     bucket = os.environ["WEED_S3_BUCKET"]
     key = event.image_key 
 
-    return s3.generate_presigned_url(
+    return boto3.client(
+        "s3", 
+        aws_access_key_id=os.environ["WEED_S3_ACCESS_KEY"], 
+        aws_secret_access_key=os.environ["WEED_S3_SECRET_KEY"], 
+        endpoint_url=os.environ["WEED_S3_PUBLIC_ENDPOINT"],
+        region_name="us-east-1",
+        config=Config(signature_version="s3v4", s3={"addressing_style": "path"})
+        ).generate_presigned_url(
+
         'get_object',
         Params={'Bucket': bucket, 'Key': key},
-        ExpiresIn=60
+        ExpiresIn=3600
     )
 
 def upload_seaweedfs(
