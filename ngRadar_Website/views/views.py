@@ -33,6 +33,7 @@ from ngRadar_Website.utils import (
     create_s3_client,
     send_kafka_message,
     write_transfer_progress,
+    create_presigned_url,
 )
 
 
@@ -365,29 +366,13 @@ def serve_image(request, uuid):
         return HttpResponseNotFound(
             "Image not available."
         )
+   
 
     try:
-        bucket = os.environ[
-            "WEED_S3_BUCKET"
-        ]
-
         s3 = create_s3_client(station=Stations.DSOC)
-
-        # presigned_url = get_presigned_url(s3, event)
-        # return redirect(presigned_url)
-
-        obj = s3.get_object(
-            Bucket=bucket,
-            Key=event.image_key,
-        )
-
-        return HttpResponse(
-            obj["Body"].read(),
-            content_type=obj.get(
-                "ContentType",
-                "image/png",
-            ),
-        )
+        
+        presigned_url = create_presigned_url(s3, event)
+        return redirect(presigned_url)
 
     except Exception as exc:
         logger.exception(
