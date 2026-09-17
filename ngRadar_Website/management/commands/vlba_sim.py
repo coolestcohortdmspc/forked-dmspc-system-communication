@@ -605,7 +605,7 @@ def process_msg(
             msg.value().decode("utf-8")
         )
 
-        station = payload["station"]
+        station = payload["rcvr_station"]
 
         # Check if the Kafka message is for this station
         if Stations(station) != STATION:
@@ -617,11 +617,6 @@ def process_msg(
 
         delete_observation_data(
             file_name
-        )
-
-        print(
-            f"Deleted VLBA raw data "
-            f"{file_name}."
         )
 
     # =========================================================

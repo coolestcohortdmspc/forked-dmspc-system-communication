@@ -1100,9 +1100,7 @@ def process_msg(
             xmit_station=(
                 vlba_station
             ),
-            rcvr_station=(
-                Stations.DSOC
-            ),
+            rcvr_station=vlba_station,
 
             message=(
                 "DSOC verified the "
