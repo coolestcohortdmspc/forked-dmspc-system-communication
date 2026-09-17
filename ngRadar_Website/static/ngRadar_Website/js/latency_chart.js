@@ -120,7 +120,7 @@ if (!canvas) {
 
                                     content: [
                                         "Newest",
-                                        "Record"
+                                        "Event"
                                     ],
 
                                     backgroundColor:
@@ -147,7 +147,7 @@ if (!canvas) {
 
                                     content: [
                                         "Oldest",
-                                        "Record"
+                                        "Event"
                                     ],
 
                                     backgroundColor:
