@@ -804,78 +804,10 @@ def process_msg(
     # VLBA has started the e-transfer.
     # =========================================================
 
-    elif (
-        incoming_key
-        == Message.VLBA_TRANSFERRING.value
-    ):
-        incoming_file = (
-            volume_folder
-            / f"{transfer_uuid}.bin"
-        )
+    elif incoming_key == Message.PROGRESS_COMPLETE.value:
 
-        # -----------------------------------------------------
-        # Track incoming bytes
-        # -----------------------------------------------------
-
-        try:
-            track_etransfer_progress(
-                payload,
-                incoming_file,
-            )
-
-        except Exception as exc:
-            print(
-                "Incoming data progress "
-                f"interrupted: {exc}"
-            )
-
-            send_kafka_message(
-                producer_topic=(
-                    producer_topic
-                ),
-                producer_config=(
-                    producer_config
-                ),
-
-                message_type=(
-                    Message.STATUS_UPDATE
-                ),
-
-                transfer_uuid=(
-                    transfer_uuid
-                ),
-                gbt_uuid=gbt_uuid,
-
-                gbt_event_time=(
-                    gbt_event_time
-                ),
-
-                station=Stations.DSOC,
-                status=Status.FAILED,
-
-                object_id=object_id,
-                target=target,
-
-                tx_waveform=tx_waveform,
-                rec_waveform=(
-                    rec_waveform
-                ),
-
-                num_bytes=num_bytes,
-                filename=filename,
-
-                xmit_station=(
-                    vlba_station
-                ),
-                rcvr_station=(
-                    Stations.DSOC
-                ),
-
-                message=str(exc),
-            )
-
-            return True
-
+        incoming_file = volume_folder / f"{transfer_uuid}.bin"
+        
         # -----------------------------------------------------
         # DSOC begins verification
         # -----------------------------------------------------

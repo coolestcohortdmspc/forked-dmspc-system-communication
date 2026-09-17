@@ -556,6 +556,32 @@ services:
         - dsoc_sim
   
 
+
+  progress_tracker:
+    container_name: progress_tracker
+    build:
+      context: .
+      target: base
+    env_file:
+      - .env
+    depends_on:
+      dsoc:
+        condition: service_started
+    volumes:
+      - .:/service
+      - dsoc_transfer:/dsoc/incoming 
+    networks:
+      - ngradar_website_network
+    profiles: ["kafka"]
+    environment:
+      # BOOTSTRAP_SERVER: kafka-broker:29092
+      BOOTSTRAP_SERVER: ${BOOTSTRAP_SERVER:-kafka-broker:29092}
+    entrypoint:
+        - python
+        - manage.py
+        - progress_tracker
+  
+
   
 
   vlba:

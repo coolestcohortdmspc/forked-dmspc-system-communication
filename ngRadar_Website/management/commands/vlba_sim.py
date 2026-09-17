@@ -323,13 +323,13 @@ def process_msg(
                     #
                     # This Kafka message:
                     #
-                    # - tells DSOC that transmission started
+                    # - tells the progress tracking worker that transmission started
                     # - records VLBA TRANSFERRING through
                     #   db_consumer
                     # -----------------------------------------
                     send_kafka_message(
                         producer_topic=(
-                            producer_topic
+                            "progress_tracking"
                         ),
                         producer_config=(
                             producer_config
@@ -392,48 +392,7 @@ def process_msg(
                     # VLBA now knows that its side of the
                     # transfer completed successfully.
                     # -----------------------------------------
-                    send_kafka_message(
-                        producer_topic=(
-                            producer_topic
-                        ),
-                        producer_config=(
-                            producer_config
-                        ),
-                        message_type=(
-                            Message.STATUS_UPDATE
-                        ),
-                        transfer_uuid=(
-                            transfer_uuid
-                        ),
-                        gbt_uuid=gbt_uuid,
-                        gbt_event_time=(
-                            gbt_event_time
-                        ),
-                        station=STATION,
-                        status=(
-                            Status.TRANSFERRED
-                        ),
-                        object_id=object_id,
-                        target=target,
-                        tx_waveform=tx_waveform,
-                        rec_waveform=(
-                            rec_waveform
-                        ),
-                        num_bytes=num_bytes,
-                        filename=filename,
-                        xmit_station=(
-                            STATION
-                        ),
-                        rcvr_station=(
-                            Stations.DSOC
-                        ),
-                        message=(
-                            f"VLBA-{STATION.name} completed "
-                            "sending the data file to DSOC "
-                            "via e-transfer."
-                        ),
-
-                    )
+                    print("E-Transfer completed successfully.")
 
                     break
 

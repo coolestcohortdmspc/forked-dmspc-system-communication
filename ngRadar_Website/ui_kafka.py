@@ -18,13 +18,14 @@ TOPIC_TO_UI_EVENT = {
     "GBT_notif": "gbt_changed",
     "VLBA_notif": "vlba_changed",
     "DSOC_notif": "dsoc_changed",
+    "progress_tracking": "progress_changed",
 }
 
 
 def consume_ui_events():
     topics = os.getenv(
         "UI_KAFKA_TOPICS",
-        "GBT_notif,VLBA_notif,DSOC_notif",
+        "GBT_notif,VLBA_notif,DSOC_notif,progress_tracking",
     ).split(",")
 
     topics = [
