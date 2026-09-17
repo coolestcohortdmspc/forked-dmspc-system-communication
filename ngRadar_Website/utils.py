@@ -748,6 +748,16 @@ def ensure_bucket_exists(s3):
         "Bucket created."
     )
 
+# generate a presigned URL for downloading an object from SeaweedFS S3.
+def create_presigned_url(s3,event):
+    bucket = os.environ["WEED_S3_BUCKET"]
+    key = event.image_key 
+
+    return s3.generate_presigned_url(
+        'get_object',
+        Params={'Bucket': bucket, 'Key': key},
+        ExpiresIn=60
+    )
 
 def upload_seaweedfs(
     s3,
