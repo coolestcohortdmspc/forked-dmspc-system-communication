@@ -190,6 +190,13 @@ def config_func(
             "DSOC_notif",
         ]
 
+    elif sim == Stations.PW:
+        producer_topic = "progress_tracking"
+
+        consumer_topic = [
+            "progress_tracking",
+        ]
+
     else:
         raise ValueError(
             f"Unsupported station: {sim}"
