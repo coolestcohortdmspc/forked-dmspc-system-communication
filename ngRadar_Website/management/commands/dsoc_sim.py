@@ -1135,7 +1135,7 @@ def process_msg(
                 gbt_event_time
             ),
 
-            station=station,
+            station=Stations.DSOC,
             status=Status.COMPLETED,
 
             object_id=object_id,
