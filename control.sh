@@ -19,7 +19,7 @@ REMOTE_DIR="/root/${REMOTE_REPO}"
 KAFKA_PROFILES="--profile kafka"
 
 # the order of these services matter!! learned the hard way..
-KAFKA_SERVICES="zookeeper kafka-broker kafka-init kafka-ui kafka-exporter seaweedfs dsoc-volume-init db_consumer"
+KAFKA_SERVICES="kafka-exporter kafka-node-1 kafka-node-2 kafka-node-3 kafka-init kafka-ui seaweedfs dsoc-volume-init db_consumer"
 SIM_SERVICES="etr_daemon gbt vlba-sc vlba-hn vlba-nl vlba-fd vlba-la vlba-pt vlba-kp vlba-ov vlba-br vlba-mk dsoc progress_tracker"
 
 PORTAINER_SERVICE="portainer"
@@ -99,11 +99,9 @@ rebuild)
     ./control.sh system-down
     ./control.sh stop
 
-    # docker volume ls -q \
-    #     | grep -v 'postgres_data$' \
-    #     | xargs -r docker volume rm || true
-
-    docker compose down --remove-orphans
+    docker volume ls -q \
+        | grep -v 'postgres_data$' \
+        | xargs -r docker volume rm || true
 
     # --no-cache ensures code changes are baked in cleanly
     docker compose build --no-cache
@@ -196,11 +194,11 @@ droplets-up)
     echo "Starting DSOC Droplet"
     ssh "$DSOC_DROPLET" \
         "cd $REMOTE_DIR && git checkout dev && git pull && ./control.sh dsoc-up"
-    
+
     echo "Starting VLBA 1 Droplet"
     ssh "$VLBA_1_DROPLET" \
         "cd $REMOTE_DIR && git checkout dev && git pull && ./control.sh vlba-up VLBA_1_SERVICES"
-    
+
     echo "Starting VLBA 2 Droplet"
     ssh "$VLBA_2_DROPLET" \
         "cd $REMOTE_DIR && git checkout dev && git pull && ./control.sh vlba-up VLBA_2_SERVICES"
@@ -208,7 +206,7 @@ droplets-up)
     echo "Starting VLBA 3 Droplet"
     ssh "$VLBA_3_DROPLET" \
         "cd $REMOTE_DIR && git checkout dev && git pull && ./control.sh vlba-up VLBA_3_SERVICES"
-    
+
     echo "Starting GBT Droplet"
     ssh "$GBT_DROPLET" \
         "cd $REMOTE_DIR && git checkout dev && git pull && ./control.sh gbt-up"
@@ -224,19 +222,19 @@ droplets-down)
     echo "Stopping GBT Droplet"
     ssh "$GBT_DROPLET" \
         "cd $REMOTE_DIR && git checkout dev && ./control.sh gbt-down"
-    
+
     echo "Stopping VLBA 1 Droplet"
     ssh "$VLBA_1_DROPLET" \
         "cd $REMOTE_DIR && git checkout dev && ./control.sh vlba-down VLBA_1_SERVICES"
-    
+
     echo "Stopping VLBA 2 Droplet"
     ssh "$VLBA_2_DROPLET" \
         "cd $REMOTE_DIR && git checkout dev && ./control.sh vlba-down VLBA_2_SERVICES"
-    
+
     echo "Stopping VLBA 3 Droplet"
     ssh "$VLBA_3_DROPLET" \
         "cd $REMOTE_DIR && git checkout dev && ./control.sh vlba-down VLBA_3_SERVICES"
-    
+
     echo "Stopping DSOC Droplet"
     ssh "$DSOC_DROPLET" \
         "cd $REMOTE_DIR && git checkout dev && ./control.sh dsoc-down"
@@ -255,7 +253,7 @@ droplets-down)
     echo "./control.sh shell"
     echo
     echo "Utility commands to rebuild working environment:"
-    echo "./control.sh rebuild"   
+    echo "./control.sh rebuild"
     echo "./control.sh hard-reset"
     echo
     echo "To run test coverage on this branch, run:"

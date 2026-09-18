@@ -70,11 +70,7 @@ ANSI_RE = re.compile(
 # GENERAL HELPERS
 # =============================================================
 
-def latency_calc(
-    event_time,
-    sim=None,
-    current_time=None,
-):
+def latency_calc(event_time, sim=None, current_time=None):
     """
     Calculate latency in milliseconds between event_time and now.
 
@@ -83,9 +79,9 @@ def latency_calc(
     """
 
     if current_time is None:
-        current_time = datetime.now(
-            timezone.utc
-        )
+        current_time = datetime.now(timezone.utc)
+    else:
+        current_time = current_time
 
     if sim == Stations.GBT:
         if event_time == -1:
@@ -156,7 +152,7 @@ def config_func(
 
     elif sim == Stations.DSOC:
             producer_topic = "DSOC_notif"
-    
+
             consumer_topic = [
                 "VLBA_notif",
             ]
@@ -165,17 +161,20 @@ def config_func(
         producer_topic = "GBT_notif"
 
         producer_config = {
-            "bootstrap.servers": (
-                bootstrap_server
-            ),
-            "message.max.bytes": (
-                MAX_BYTES
-            ),
-            "message.timeout.ms": 2000,
+            "bootstrap.servers": (bootstrap_server),
+            # "message.max.bytes": (MAX_BYTES),
+            # "message.timeout.ms": 2000,
             "client.id": (
                 f"{sim.name.lower()}"
                 "-producer"
             ),
+            "acks": "all",
+            "enable.idempotence": True,
+            "retries": 10,
+            "delivery.timeout.ms": 120000,
+            "request.timeout.ms": 30000,
+            "reconnect.backoff.ms": 100,
+            "reconnect.backoff.max.ms": 10000,
         }
 
         return (
@@ -218,15 +217,9 @@ def config_func(
     }
 
     consumer_config = {
-        "bootstrap.servers": (
-            bootstrap_server
-        ),
-        "fetch.max.bytes": (
-            MAX_BYTES
-        ),
-        "session.timeout.ms": (
-            SESSION_TIMEOUT_MS
-        ),
+        "bootstrap.servers": (bootstrap_server),
+        # "fetch.max.bytes": (MAX_BYTES),
+        # "session.timeout.ms": (SESSION_TIMEOUT_MS),
         "client.id": (
             f"{sim.name.lower()}"
             "-consumer"
@@ -235,10 +228,22 @@ def config_func(
             f"{sim.name.lower()}"
             "-consumer-group"
         ),
-        "auto.offset.reset": (
-            "earliest"
-        ),
-    }
+        # "auto.offset.reset": (
+        #     "earliest"
+        # ),
+        # Consumer failover/recovery
+        "session.timeout.ms": 45000,
+        "heartbeat.interval.ms": 15000,
+        "socket.timeout.ms": 30000,
+        "reconnect.backoff.ms": 100,
+        "reconnect.backoff.max.ms": 10000,
+
+        # Usually useful for clients that must discover changed leaders
+        "topic.metadata.refresh.interval.ms": 300000,
+        "metadata.max.age.ms": 300000,
+
+        "enable.auto.commit": False,
+    } # TODO make sure this works
 
     return (
         producer_topic,
@@ -256,26 +261,18 @@ def bootstrap(sim):
     load_dotenv()
 
     bootstrap_server = os.getenv(
-        "BOOTSTRAP_SERVER",
+        "KAFKA_BOOTSTRAP_SERVERS",
         "kafka-broker:29092",
     )
 
-    return config_func(
-        sim,
-        bootstrap_server,
-    )
+    return config_func(sim, bootstrap_server)
 
 
 # =============================================================
 # KAFKA PRODUCER / CONSUMER
 # =============================================================
 
-def produce(
-    topic,
-    config,
-    key,
-    value
-):
+def produce(topic, config, key, value):
     """
     Produce one Kafka message.
 
@@ -286,19 +283,14 @@ def produce(
 
     delivery_error = None
 
-    def delivery_report(
-        err,
-        msg,
-    ):
+    def delivery_report(err, msg):
         nonlocal delivery_error
 
         if err is not None:
             delivery_error = err
 
     try:
-        producer = Producer(
-            config
-        )
+        producer = Producer(config)
 
         producer.produce(
             topic,
@@ -307,9 +299,7 @@ def produce(
             callback=delivery_report,
         )
 
-        remaining = (
-            producer.flush(2)
-        )
+        remaining = (producer.flush(2))
 
         if delivery_error is not None:
             print(
@@ -366,56 +356,32 @@ def consume(
             "enable.auto.commit": False,
         }
 
-    consumer = Consumer(
-        config
-    )
+        consumer = Consumer(config)
 
-    consumer.subscribe(
-        topic
-    )
+        consumer.subscribe(topic)
 
     try:
         while True:
-            msg = consumer.poll(
-                1.0
-            )
-
+            #consumer polls the topic and prints any incoming messages
+            msg = consumer.poll(1.0) #polls for messages for 1 second
+            
             if msg is None:
                 continue
 
             if msg.error():
                 error = msg.error()
 
-                if (
-                    error.code()
-                    == KafkaError._PARTITION_EOF
-                ):
-                    print(
-                        "Consumer reached "
-                        "partition EOF."
-                    )
+                if error.code() == KafkaError._PARTITION_EOF:
+                    print("Consumer reached partition EOF")
                     continue
 
-                print(
-                    "Consumer error:",
-                    error,
-                )
-
+                print("Consumer error:", error)
                 break
 
-            succeeded = process_msg(
-                msg,
-                producer_topic,
-                producer_config,
-            )
+            succeeded = process_msg(msg, producer_topic, producer_config)
 
-            if (
-                manual_commit
-                and succeeded
-            ):
-                consumer.commit(
-                    msg
-                )
+            if manual_commit and succeeded:
+                consumer.commit(msg)
 
     finally:
         consumer.close()
@@ -459,14 +425,10 @@ def send_kafka_message(
     to ObservatoryEvent.
     """
 
-    event_uuid = (
-        uuid.uuid4()
-    )
+    event_uuid = (uuid.uuid4())
 
     payload = {
-        "event_uuid": (
-            str(event_uuid)
-        ),
+        "event_uuid": (str(event_uuid)),
         "gbt_uuid": (
             str(gbt_uuid)
             if gbt_uuid
@@ -482,9 +444,7 @@ def send_kafka_message(
             if transfer_uuid
             else None
         ),
-        "retry_count": (
-            int(retry_count)
-        ),
+        "retry_count": (int(retry_count)),
         "object_id": (
             object_id
             if object_id is not None
@@ -525,12 +485,8 @@ def send_kafka_message(
             if status is not None   # Needed for UI
                 else None
         ),
-        "station": (
-            int(station)
-        ),
-        "station_name": (
-            station.label   # Needed for UI.
-        ),
+        "station": (int(station)),
+        "station_name": (station.label),
         "status": (
             int(status)
             if status is not None
@@ -561,28 +517,16 @@ def send_kafka_message(
             if num_bytes is not None
                 else 0
         ),
-        "latency_ms": (
-            float(latency_ms)
-        ),
-        "message": (
-            message
-        ),
-        "event_time": (
-            datetime.now(
-                timezone.utc
-            ).isoformat()
-        ),
+        "latency_ms": (float(latency_ms)),
+        "message": (message),
+        "event_time": (datetime.now(timezone.utc).isoformat()),
     }
 
     success = produce(
         producer_topic,
         producer_config,
-        str(
-            message_type.value
-        ),
-        json.dumps(
-            payload
-        ),
+        str(message_type.value),
+        json.dumps(payload),
     )
 
     if not success:
@@ -637,9 +581,7 @@ def create_s3_client(station):
     S3 gateway to become available.
     """
 
-    endpoint = os.environ[
-        "WEED_S3_ENDPOINT"
-    ]
+    endpoint = os.environ["WEED_S3_ENDPOINT"]
 
     print(
         "Connecting to:",
@@ -649,41 +591,23 @@ def create_s3_client(station):
     s3 = boto3.client(
         "s3",
         endpoint_url=endpoint,
-        aws_access_key_id=(
-            os.environ[
-                "WEED_S3_ACCESS_KEY"
-            ]
-        ),
-        aws_secret_access_key=(
-            os.environ[
-                "WEED_S3_SECRET_KEY"
-            ]
-        ),
+        aws_access_key_id=(os.environ["WEED_S3_ACCESS_KEY"]),
+        aws_secret_access_key=(os.environ["WEED_S3_SECRET_KEY"]),
         region_name="us-east-1",
         config=Config(
             signature_version="s3v4",
-            s3={
-                "addressing_style": (
-                    "path"
-                )
-            },
+            s3={"addressing_style": "path"},
         ),
     )
 
+    # Change to range(5) if we want enough time to turn seaweed back on during polling
     for attempt in range(3):
         try:
             s3.list_buckets()
-
-            print(
-                "SeaweedFS S3 is ready."
-            )
-
+            print("SeaweedFS S3 is ready.")
             break
 
-        except (
-            EndpointConnectionError,
-            ConnectionError,
-        ):
+        except (EndpointConnectionError, ConnectionError):
             print(
                 "Waiting for SeaweedFS... "
                 f"({attempt + 1}/3)"
@@ -705,9 +629,7 @@ def create_s3_client(station):
             "became ready."
         )
 
-    ensure_bucket_exists(
-        s3
-    )
+    ensure_bucket_exists(s3)
 
     return s3
 
@@ -717,14 +639,10 @@ def ensure_bucket_exists(s3):
     Ensure the configured SeaweedFS bucket exists.
     """
 
-    bucket = os.environ[
-        "WEED_S3_BUCKET"
-    ]
+    bucket = os.environ["WEED_S3_BUCKET"]
 
     try:
-        s3.head_bucket(
-            Bucket=bucket
-        )
+        s3.head_bucket(Bucket=bucket)
 
         print(
             f"Bucket '{bucket}' exists."
@@ -733,13 +651,7 @@ def ensure_bucket_exists(s3):
         return
 
     except ClientError as exc:
-        status_code = (
-            exc.response[
-                "ResponseMetadata"
-            ][
-                "HTTPStatusCode"
-            ]
-        )
+        status_code = (exc.response["ResponseMetadata"]["HTTPStatusCode"])
 
         if status_code != 404:
             raise
@@ -748,27 +660,19 @@ def ensure_bucket_exists(s3):
         f"Creating bucket '{bucket}'..."
     )
 
-    s3.create_bucket(
-        Bucket=bucket
-    )
+    s3.create_bucket(Bucket=bucket)
 
     print(
         "Bucket created."
     )
 
 
-def upload_seaweedfs(
-    s3,
-    image_key,
-    file_data,
-):
+def upload_seaweedfs(s3, image_key, file_data,):
     """
     Upload PNG data to SeaweedFS via its S3 API.
     """
 
-    bucket = os.environ[
-        "WEED_S3_BUCKET"
-    ]
+    bucket = os.environ["WEED_S3_BUCKET"]
 
     s3.put_object(
         Bucket=bucket,
@@ -777,10 +681,7 @@ def upload_seaweedfs(
         ContentType="image/png",
     )
 
-    print(
-        f"Success: {image_key}"
-    )
-
+    print(f"Success: {image_key}")
     return image_key
 
 
@@ -805,92 +706,43 @@ def write_transfer_progress(
         "progress.json"
     )
 
-    temp_path = (
-        progress_path
-        + ".tmp"
-    )
+    temp_path = (progress_path + ".tmp")
 
     progress_data = {
-        "received_bytes": (
-            received_bytes
-        ),
-        "total_bytes": (
-            total_bytes
-        ),
-        "percent": (
-            percent
-        ),
-        "transfer_id": (
-            transfer_id
-        ),
+        "received_bytes": received_bytes,
+        "total_bytes": total_bytes,
+        "percent": percent,
+        "transfer_id": transfer_id,
     }
 
-    with open(
-        temp_path,
-        "w",
-        encoding="utf-8",
-    ) as file:
-        json.dump(
-            progress_data,
-            file,
-        )
+    with open(temp_path, "w", encoding="utf-8") as f:
+        json.dump(progress_data, f)
 
-    os.replace(
-        temp_path,
-        progress_path,
-    )
+    os.replace(temp_path, progress_path)
 
 
-def parse_etc_progress(
-    line,
-    *,
-    expected_num_bytes,
-    transfer_id,
-):
-    """
-    Parse one line of etc CLI progress output.
-    """
+# Intercepts etc CLI and parses output:
+def parse_etc_progress(line, *, expected_num_bytes, transfer_id):
+    # Remove terminal escape sequences such as ESC[K.
+    clean_line = ANSI_RE.sub("", line)
 
-    clean_line = (
-        ANSI_RE.sub(
-            "",
-            line,
-        )
-    )
-
-    match = (
-        PROGRESS_RE.search(
-            clean_line
-        )
-    )
+    match = PROGRESS_RE.search(clean_line)
 
     if not match:
         return
 
-    percent = float(
-        match.group(
-            "percent"
-        )
-    )
+    percent = float(match.group("percent"))
 
     received_bytes = round(
-        expected_num_bytes
-        * (
-            percent
-            / 100.0
-        )
+        expected_num_bytes * (percent / 100.0)
     )
 
     if percent >= 100.0:
-        received_bytes = (
-            expected_num_bytes
-        )
+        received_bytes = expected_num_bytes
 
     print(
-        "Transfer progress: "
-        f"{received_bytes}/"
-        f"{expected_num_bytes} "
-        "bytes "
+        f"Transfer progress: "
+        f"{received_bytes}/{expected_num_bytes} bytes "
         f"({percent:.1f}%)"
     )
 
@@ -925,27 +777,16 @@ def wait_for_etd():
         [
             "etc",
             "--list",
-            os.environ[
-                "ETD_DESTINATION"
-            ],
-            "--max-conn-retry",
-            str(
-                ETD_MAX_CONN_RETRY
-            ),
-            "--retry-conn-delay",
-            str(
-                ETD_RETRY_CONN_DELAY
-            ),
+            os.environ["ETD_DESTINATION"],
+            "--max-conn-retry", str(ETD_MAX_CONN_RETRY),
+            "--retry-conn-delay", str(ETD_RETRY_CONN_DELAY),
         ],
         capture_output=True,
     )
-
-    return (
-        result.returncode
-        == 0
-    )
+    return result.returncode == 0
 
 
+# etransfer command to send data from client -> daemon
 def etc_send(frame_path):
     """
     Send one raw-data file from VLBA to DSOC using e-transfer.
@@ -954,35 +795,23 @@ def etc_send(frame_path):
     using the partially received destination file.
     """
 
-    expected_num_bytes = (
-        frame_path
-        .stat()
-        .st_size
-    )
+    expected_num_bytes = frame_path.stat().st_size
+    transfer_id = str(uuid.uuid4())
+    # Reset progress at the beginning of a new transfer.
+    # write_transfer_progress(
+    #     received_bytes=0,
+    #     total_bytes=expected_num_bytes,
+    #     percent=0.0,
+    #     transfer_id=transfer_id,
+    # )
 
-    transfer_id = str(
-        uuid.uuid4()
-    )
+    master_fd, slave_fd = os.openpty()
 
-    master_fd, slave_fd = (
-        os.openpty()
-    )
-
-    etd_host = os.environ[
-        "ETD_HOST"
-    ]
-
-    etd_command_port = (
-        os.environ.get(
-            "ETD_COMMAND_PORT",
-            "4004",
-        )
-    )
+    etd_host = os.environ["ETD_HOST"]
+    etd_command_port = os.environ.get("ETD_COMMAND_PORT", "4004")
 
     etd_destination = (
-        f"tcp://{etd_host}"
-        f"#{etd_command_port}"
-        ":/dsoc/incoming/"
+        f"tcp://{etd_host}#{etd_command_port}:/dsoc/incoming/"
     )
 
     os.environ["ETD_DESTINATION"] = etd_destination
@@ -1000,101 +829,107 @@ def etc_send(frame_path):
         close_fds=True,
     )
 
-    os.close(
-        slave_fd
-    )
+    os.close(slave_fd)
 
     buffer = ""
 
     try:
-        while (
-            process.poll()
-            is None
-        ):
-            readable, _, _ = (
-                select.select(
-                    [master_fd],
-                    [],
-                    [],
-                    0.5,
-                )
+        while process.poll() is None:
+            readable, _, _ = select.select(
+                [master_fd],
+                [],
+                [],
+                0.5,
             )
 
             if not readable:
                 continue
 
             try:
-                terminal_output = (
-                    os.read(
-                        master_fd,
-                        4096,
-                    ).decode(
-                        "utf-8",
-                        errors="replace",
-                    )
+
+                terminal_output = os.read(master_fd, 4096).decode(
+                    "utf-8",
+                    errors="replace",
                 )
 
             except OSError:
                 break
 
-            print(
-                terminal_output,
-                end="",
-                flush=True,
-            )
+            # Print the actual etc output to Docker logs.
+            print(terminal_output, end="", flush=True)
 
-            buffer += (
-                terminal_output
-            )
+            buffer += terminal_output
 
-            parts = re.split(
-                r"[\r\n]",
-                buffer,
-            )
+            # etc redraws the same terminal line using carriage returns.
+            parts = re.split(r"[\r\n]", buffer)
 
-            buffer = (
-                parts.pop()
-            )
+            # Save any incomplete piece for the next chunk.
+            buffer = parts.pop()
 
             for line in parts:
                 parse_etc_progress(
                     line,
-                    expected_num_bytes=(
-                        expected_num_bytes
-                    ),
-                    transfer_id=(
-                        transfer_id
-                    ),
+                    expected_num_bytes=expected_num_bytes,
+                    transfer_id=transfer_id,
                 )
 
+        # Process anything left in the buffer.
         if buffer:
             parse_etc_progress(
                 buffer,
-                expected_num_bytes=(
-                    expected_num_bytes
-                ),
-                transfer_id=(
-                    transfer_id
-                ),
+                expected_num_bytes=expected_num_bytes,
+                transfer_id=transfer_id,
             )
 
     finally:
-        os.close(
-            master_fd
-        )
+        os.close(master_fd)
 
-    return_code = (
-        process.wait()
-    )
+    return_code = process.wait()
 
     if return_code != 0:
-        raise (
-            subprocess
-            .CalledProcessError(
-                return_code,
-                process.args,
-            )
+        raise subprocess.CalledProcessError(
+            return_code,
+            process.args,
         )
+
+
+def produce(station, topic, config, key, value):
+    delivery_error = None
+
+    def delivery_report(err, msg):
+        nonlocal delivery_error
+
+        if err is not None:
+            delivery_error = err
+
+    try:
+        # creates a new producer instance
+        producer = Producer(config)
+
+        # producing a message to the specified topic 
+        producer.produce(topic, key=key, value=value, callback=delivery_report)
+
+        # Give Kafka a limited amount of time to deliver the message
+        remaining = producer.flush(2)
+
+        if delivery_error is not None:
+            publish_status_obsEvents(
+                station=station,
+                status=Status.FAILED,
+                msg=f"{delivery_error}",
+            )
+            return False
+
+        if remaining > 0:
+            publish_status_obsEvents(
+                station=station,
+                status=Status.FAILED,
+                msg="Kafka broker did not respond.",
+            )
+            return False
+
+        print(f"Produced message to topic {topic} with key {key}.")
+        return True
 
 
 # =============================================================
@@ -1117,38 +952,15 @@ def create_file(
 
     num_buffers = 100
 
-    buffer_size = (
-        file_size_bytes
-        // num_buffers
-    )
+    buffer_size = (file_size_bytes // num_buffers)
 
-    remainder = (
-        file_size_bytes
-        % num_buffers
-    )
+    remainder = (file_size_bytes % num_buffers)
 
-    with open(
-        file_path,
-        "wb",
-    ) as file:
-        for index in range(
-            num_buffers
-        ):
-            size = (
-                buffer_size
-                + (
-                    1
-                    if index
-                    < remainder
-                    else 0
-                )
-            )
+    with open(file_path, "wb") as file:
+        for index in range(num_buffers):
+            size = (buffer_size + (1 if index < remainder else 0))
 
-            buffer = (
-                random.randbytes(
-                    size
-                )
-            )
+            buffer = (random.randbytes(size))
 
             file.write(
                 buffer
@@ -1183,11 +995,7 @@ def watch_for_file(
         )
 
         if output.strip():
-            print(
-                "Output:\n",
-                output,
-            )
-
+            print("Output:\n", output)
         else:
             break
 
@@ -1202,10 +1010,7 @@ def delete_observation_data(
     Delete one raw VLBA observation file.
     """
 
-    file_path = (
-        Path(directory)
-        / file_name
-    )
+    file_path = (Path(directory) / file_name)
 
     if file_path.exists():
         file_path.unlink()
@@ -1216,23 +1021,16 @@ def delete_observation_data(
         )
 
     else:
-        print(
-            f"File {file_name} "
-            "does not exist."
-        )
+        print(f"File {file_name} does not exists")
 
 
-def get_folder_size(
-    folder_path: Path,
-):
+def get_folder_size(folder_path: Path):
     """
     Return total size of all files beneath folder_path.
     """
 
     if not folder_path.exists():
-        raise FileNotFoundError(
-            folder_path
-        )
+        raise FileNotFoundError(folder_path)
 
     return sum(
         path.stat().st_size
