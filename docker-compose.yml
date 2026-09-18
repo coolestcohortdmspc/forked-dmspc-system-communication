@@ -260,6 +260,12 @@ services:
     networks:
       - ngradar_website_network
       - proxy
+    environment:
+      # this is what tells the ngradar_website service to run the UI Kafka consumer in a separate thread, which is what we want for the SSE functionality.
+      ENABLE_UI_KAFKA_CONSUMER: "true"
+      UI_KAFKA_TOPICS: "GBT_notif,VLBA_notif,DSOC_notif,progress_tracking"
+      UI_KAFKA_GROUP_ID: "ngradar-ui-sse"
+      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS}
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=proxy"
@@ -274,11 +280,10 @@ services:
       - "traefik.http.services.ngradar_website.loadbalancer.server.port=8000"
     stdin_open: true
     tty: true
-    command:
-      - python
-      - manage.py
-      - runserver
-      - 0.0.0.0:8000
+    command: >
+      uvicorn asgi:application
+      --host 0.0.0.0
+      --port 8000
 
 
   postgres:
@@ -317,22 +322,6 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-
-  # staging_loader:
-  #   container_name: staging_loader
-  #   build:
-  #     context: .
-  #     target: load-staging-data
-  #   env_file:
-  #     - .env
-  #   networks:
-  #     - ngradar_website_network
-  #   depends_on:
-  #     - postgres
-  #   volumes:
-  #     - staging_dump:/dump
-  #   profiles:
-  #     - tools
 
 #==========================
 # kafka related containers:
@@ -374,14 +363,7 @@ services:
 
       kafka-topics --bootstrap-server "$KAFKA_BOOTSTRAP_SERVERS" \
         --create --if-not-exists \
-        --topic user_input \
-        --partitions 3 \
-        --replication-factor 3 \
-        --config min.insync.replicas=2
-
-      kafka-topics --bootstrap-server "$KAFKA_BOOTSTRAP_SERVERS" \
-        --create --if-not-exists \
-        --topic GBT_data \
+        --topic GBT_notif \
         --partitions 3 \
         --replication-factor 3 \
         --config min.insync.replicas=2
@@ -396,6 +378,13 @@ services:
       kafka-topics --bootstrap-server "$KAFKA_BOOTSTRAP_SERVERS" \
         --create --if-not-exists \
         --topic DSOC_notif \
+        --partitions 3 \
+        --replication-factor 3 \
+        --config min.insync.replicas=2
+
+      kafka-topics --bootstrap-server "$KAFKA_BOOTSTRAP_SERVERS" \
+        --create --if-not-exists \
+        --topic progress_tracking \
         --partitions 3 \
         --replication-factor 3 \
         --config min.insync.replicas=2
@@ -461,13 +450,13 @@ services:
     #   test:
     #     [
     #       "CMD-SHELL",
-    #       "KAFKA_OPTS='' kafka-topics --bootstrap-server ${KAFKA_EXTERNAL_HOST:-kafka-node-1}:9091 --list >/dev/null 2>&1", 
+    #       "KAFKA_OPTS='' kafka-topics --bootstrap-server ${KAFKA_EXTERNAL_HOST:-kafka-node-1}:9091 --list >/dev/null 2>&1",
     #     ]
     #   interval: 5s
     #   timeout: 5s
     #   retries: 20
     #   start_period: 15s
-    
+
 
 
   kafka-node-2:
@@ -526,13 +515,13 @@ services:
     #   test:
     #     [
     #       "CMD-SHELL",
-    #       "KAFKA_OPTS='' kafka-topics --bootstrap-server ${KAFKA_EXTERNAL_HOST:-kafka-node-2}:9092 --list >/dev/null 2>&1", 
+    #       "KAFKA_OPTS='' kafka-topics --bootstrap-server ${KAFKA_EXTERNAL_HOST:-kafka-node-2}:9092 --list >/dev/null 2>&1",
     #     ]
     #   interval: 5s
     #   timeout: 5s
     #   retries: 20
     #   start_period: 15s
-    
+
 
 
   kafka-node-3:
@@ -591,7 +580,7 @@ services:
     #   test:
     #     [
     #       "CMD-SHELL",
-    #       "KAFKA_OPTS='' kafka-topics --bootstrap-server ${KAFKA_EXTERNAL_HOST:-kafka-node-3}:9093 --list >/dev/null 2>&1", 
+    #       "KAFKA_OPTS='' kafka-topics --bootstrap-server ${KAFKA_EXTERNAL_HOST:-kafka-node-3}:9093 --list >/dev/null 2>&1",
     #     ]
     #   interval: 5s
     #   timeout: 5s
@@ -616,10 +605,35 @@ services:
     networks:
       - ngradar_website_network
 
+# Consumes kafka messages and writes them to the database.
+# This is a separate service from the UI consumer, which is only for sending messages to the front-end via SSE.
+# The UI consumer is part of the ngradar_website service, while this db_consumer is a separate service
+# that runs in the background and writes to the database.
+  db_consumer:
+    build:
+      context: .
+      target: app
+    env_file:
+      - .env
+    profiles:
+      - kafka
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - ngradar_website_network
+    restart: unless-stopped
+    environment:
+      DB_KAFKA_TOPICS: "GBT_notif,VLBA_notif,DSOC_notif"
+      DB_KAFKA_GROUP_ID: "ngradar-db"
+      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS}
+    command: >
+      python manage.py db_consumer
+
 
 
 #==========================
-# sim containers:
+# consumer sim containers:
 #==========================
 
   gbt:
@@ -675,14 +689,40 @@ services:
       - ngradar_website_network
     profiles: ["kafka"]
     environment:
-      BOOTSTRAP_SERVER: ${KAFKA_BOOTSTRAP_SERVERS} #needs all 3 brokers 
+      BOOTSTRAP_SERVER: ${KAFKA_BOOTSTRAP_SERVERS} #needs all 3 brokers
     entrypoint:
         - python
         - manage.py
         - dsoc_sim
   
 
-  
+
+  progress_tracker:
+    container_name: progress_tracker
+    build:
+      context: .
+      target: base
+    env_file:
+      - .env
+    depends_on:
+      dsoc:
+        condition: service_started
+    volumes:
+      - .:/service
+      - dsoc_transfer:/dsoc/incoming
+    networks:
+      - ngradar_website_network
+    profiles: ["kafka"]
+    environment:
+      # BOOTSTRAP_SERVER: kafka-broker:29092
+      BOOTSTRAP_SERVER: ${BOOTSTRAP_SERVER:-kafka-broker:29092}
+    entrypoint:
+        - python
+        - manage.py
+        - progress_tracker
+
+
+
 
   vlba:
     container_name: vlba
@@ -776,6 +816,7 @@ services:
     container_name: vlba-MK
     environment:
       STATION_NAME: MK
+
 
 
 #==========================
@@ -889,13 +930,13 @@ services:
 
 volumes:
   postgres_data:
-  staging_dump:
   seaweed_data:
   dsoc_transfer:
   vlba_data:
   portainer_data:
   prometheus_data:
   grafana_data:
+  volumes:
 
 networks:
   ngradar_website_network:

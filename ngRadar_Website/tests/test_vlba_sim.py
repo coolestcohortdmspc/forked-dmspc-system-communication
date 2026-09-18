@@ -18,8 +18,6 @@ import subprocess
 mock_env_data = "BOOTSTRAP_SERVER=localhost:9092\nSOME_OTHER_VAR=value"
 with patch("pathlib.Path.read_text", return_value=mock_env_data):
     from ngRadar_Website.management.commands.vlba_sim import (
-        send_kafka_message,
-        record_transfer_event,
         process_msg,
         MAX_RESUME_ATTEMPTS,
     )
