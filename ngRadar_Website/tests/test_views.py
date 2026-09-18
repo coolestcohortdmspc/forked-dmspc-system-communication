@@ -1,10 +1,9 @@
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-from ngRadar_Website.views.views import get_obs_events
 from ngRadar_Website.enums import Stations, Message, Status
 from datetime import datetime, timezone
-from ngRadar_Website.models.models import gbtEvent, dsocEvent, ObservatoryEvent, uiEvent
+from ngRadar_Website.models.models import ObservatoryEvent
 from django.test import RequestFactory
 from django.urls import reverse
 from django.http import HttpResponse, HttpResponseRedirect
@@ -60,13 +59,18 @@ def test_serve_image(mock_create, mock_get_obj):
     }
 
     #call the function:
-    output = serve_image(request = "request", uuid = "uuid")
+    response = serve_image(
+            request="request",
+            uuid="uuid",
+        )
 
     mock_get_obj.assert_called_once_with(ObservatoryEvent, uuid="uuid")
-    mock_create.assert_called_once()
+    mock_create.assert_called_once_with(station=Stations.DSOC)
     mock_s3.get_object.assert_called_once_with(
-        Bucket="fake_bucket", Key="images/test.png"
-    )
+            Bucket="fake_bucket",
+            Key="images/test.png",
+        )
+    assert response.content == b"fake_image_data"
 
 @patch("ngRadar_Website.views.views.get_object_or_404")
 @patch("ngRadar_Website.views.views.publish_status_obsEvents")
@@ -93,8 +97,7 @@ def test_serve_image_error(mock_publish, mock_get_obj):
 @patch("ngRadar_Website.views.views.produce")
 @patch("ngRadar_Website.views.views.cache")
 @patch("ngRadar_Website.views.views.write_transfer_progress")
-@patch("ngRadar_Website.views.views.uiEvent.objects.create")
-def test_submit_waveform(Mock_UI_EVENT, Mock_ProgressBar, Mock_Cache, Mock_Producer, mock_datetime, test_uuid):
+def test_submit_waveform(Mock_ProgressBar, Mock_Cache, Mock_Producer, mock_datetime, test_uuid):
     #create simulated data
     mock_uuid = uuid.UUID('12345678-1234-5678-1234-567812345678')
     test_timestamp = datetime(2026, 8, 17, 12, 30, 45, tzinfo=timezone.utc)
@@ -118,12 +121,8 @@ def test_submit_waveform(Mock_UI_EVENT, Mock_ProgressBar, Mock_Cache, Mock_Produ
     Mock_EVENT.uuid = mock_uuid
     Mock_EVENT.selected_waveform = test_waveform
     Mock_EVENT.event_time = test_timestamp
-    Mock_UI_EVENT.return_value = Mock_EVENT
 
     data = submit_waveform(myRequest)
-    
-    # Assert MockUiEvent was called
-    Mock_UI_EVENT.assert_called_once()
 
     # Assert waveform_producer was called
     Mock_Producer.assert_called_once()
@@ -265,14 +264,11 @@ def test_lock_status_none(mock_json, mock_cache_get):
 
 
 @patch("ngRadar_Website.views.views.cache.get")
-@patch("ngRadar_Website.views.views.dsocEvent")
 @patch("ngRadar_Website.views.views.cache.delete")
 @patch("ngRadar_Website.views.views.JsonResponse")
-def test_lock_matching_event_time(mock_json, mock_cache_delete, mock_dsocEvent, mock_cache_get):
+def test_lock_matching_event_time(mock_json, mock_cache_delete, mock_cache_get):
     """Scenario 2: lock time matches the event time"""
     mock_cache_get.return_value = "fake_time"
-
-    mock_dsocEvent.objects.filter.return_value.exists.return_value = True
 
     mock_cache_delete.return_value = None
 
@@ -282,20 +278,16 @@ def test_lock_matching_event_time(mock_json, mock_cache_delete, mock_dsocEvent, 
 
     assert output == "fake_json_response"
     mock_cache_get.assert_called_once_with('submit_locked', None)
-    mock_dsocEvent.objects.filter.assert_called_once_with(event_time__gt="fake_time")
     mock_cache_delete.assert_called_once_with('submit_locked')
     mock_json.assert_called_once_with({"locked": False,
                                  "error": False})
 
 
 @patch("ngRadar_Website.views.views.cache.get")
-@patch("ngRadar_Website.views.views.dsocEvent")
 @patch("ngRadar_Website.views.views.JsonResponse")
-def test_lock_true(mock_json, mock_dsocEvent, mock_cache_get):
+def test_lock_true(mock_json, mock_cache_get):
     """Scenario 3: lock status is True"""
     mock_cache_get.return_value = "fake_time"
-
-    mock_dsocEvent.objects.filter.return_value.exists.return_value = False
 
     mock_json.return_value = "fake_json_response"
 
@@ -303,7 +295,6 @@ def test_lock_true(mock_json, mock_dsocEvent, mock_cache_get):
 
     assert output == "fake_json_response"
     mock_cache_get.assert_called_once_with('submit_locked', None)
-    mock_dsocEvent.objects.filter.assert_called_once_with(event_time__gt="fake_time")
     mock_json.assert_called_once_with({'locked':True,
                              "error": False})
 
