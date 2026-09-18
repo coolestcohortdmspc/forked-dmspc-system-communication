@@ -406,7 +406,7 @@ def serve_image(request, uuid):
 
 @require_GET
 def lock_status(request):
-    """
+    """status_partial
     Submission lock fallback endpoint.
 
     A submission remains locked until a DSOC COMPLETED
