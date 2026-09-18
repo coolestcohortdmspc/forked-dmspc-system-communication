@@ -130,18 +130,16 @@ def get_dashboard_context(message_number=None):
 
     ObservatoryEvent is the only source of truth here.
     """
-
+    # use the default value if none is specified from the button
     if message_number is not None:
         records_to_display=message_number
     elif(message_number==None):
         records_to_display=RECORDS_TO_DISPLAY
-    print("Number to Display")
-    print(records_to_display)
 
     latest_events = list(
         ObservatoryEvent.objects
         .order_by("-event_time", "-uuid")
-        [:RECORDS_TO_DISPLAY]
+        [:records_to_display]
     )
 
     avg_latency = (
@@ -291,13 +289,14 @@ def latency_data(request):
     dashboard.html can request this endpoint whenever it receives
     observatory_event_created over the main SSE connection.
     """
+    message_number = int(request.session.get("message_number", RECORDS_TO_DISPLAY))
 
     events = list(
         ObservatoryEvent.objects
         .exclude(tx_waveform="Tx_OFF")
         .exclude(latency_ms=0)
         .order_by("-event_time")
-        [:RECORDS_TO_DISPLAY]
+        [:message_number]
     )
 
     # Graph should read oldest -> newest.
@@ -640,13 +639,15 @@ def dashboard_view(request):
     """
     Dashboard represents persisted ObservatoryEvent history.
     """
+    #handle requests made from drop down button
     if request.method == 'POST':
         message_number = int(request.POST.get('message_number',RECORDS_TO_DISPLAY))
+        #save number from button through page reloads
         request.session['message_number'] = message_number
     else:
         message_number = int(request.session.get('message_number', RECORDS_TO_DISPLAY))
 
-    print("VIEW message_number:", message_number)
+    #send message number back to function
     context = get_dashboard_context(message_number=message_number)
 
     context['selected_number'] = message_number
@@ -827,11 +828,14 @@ def progress_sse(request):
 # ============================================================
 @require_GET
 def latency_data(request):
+
+    message_number = int(request.session.get("message_number", RECORDS_TO_DISPLAY))
+
     database_events = (
         ObservatoryEvent.objects
         .exclude(tx_waveform="Tx_OFF")
         .order_by("-event_time")
-        [:RECORDS_TO_DISPLAY]
+        [:message_number]
     )
 
     latest_events = list(
