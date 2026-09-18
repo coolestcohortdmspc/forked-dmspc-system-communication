@@ -34,6 +34,8 @@ from ngRadar_Website.enums import (
     Status,
 )
 
+from ngRadar_Website.models.models import ObservatoryEvent
+
 
 # =============================================================
 # CONSTANTS
@@ -909,7 +911,28 @@ def etc_send(frame_path):
             return_code,
             process.args,
         )
+def publish_status_obsEvents(station, status, msg):
+      """
+      Function to be used by all sims to publish failure status and message to the ObservatoryEvent database table.
+      """
 
+      data = {
+          "object_id": 30104,
+          "target": "Moretus",
+          "rcvr_station": station,
+          "xmit_station": Stations.GBT,
+          "event_time": datetime.now(timezone.utc),
+          "latency_ms": 0.00,
+          "status": status,
+          "message": msg,
+      }
+
+      try:
+          record = ObservatoryEvent.objects.create(**data)
+          print("Status saved to database successfully.")
+
+      except Exception as e:
+          print(f"Database error: {e}")
 
 def produce(station, topic, config, key, value):
     delivery_error = None
@@ -949,6 +972,13 @@ def produce(station, topic, config, key, value):
         print(f"Produced message to topic {topic} with key {key}.")
         return True
 
+    except Exception as exc:
+        publish_status_obsEvents(
+            station=station,
+            status=Status.FAILED,
+            msg=f"{exc}",
+        )
+        return False
 
 # =============================================================
 # FILE / STORAGE HELPERS
