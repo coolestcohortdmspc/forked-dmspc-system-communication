@@ -679,15 +679,13 @@ services:
       - "traefik.docker.network=proxy"
 
       # S3 traffic on port 8333
-      - "traefik.http.routers.seaweedfs.rule=Host(`${WEBSITE_DOMAIN_NAME}`) && PathPrefix(`/images`)" 
+      - "traefik.http.routers.seaweedfs.rule=Host(`images.${WEBSITE_DOMAIN_NAME}`)"
       - "traefik.http.routers.seaweedfs.entrypoints=${HTTP_ENTRYPOINT:-web}"
       - "traefik.http.routers.seaweedfs.service=seaweedfs"
       - "traefik.http.routers.seaweedfs.tls=${TLS:-false}" #false when local, true on droplet
       - "${CERTRESOLVER}" # reads dummy label when local, and certificate resolver when deployed on droplets with HTTPS
       - "traefik.http.services.seaweedfs.loadbalancer.server.port=8333"
 
-      - "traefik.http.middlewares.strip-images.stripprefix.prefixes=/images"
-      - "traefik.http.routers.seaweedfs.middlewares=strip-images"
 
 
 # Commenting this out because we never use this, but keeping it in case we want to? 
