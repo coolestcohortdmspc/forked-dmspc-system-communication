@@ -270,7 +270,7 @@ services:
     volumes:
       - .:/service
     # ports:
-    #   - 8000:8000
+      #   - 8000:8000
     networks:
       - ngradar_website_network
       - proxy

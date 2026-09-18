@@ -323,11 +323,6 @@ document.body.addEventListener(
     (event) => {
         const data = event.detail;
 
-        console.log(
-            "[Home] DSOC event:",
-            data
-        );
-
         if (
             data.status_name === "COMPLETED" ||
             data.status_name === "FAILED"
