@@ -129,6 +129,7 @@ def config_func(
         GBT_notif
         VLBA_notif
         DSOC_notif
+        progress_tracking
 
     GBT:
         consumes GBT_notif

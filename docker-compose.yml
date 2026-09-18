@@ -277,7 +277,7 @@ services:
     environment:
       # this is what tells the ngradar_website service to run the UI Kafka consumer in a separate thread, which is what we want for the SSE functionality.
       ENABLE_UI_KAFKA_CONSUMER: "true"
-      UI_KAFKA_TOPICS: "GBT_notif,VLBA_notif,DSOC_notif"
+      UI_KAFKA_TOPICS: "GBT_notif,VLBA_notif,DSOC_notif,progress_tracking"
       UI_KAFKA_GROUP_ID: "ngradar-ui-sse"
       BOOTSTRAP_SERVER: "kafka-broker:29092"
     labels:

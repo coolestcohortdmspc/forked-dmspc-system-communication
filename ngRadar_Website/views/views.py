@@ -46,8 +46,6 @@ logger = logging.getLogger(__name__)
 RECORDS_TO_DISPLAY = 30
 LAST_RECORDS = 5
 
-PROGRESS_JSON_PATH = "/service/mock_assets/progress.json"
-
 
 # ============================================================
 # ObservatoryEvent query helpers
@@ -205,6 +203,7 @@ async def sse_stream(request):
         gbt_changed
         vlba_changed
         dsoc_changed
+        progress changed
         status_changed
         observatory_event_created
         heartbeat
@@ -662,149 +661,6 @@ def event_table_partial(request):
         ),
         get_dashboard_context(),
     )
-
-
-
-# ============================================================
-# e-transfer progress SSE
-# ============================================================
-
-@require_GET
-def progress_sse(request):
-    """
-    Existing file-based e-transfer progress stream.
-
-    This is independent of the main Kafka/SSE event stream.
-
-    Future improvement:
-        publish transfer progress through Kafka and remove
-        progress.json + this second SSE connection.
-    """
-
-    if not os.path.exists(
-        PROGRESS_JSON_PATH
-    ):
-        return HttpResponseNotFound(
-            "Progress file not found"
-        )
-
-    def format_sse(
-        event=None,
-        data=None,
-    ):
-        output = ""
-
-        if event:
-            output += (
-                f"event: {event}\n"
-            )
-
-        if data is not None:
-            output += (
-                f"data: {data}\n"
-            )
-
-        return output + "\n"
-
-    def event_generator():
-        last_seen = None
-        completed_transfer_id = None
-
-        while True:
-            if not os.path.exists(
-                PROGRESS_JSON_PATH
-            ):
-                time.sleep(0.5)
-                continue
-
-            try:
-                with open(
-                    PROGRESS_JSON_PATH,
-                    "r",
-                    encoding="utf-8",
-                ) as progress_file:
-                    payload = json.load(
-                        progress_file
-                    )
-
-                received = payload.get(
-                    "received_bytes",
-                    0,
-                )
-
-                total = payload.get(
-                    "total_bytes",
-                    0,
-                )
-
-                percent = payload.get(
-                    "percent",
-                    0.0,
-                )
-
-                transfer_id = payload.get(
-                    "transfer_id",
-                    0,
-                )
-
-                if payload != last_seen:
-                    last_seen = payload
-
-                    yield format_sse(
-                        data=json.dumps({
-                            "received": received,
-                            "total": total,
-                            "percent": percent,
-                            "transfer_id": (
-                                transfer_id
-                            ),
-                        })
-                    )
-
-                if (
-                    total > 0
-                    and received >= total
-                    and transfer_id
-                    != completed_transfer_id
-                ):
-                    completed_transfer_id = (
-                        transfer_id
-                    )
-
-                    yield format_sse(
-                        event="done",
-                        data=json.dumps({
-                            "transfer_id": (
-                                transfer_id
-                            ),
-                            "percent": percent,
-                        }),
-                    )
-
-            except Exception as exc:
-                logger.exception(
-                    "Unable to read "
-                    "e-transfer progress."
-                )
-
-                yield format_sse(
-                    event="progress_error",
-                    data=json.dumps({
-                        "message": str(exc)
-                    }),
-                )
-
-            time.sleep(0.2)
-
-    response = StreamingHttpResponse(
-        event_generator(),
-        content_type="text/event-stream",
-    )
-
-    response["Cache-Control"] = "no-cache"
-    response["X-Accel-Buffering"] = "no"
-
-    return response
 
 
 # ============================================================

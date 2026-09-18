@@ -127,7 +127,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         topics = os.getenv(
             "DB_KAFKA_TOPICS",
-            "GBT_notif,VLBA_notif,DSOC_notif,progress_tracking",
+            "GBT_notif,VLBA_notif,DSOC_notif",
         ).split(",")
 
         consumer_config = {

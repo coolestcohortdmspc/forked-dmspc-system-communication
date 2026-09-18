@@ -5,7 +5,6 @@ from django.core.management.base import BaseCommand
 from confluent_kafka import (
     Consumer,
     KafkaError,
-    Producer,
 )
 from ngRadar_Website.enums import (
     Stations,
@@ -15,6 +14,7 @@ from ngRadar_Website.enums import (
 from ngRadar_Website.utils import (
     bootstrap,
     consumer_group_has_members,
+    produce,
     send_kafka_message,
 )
 
@@ -24,22 +24,39 @@ Progress Tracking Worker Simulator
 
 This simulator:
 
-- Consumes VLBA workflow events from Kafka.
-- Checks DSOC storage availability.
-- Monitors the incoming e-transfer.
-- Verifies the completed transfer.
-- Generates the simulated DDM product.
-- Stores the DDM image in SeaweedFS.
-- Sends DSOC state/workflow events to Kafka.
+- 
 
 """
 
 
 STALL_TIMEOUT_SECONDS = 15
 
-MAX_STORAGE_RETRIES = 15
-
 volume_folder = Path("/dsoc/incoming")
+
+# Helper kafka produce function
+def publish_progress(
+    *,
+    producer_config,
+    payload,
+):
+    print(
+        "[PROGRESS] Publishing:",
+        payload,
+    )
+
+    success = produce(
+        "progress_tracking",
+        producer_config,
+        str(Message.PROGRESS_UPDATE.value),
+        json.dumps(payload),
+    )
+
+    print(
+        "[PROGRESS] Kafka publish:",
+        success,
+    )
+
+    return success
 
 # =============================================================
 # process_msg takes message from VLBA indicating a new transfer has started and adds it to the list of active transfers.
@@ -52,19 +69,14 @@ def process_msg(
     producer_config,
 ):
     incoming_key = int(msg.key().decode("utf-8"))
-
     payload = json.loads(msg.value().decode("utf-8"))
 
-    if incoming_key == Message.VLBA_TRANSFERRING.value:
-        # Add the transfer to the list of active transfers
-        # add two fields in the payload for last_progress_at and
-        # received bytes to track when the last progress was made for this transfer
+    if (incoming_key != Message.VLBA_TRANSFERRING.value):
+        return True
+    else:
         payload["last_progress_at"] = time.monotonic()
         payload["last_received_bytes"] = 0
         active_transfers.append(payload)
-
-    else:
-        print("Invalid Kafka Message Key!")
 
     return True
 
@@ -161,15 +173,20 @@ def progress_consume(
 # E-TRANSFER PROGRESS
 # =============================================================
 
-# give the function dsoc/incoming path and append the filename from payload
-
-def get_transfer_progress(payload, producer_topic, producer_config):
+def get_transfer_progress(
+    payload,
+    producer_topic,
+    producer_config,
+):
     """
-    Track bytes arriving from VLBA.
+    Track bytes arriving from a VLBA.
 
-    This no longer checks ETransferEvent to decide whether the
-    transfer should continue. Kafka/workflow state and the actual
-    incoming file are now the source of truth.
+    Progress updates are published to the
+    progress_tracking Kafka topic for the UI.
+
+    Once the complete file has arrived,
+    PROGRESS_COMPLETE is published so DSOC
+    can continue processing the transfer.
     """
 
     filename = payload["filename"]
@@ -177,8 +194,7 @@ def get_transfer_progress(payload, producer_topic, producer_config):
     station = payload["station"]
     last_progress_at = payload["last_progress_at"]
     last_received_bytes = payload["last_received_bytes"]
-    tracked_file = volume_folder / filename
-
+    tracked_file = (volume_folder / filename)
     total_bytes = int(payload["num_bytes"])
 
     if total_bytes <= 0:
@@ -187,87 +203,133 @@ def get_transfer_progress(payload, producer_topic, producer_config):
             "be greater than zero."
         )
 
-    if tracked_file.exists():
-        current_bytes = (tracked_file.stat().st_size)
+    # -----------------------------------------------------
+    # File has not appeared at DSOC yet.
+    # -----------------------------------------------------
 
-        if current_bytes > last_received_bytes:
-            last_progress_at = time.monotonic()
+    if not tracked_file.exists():
+        return False
 
-        last_received_bytes = current_bytes
+    current_bytes = (tracked_file.stat().st_size)
 
-        percent = (last_received_bytes / total_bytes  * 100)
-        print(f"Transfer of <{transfer_uuid}.bin> is {percent:.2f}% complete. ({last_received_bytes}/{total_bytes} bytes)")
+    # -----------------------------------------------------
+    # New bytes arrived.
+    # -----------------------------------------------------
 
-        if last_received_bytes >= total_bytes:
-            print(
-                "Transfer of "
-                f"<{transfer_uuid}.bin> "
-                "COMPLETE."
-            )
+    if (current_bytes > last_received_bytes):
+        last_progress_at = (time.monotonic())
 
-            del payload["last_progress_at"]
-            del payload["last_received_bytes"]
-
-            send_kafka_message(
-                producer_topic=producer_topic,
-                producer_config=producer_config,
-                message_type=Message.PROGRESS_COMPLETE,
-                transfer_uuid=transfer_uuid,
-                gbt_uuid=payload["gbt_uuid"],
-                gbt_event_time=payload["gbt_event_time"],
-                station=Stations(payload["station"]),
-                status=Status.TRANSFERRED,
-                object_id=payload["object_id"],
-                target=payload["target"],
-                tx_waveform=payload["tx_waveform"],
-                rec_waveform=payload["rec_waveform"],
-                num_bytes=payload["num_bytes"],
-                filename=payload["filename"],
-                xmit_station=payload["xmit_station"],
-                rcvr_station=Stations.DSOC,
-                message=(
-                    f"VLBA-{Stations(payload['station']).name} completed "
-                    "sending the data file to DSOC "
-                    "via e-transfer."
-                ),
-
-            )
-
-            # VLBA already sends a kafka message to the UI when etc_send is complete. We need to notify DSOC that the transfer is complete and ready for processing but don't want it to look like duplicates on the UI.
-
-            return True
-
-
-        if time.monotonic() - last_progress_at > STALL_TIMEOUT_SECONDS:
-            vlba_consumer_group = (
-                f"{vlba_station.name.lower()}"
-                "-consumer-group"
-            )
-
-            if consumer_group_has_members(vlba_consumer_group):
-                # VLBA is alive. The transfer may
-                # simply be slow.
-                last_progress_at = time.monotonic()
-
-            else:
-                vlba_station = Stations(station)
-                raise RuntimeError(
-                    f"{vlba_station.label} "
-                    "went offline "
-                    "mid-transfer. "
-                    "Transfer interrupted."
-                )
-        payload["last_progress_at"] = last_progress_at
-        payload["last_received_bytes"] = last_received_bytes
-
-    else:
-        print(
-            f"Transfer file <{filename}> "
-            "not found in DSOC incoming folder."
+        percent = min(
+            100.0,
+            (
+                current_bytes
+                / total_bytes
+                * 100
+            ),
         )
 
-    return False
+        publish_progress(
+            producer_config=producer_config,
+            payload={
+                "gbt_uuid": payload["gbt_uuid"],
+                "transfer_uuid": transfer_uuid,
+                "station": station,
+                "station_name": Stations(station).name,
+                "received_bytes": current_bytes,
+                "total_bytes": total_bytes,
+                "percent":
+                    round(
+                        percent,
+                        2,
+                    ),
+            },
+        )
 
+        print(
+            f"Transfer {transfer_uuid} "
+            f"from VLBA-"
+            f"{Stations(station).name}: "
+            f"{percent:.2f}% "
+            f"({current_bytes}/"
+            f"{total_bytes})"
+        )
+
+    last_received_bytes = (current_bytes)
+
+    # -----------------------------------------------------
+    # Transfer complete.
+    # -----------------------------------------------------
+
+    if current_bytes >= total_bytes:
+        print(
+            "Transfer of "
+            f"<{transfer_uuid}.bin> "
+            "COMPLETE."
+        )
+
+        send_kafka_message(
+            producer_topic=producer_topic,
+            producer_config=producer_config,
+            message_type=Message.PROGRESS_COMPLETE,
+            transfer_uuid=transfer_uuid,
+            gbt_uuid=payload["gbt_uuid"],
+            gbt_event_time=payload["gbt_event_time"],
+            station=Stations(payload["station"]),
+            status=Status.TRANSFERRED,
+            object_id=payload["object_id"],
+            target=payload["target"],
+            tx_waveform=payload["tx_waveform"],
+            rec_waveform=payload["rec_waveform"],
+            num_bytes=payload["num_bytes"],
+            filename=payload["filename"],
+            xmit_station=payload["xmit_station"],
+            rcvr_station=Stations.DSOC,
+            message=(
+                f"VLBA-{Stations(payload['station']).name} completed "
+                "sending the data file to DSOC "
+                "via e-transfer."
+            ),
+
+        )
+
+        return True
+
+    # -----------------------------------------------------
+    # Transfer has not changed recently.
+    # -----------------------------------------------------
+
+    if (time.monotonic() - last_progress_at > STALL_TIMEOUT_SECONDS):
+        vlba_station = Stations(station)
+
+        vlba_consumer_group = (
+            f"{vlba_station.name.lower()}"
+            "-consumer-group"
+        )
+
+        if consumer_group_has_members(vlba_consumer_group):
+            # VLBA is still alive.
+            # Reset the stall timer and
+            # continue monitoring.
+            last_progress_at = (time.monotonic())
+
+        else:
+            raise RuntimeError(
+                f"{vlba_station.label} "
+                "went offline "
+                "mid-transfer. "
+                "Transfer interrupted."
+            )
+
+    # -----------------------------------------------------
+    # Persist transient tracking state in this
+    # active_transfers payload.
+    # -----------------------------------------------------
+
+    payload["last_progress_at"] = (last_progress_at)
+
+    payload["last_received_bytes"] = (last_received_bytes)
+
+    return False
 
 
 
