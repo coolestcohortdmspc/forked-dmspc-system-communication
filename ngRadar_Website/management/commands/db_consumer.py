@@ -16,35 +16,24 @@ def process_msg(
     producer_config,
 ):
     try:
-        incoming_key = int(
-            msg.key().decode("utf-8")
-        )
+        incoming_key = int(msg.key().decode("utf-8"))
 
         # Do not persist our own
         # database acknowledgements.
-        if (
-            incoming_key
-            == Message.DB_COMMITTED.value
-        ):
+        if (incoming_key == Message.DB_COMMITTED.value):
             return True
 
         topic = msg.topic()
 
-        payload = json.loads(
-            msg.value().decode("utf-8")
-        )
+        payload = json.loads(msg.value().decode("utf-8"))
 
         with transaction.atomic():
-            record_obs_event(
-                payload
-            )
+            record_obs_event(payload)
 
             transaction.on_commit(
                 lambda: publish_db_committed(
                     topic=topic,
-                    producer_config=(
-                        producer_config
-                    ),
+                    producer_config=(producer_config),
                     payload=payload,
                 )
             )
@@ -85,59 +74,23 @@ def record_obs_event(payload):
         ObservatoryEvent.objects.update_or_create(
             uuid=payload["event_uuid"],
             defaults={
-                "gbt_uuid": payload.get(
-                    "gbt_uuid"
-                ),
-                "transfer_uuid": payload.get(
-                    "transfer_uuid"
-                ),
-                "object_id": payload.get(
-                    "object_id"
-                ),
-                "target": payload.get(
-                    "target"
-                ),
-                "tx_waveform": payload.get(
-                    "tx_waveform"
-                ),
-                "rec_waveform": payload.get(
-                    "rec_waveform"
-                ),
-                "product_type": payload.get(
-                    "product_type"
-                ),
-                "product_id": payload.get(
-                    "product_id"
-                ),
-                "station": payload.get(
-                    "station"
-                ),
-                "event_time": payload[
-                    "event_time"
-                ],
-                "xmit_station": payload.get(
-                    "xmit_station"
-                ),
-                "rcvr_station": payload.get(
-                    "rcvr_station"
-                ),
-                "image_key": payload.get(
-                    "image_key"
-                ),
-                "num_bytes": payload.get(
-                    "num_bytes"
-                ),
-                "latency_ms": payload.get(
-                    "latency_ms",
-                    0.0,
-                ),
-                "status": payload.get(
-                    "status"
-                ),
-                "message": payload.get(
-                    "message",
-                    "",
-                ),
+                "gbt_uuid": payload.get("gbt_uuid"),
+                "transfer_uuid": payload.get("transfer_uuid"),
+                "object_id": payload.get("object_id"),
+                "target": payload.get("target"),
+                "tx_waveform": payload.get("tx_waveform"),
+                "rec_waveform": payload.get("rec_waveform"),
+                "product_type": payload.get("product_type"),
+                "product_id": payload.get("product_id"),
+                "station": payload.get("station"),
+                "event_time": payload["event_time"],
+                "xmit_station": payload.get("xmit_station"),
+                "rcvr_station": payload.get("rcvr_station"),
+                "image_key": payload.get("image_key"),
+                "num_bytes": payload.get("num_bytes"),
+                "latency_ms": payload.get("latency_ms", 0.0,),
+                "status": payload.get("status"),
+                "message": payload.get("message","",),
             },
         )
     )

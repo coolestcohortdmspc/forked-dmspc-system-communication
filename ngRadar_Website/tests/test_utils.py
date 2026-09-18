@@ -120,18 +120,31 @@ def test_config_func_GBT():
     assert producer_topic == "GBT_data"
     assert producer_config == {
             "bootstrap.servers": bootstrap,
-            "message.max.bytes": 8388608,
-            "message.timeout.ms": 2000,
-            "client.id": "gbt-producer"
+            "client.id": "gbt-producer",
+            "acks": "all",
+            "enable.idempotence": True,
+            "retries": 10,
+            "delivery.timeout.ms": 120000,
+            "request.timeout.ms": 30000,
+            "reconnect.backoff.ms": 100,
+            "reconnect.backoff.max.ms": 10000,
         }
     assert consumer_topic == ["user_input"]
     assert consumer_config == {
             "bootstrap.servers": bootstrap,
-            "fetch.max.bytes": 8388608,
-            "session.timeout.ms": 10000,
             "client.id": "gbt-consumer",
             "group.id": "gbt-consumer-group",
-            "auto.offset.reset": "earliest",
+            "session.timeout.ms": 45000,
+            "heartbeat.interval.ms": 15000,
+            "socket.timeout.ms": 30000,
+            "reconnect.backoff.ms": 100,
+            "reconnect.backoff.max.ms": 10000,
+
+            # Usually useful for clients that must discover changed leaders
+            "topic.metadata.refresh.interval.ms": 300000,
+            "metadata.max.age.ms": 300000,
+
+            "enable.auto.commit": False,
         }
 
 
@@ -149,18 +162,31 @@ def test_config_func_VLBA(sim):
     assert producer_topic == "VLBA_notif"
     assert producer_config == {
             "bootstrap.servers": bootstrap,
-            "message.max.bytes": 8388608,
-            "message.timeout.ms": 2000,
-            "client.id": f"{sim.name.lower()}-producer"
+            "client.id": f"{sim.name.lower()}-producer",
+            "acks": "all",
+            "enable.idempotence": True,
+            "retries": 10,
+            "delivery.timeout.ms": 120000,
+            "request.timeout.ms": 30000,
+            "reconnect.backoff.ms": 100,
+            "reconnect.backoff.max.ms": 10000,
         }
     assert consumer_topic == ["GBT_data", "DSOC_notif"]
     assert consumer_config == {
             "bootstrap.servers": bootstrap,
-            "fetch.max.bytes": 8388608,
-            "session.timeout.ms": 10000,
             "client.id": f"{sim.name.lower()}-consumer",
             "group.id": f"{sim.name.lower()}-consumer-group",
-            "auto.offset.reset": "earliest",
+            "session.timeout.ms": 45000,
+            "heartbeat.interval.ms": 15000,
+            "socket.timeout.ms": 30000,
+            "reconnect.backoff.ms": 100,
+            "reconnect.backoff.max.ms": 10000,
+
+            # Usually useful for clients that must discover changed leaders
+            "topic.metadata.refresh.interval.ms": 300000,
+            "metadata.max.age.ms": 300000,
+
+            "enable.auto.commit": False,
         }
 
 
@@ -176,19 +202,31 @@ def test_config_func_DSOC():
     assert producer_topic == "DSOC_notif"
     assert producer_config == {
             "bootstrap.servers": bootstrap,
-            "message.max.bytes": 8388608,
-            "message.timeout.ms": 2000,
-            "client.id": f"{sim.name.lower()}-producer"
+            "client.id": f"{sim.name.lower()}-producer",
+            "acks": "all",
+            "enable.idempotence": True,
+            "retries": 10,
+            "delivery.timeout.ms": 120000,
+            "request.timeout.ms": 30000,
+            "reconnect.backoff.ms": 100,
+            "reconnect.backoff.max.ms": 10000,
         }
     assert consumer_topic == ["VLBA_notif"]
     assert consumer_config == {
             "bootstrap.servers": bootstrap,
-            "fetch.max.bytes": 8388608,
-            # "session.timeout.ms": 45000,
-            "session.timeout.ms": 10000,
             "client.id": f"{sim.name.lower()}-consumer",
             "group.id": f"{sim.name.lower()}-consumer-group",
-            "auto.offset.reset": "earliest",
+            "session.timeout.ms": 45000,
+            "heartbeat.interval.ms": 15000,
+            "socket.timeout.ms": 30000,
+            "reconnect.backoff.ms": 100,
+            "reconnect.backoff.max.ms": 10000,
+
+            # Usually useful for clients that must discover changed leaders
+            "topic.metadata.refresh.interval.ms": 300000,
+            "metadata.max.age.ms": 300000,
+
+            "enable.auto.commit": False,
         }
 
     
@@ -203,9 +241,14 @@ def test_config_func_UI():
     assert topic == "user_input"
     assert config == {
             "bootstrap.servers": bootstrap,
-            "message.max.bytes": 8388608,
-            "message.timeout.ms": 2000,
             "client.id": f"{sim.name.lower()}-producer",
+            "acks": "all",
+            "enable.idempotence": True,
+            "retries": 10,
+            "delivery.timeout.ms": 120000,
+            "request.timeout.ms": 30000,
+            "reconnect.backoff.ms": 100,
+            "reconnect.backoff.max.ms": 10000,
         }
 
 
@@ -321,7 +364,7 @@ def test_consume_exception(mock_publish, mock_Consumer):
     mock_publish.assert_called_once_with(
             station=Stations.GBT,
             status=Status.FAILED,
-            msg="Failed to connect to Kafka!",
+            msg="Waiting to recover Kafka connection...",
         )
 
 @patch("ngRadar_Website.utils.Consumer")
@@ -348,7 +391,7 @@ def test_consume_error(mock_publish, mock_Consumer):
     mock_publish.assert_called_once_with(
             station=Stations.GBT,
             status=Status.FAILED,
-            msg="Failed to connect to Kafka.",
+            msg="Waiting to recover Kafka connection...",
         )
 
 @patch("ngRadar_Website.utils.Consumer")
@@ -376,7 +419,7 @@ def test_consume_manual(mock_publish, mock_Consumer):
     mock_publish.assert_called_once_with(
             station=Stations.DSOC,
             status=Status.FAILED,
-            msg="Failed to connect to Kafka.",
+            msg="Waiting to recover Kafka connection...",
         )
 
 @patch("ngRadar_Website.utils.Consumer")
@@ -412,7 +455,7 @@ def test_consume_partition_error(mock_publish, mock_Consumer, capsys):
     mock_publish.assert_called_once_with(
             station=Stations.PT,
             status=Status.FAILED,
-            msg="Failed to connect to Kafka!",
+            msg="Waiting to recover Kafka connection...",
         )
     assert captured.out.strip() == "Consumer reached partition EOF"
 

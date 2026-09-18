@@ -16,6 +16,7 @@ class Stations(models.IntegerChoices):
     MK  = 99, "Mauna Kea (25-m, VLBA)"
     DSOC = 100, "DSOC (Domenici Socorro Operations Center)"
     UI = 101, "User Interface"
+    PTW = 102, "Progress Tracking Worker"
 
 
 class Status(models.IntegerChoices):
@@ -49,6 +50,9 @@ class Message(models.IntegerChoices):
         # status=Status.TRANSFERRED
         # status=Status.VERIFYING
         # status=Status.FAILED
+    PROGRESS_COMPLETE = 11, "Progress complete for an e-transfer."
+    PROGRESS_UPDATE = 12, "Progress update for an e-transfer."
+
 
 
 class UIEvent:
@@ -56,6 +60,7 @@ class UIEvent:
     GBT_CHANGED = "gbt_changed"
     VLBA_CHANGED = "vlba_changed"
     DSOC_CHANGED = "dsoc_changed"
+    PROGRESS_CHANGED = "progress_changed"
     TRANSFER_CHANGED = "transfer_changed"
     LATENCY_CHANGED = "latency_changed"
     IMAGE_READY = "image_ready"

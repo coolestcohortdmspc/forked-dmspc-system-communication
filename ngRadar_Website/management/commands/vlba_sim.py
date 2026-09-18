@@ -90,9 +90,7 @@ def process_msg(
             "Received Kafka message from GBT."
         )
 
-        payload = json.loads(
-            msg.value().decode("utf-8")
-        )
+        payload = json.loads(msg.value().decode("utf-8"))
 
         # An observation-wide correlation ID.
         gbt_uuid = payload["gbt_uuid"]
@@ -106,30 +104,19 @@ def process_msg(
         )
 
         # Observation context inherited from GBT.
-        object_id = payload.get(
-            "object_id"
-        )
+        object_id = payload.get("object_id")
 
-        target = payload.get(
-            "target"
-        )
+        target = payload.get("target")
 
-        tx_waveform = payload.get(
-            "tx_waveform"
-        )
+        tx_waveform = payload.get("tx_waveform")
 
-        rec_waveform = payload.get(
-            "rec_waveform"
-        )
+        rec_waveform = payload.get("rec_waveform")
 
         # One transfer UUID identifies this entire
         # VLBA -> DSOC e-transfer lifecycle.
         transfer_uuid = uuid.uuid4()
 
-        frame_path = (
-            raw_data_path
-            / f"{transfer_uuid}.bin"
-        )
+        frame_path = (raw_data_path / f"{transfer_uuid}.bin")
 
         Thread(
             target=create_file,
@@ -137,46 +124,31 @@ def process_msg(
             daemon=True,
         ).start()
 
-        watch_for_file(
-            frame_path
-        )
+        watch_for_file(frame_path)
 
         # -----------------------------------------------------
         # Raw data file successfully created
         # -----------------------------------------------------
         if frame_path.is_file():
-            num_bytes = (
-                frame_path.stat().st_size
-            )
+            num_bytes = (frame_path.stat().st_size)
 
             send_kafka_message(
                 producer_topic=producer_topic,
                 producer_config=producer_config,
-
-                message_type=(
-                    Message.VLBA_REQUEST_STORAGE
-                ),
-
+                message_type=(Message.VLBA_REQUEST_STORAGE),
                 transfer_uuid=transfer_uuid,
                 gbt_uuid=gbt_uuid,
                 gbt_event_time=gbt_event_time,
-
                 station=STATION,
-
                 status=Status.QUEUED,
-
                 object_id=object_id,
                 target=target,
-
                 tx_waveform=tx_waveform,
                 rec_waveform=rec_waveform,
-
                 num_bytes=num_bytes,
                 filename=frame_path.name,
-
                 xmit_station=STATION,
                 rcvr_station=Stations.DSOC,
-
                 message=(
                     "VLBA requested a storage "
                     "check at DSOC."
@@ -195,9 +167,7 @@ def process_msg(
             send_kafka_message(
                 producer_topic=producer_topic,
                 producer_config=producer_config,
-                message_type=(
-                    Message.VLBA_FAILED
-                ),
+                message_type=(Message.VLBA_FAILED),
                 transfer_uuid=transfer_uuid,
                 gbt_uuid=gbt_uuid,
                 gbt_event_time=gbt_event_time,
@@ -228,14 +198,9 @@ def process_msg(
     #
     # DSOC responded to our storage request.
     # =========================================================
-    elif (
-        incoming_key
-        == Message.DSOC_RESPOND_STORAGE.value
-    ):
+    elif (incoming_key == Message.DSOC_RESPOND_STORAGE.value):
 
-        payload = json.loads(
-            msg.value().decode("utf-8")
-        )
+        payload = json.loads(msg.value().decode("utf-8"))
 
         station = payload["station"]
 
@@ -248,55 +213,25 @@ def process_msg(
             "check response!"
         )
 
-        transfer_uuid = payload[
-            "transfer_uuid"
-        ]
-
-        gbt_uuid = payload[
-            "gbt_uuid"
-        ]
-
-        gbt_event_time = payload.get(
-            "gbt_event_time"
-        )
-
-        object_id = payload.get(
-            "object_id"
-        )
-
-        target = payload.get(
-            "target"
-        )
-
-        tx_waveform = payload.get(
-            "tx_waveform"
-        )
-
-        rec_waveform = payload.get(
-            "rec_waveform"
-        )
-
-        num_bytes = int(
-            payload.get(
+        transfer_uuid = payload["transfer_uuid"]
+        gbt_uuid = payload["gbt_uuid"]
+        gbt_event_time = payload.get("gbt_event_time")
+        object_id = payload.get("object_id")
+        target = payload.get("target")
+        tx_waveform = payload.get("tx_waveform")
+        rec_waveform = payload.get("rec_waveform")
+        num_bytes = int(payload.get(
                 "num_bytes",
                 0,
             )
         )
-
-        filename = payload.get(
-            "filename"
-        )
-
-        retry_count = int(
-            payload.get(
+        filename = payload.get("filename")
+        retry_count = int(payload.get(
                 "retry_count",
                 0,
             )
         )
-
-        response_status = int(
-            payload["status"]
-        )
+        response_status = int(payload["status"])
 
         # =====================================================
         # DSOC storage check permanently failed
@@ -323,45 +258,27 @@ def process_msg(
                     #
                     # This Kafka message:
                     #
-                    # - tells DSOC that transmission started
+                    # - tells the progress tracking worker that transmission started
                     # - records VLBA TRANSFERRING through
                     #   db_consumer
                     # -----------------------------------------
                     send_kafka_message(
-                        producer_topic=(
-                            producer_topic
-                        ),
-                        producer_config=(
-                            producer_config
-                        ),
-                        message_type=(
-                            Message.VLBA_TRANSFERRING
-                        ),
-                        transfer_uuid=(
-                            transfer_uuid
-                        ),
+                        producer_topic=("progress_tracking"),
+                        producer_config=(producer_config),
+                        message_type=(Message.VLBA_TRANSFERRING),
+                        transfer_uuid=(transfer_uuid),
                         gbt_uuid=gbt_uuid,
-                        gbt_event_time=(
-                            gbt_event_time
-                        ),
+                        gbt_event_time=(gbt_event_time),
                         station=STATION,
-                        status=(
-                            Status.TRANSFERRING
-                        ),
+                        status=(Status.TRANSFERRING),
                         object_id=object_id,
                         target=target,
                         tx_waveform=tx_waveform,
-                        rec_waveform=(
-                            rec_waveform
-                        ),
+                        rec_waveform=(rec_waveform),
                         num_bytes=num_bytes,
                         filename=filename,
-                        xmit_station=(
-                            STATION
-                        ),
-                        rcvr_station=(
-                            Stations.DSOC
-                        ),
+                        xmit_station=(STATION),
+                        rcvr_station=(Stations.DSOC),
                         message=(
                             "Hancock VLBA has "
                             "started sending the "
@@ -370,10 +287,7 @@ def process_msg(
                         ),
                     )
 
-                    frame_path = (
-                        raw_data_path
-                        / f"{transfer_uuid}.bin"
-                    )
+                    frame_path = (raw_data_path / f"{transfer_uuid}.bin")
 
                     print(
                         "DSOC responded "
@@ -382,9 +296,7 @@ def process_msg(
                         "e-transfer..."
                     )
 
-                    etc_send(
-                        frame_path
-                    )
+                    etc_send(frame_path)
 
                     # -----------------------------------------
                     # etc_send returned successfully.
@@ -392,48 +304,7 @@ def process_msg(
                     # VLBA now knows that its side of the
                     # transfer completed successfully.
                     # -----------------------------------------
-                    send_kafka_message(
-                        producer_topic=(
-                            producer_topic
-                        ),
-                        producer_config=(
-                            producer_config
-                        ),
-                        message_type=(
-                            Message.STATUS_UPDATE
-                        ),
-                        transfer_uuid=(
-                            transfer_uuid
-                        ),
-                        gbt_uuid=gbt_uuid,
-                        gbt_event_time=(
-                            gbt_event_time
-                        ),
-                        station=STATION,
-                        status=(
-                            Status.TRANSFERRED
-                        ),
-                        object_id=object_id,
-                        target=target,
-                        tx_waveform=tx_waveform,
-                        rec_waveform=(
-                            rec_waveform
-                        ),
-                        num_bytes=num_bytes,
-                        filename=filename,
-                        xmit_station=(
-                            STATION
-                        ),
-                        rcvr_station=(
-                            Stations.DSOC
-                        ),
-                        message=(
-                            f"VLBA-{STATION.name} completed "
-                            "sending the data file to DSOC "
-                            "via e-transfer."
-                        ),
-
-                    )
+                    print("E-Transfer completed successfully.")
 
                     break
 
@@ -463,49 +334,28 @@ def process_msg(
                     )
 
                     send_kafka_message(
-                        producer_topic=(
-                            producer_topic
-                        ),
-                        producer_config=(
-                            producer_config
-                        ),
-                        message_type=(
-                            Message.VLBA_FAILED
-                        ),
-                        transfer_uuid=(
-                            transfer_uuid
-                        ),
+                        producer_topic=(producer_topic),
+                        producer_config=(producer_config),
+                        message_type=(Message.VLBA_FAILED),
+                        transfer_uuid=(transfer_uuid),
                         gbt_uuid=gbt_uuid,
-                        gbt_event_time=(
-                            gbt_event_time
-                        ),
+                        gbt_event_time=(gbt_event_time),
                         station=STATION,
                         status=Status.FAILED,
                         object_id=object_id,
                         target=target,
                         tx_waveform=tx_waveform,
-                        rec_waveform=(
-                            rec_waveform
-                        ),
+                        rec_waveform=(rec_waveform),
                         num_bytes=num_bytes,
                         filename=filename,
-                        xmit_station=(
-                            STATION
-                        ),
-                        rcvr_station=(
-                            Stations.DSOC
-                        ),
-                        message=(
-                            failure_message
-                        ),
+                        xmit_station=(STATION),
+                        rcvr_station=(Stations.DSOC),
+                        message=(failure_message),
                     )
 
                     attempts += 1
 
-                    if (
-                        attempts
-                        >= MAX_RESUME_ATTEMPTS
-                    ):
+                    if (attempts >= MAX_RESUME_ATTEMPTS):
                         print(
                             "E-transfer failed "
                             f"{attempts} times. "
@@ -545,38 +395,22 @@ def process_msg(
                     )
 
                     send_kafka_message(
-                        producer_topic=(
-                            producer_topic
-                        ),
-                        producer_config=(
-                            producer_config
-                        ),
-                        message_type=(
-                            Message.VLBA_FAILED
-                        ),
-                        transfer_uuid=(
-                            transfer_uuid
-                        ),
+                        producer_topic=(producer_topic),
+                        producer_config=(producer_config),
+                        message_type=(Message.VLBA_FAILED),
+                        transfer_uuid=(transfer_uuid),
                         gbt_uuid=gbt_uuid,
-                        gbt_event_time=(
-                            gbt_event_time
-                        ),
+                        gbt_event_time=(gbt_event_time),
                         station=STATION,
                         status=Status.FAILED,
                         object_id=object_id,
                         target=target,
                         tx_waveform=tx_waveform,
-                        rec_waveform=(
-                            rec_waveform
-                        ),
+                        rec_waveform=(rec_waveform),
                         num_bytes=num_bytes,
                         filename=filename,
-                        xmit_station=(
-                            STATION
-                        ),
-                        rcvr_station=(
-                            Stations.DSOC
-                        ),
+                        xmit_station=(STATION),
+                        rcvr_station=(Stations.DSOC),
                         message=(
                             "The e-transfer "
                             "failed unexpectedly "
@@ -610,9 +444,7 @@ def process_msg(
             send_kafka_message(
                 producer_topic=producer_topic,
                 producer_config=producer_config,
-                message_type=(
-                    Message.VLBA_REQUEST_STORAGE
-                ),
+                message_type=(Message.VLBA_REQUEST_STORAGE),
                 retry_count=retry_count,
                 transfer_uuid=transfer_uuid,
                 gbt_uuid=gbt_uuid,
@@ -638,32 +470,17 @@ def process_msg(
     #
     # DSOC says the VLBA raw file can be deleted.
     # =========================================================
-    elif (
-        incoming_key
-        == Message.VLBA_DELETE.value
-    ):
-        payload = json.loads(
-            msg.value().decode("utf-8")
-        )
-
-        station = payload["station"]
+    elif (incoming_key == Message.VLBA_DELETE.value):
+        payload = json.loads(msg.value().decode("utf-8"))
+        station = payload["rcvr_station"]
 
         # Check if the Kafka message is for this station
         if Stations(station) != STATION:
             return
 
-        file_name = payload[
-            "filename"
-        ]
+        file_name = payload["filename"]
 
-        delete_observation_data(
-            file_name
-        )
-
-        print(
-            f"Deleted VLBA raw data "
-            f"{file_name}."
-        )
+        delete_observation_data(file_name)
 
     # =========================================================
     # Unknown workflow message

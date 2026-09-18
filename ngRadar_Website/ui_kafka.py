@@ -18,13 +18,14 @@ TOPIC_TO_UI_EVENT = {
     "GBT_notif": "gbt_changed",
     "VLBA_notif": "vlba_changed",
     "DSOC_notif": "dsoc_changed",
+    "progress_tracking": "progress_changed",
 }
 
 
 def consume_ui_events():
     topics = os.getenv(
         "UI_KAFKA_TOPICS",
-        "GBT_notif,VLBA_notif,DSOC_notif",
+        "GBT_notif,VLBA_notif,DSOC_notif,progress_tracking",
     ).split(",")
 
     topics = [
@@ -63,10 +64,7 @@ def consume_ui_events():
                 continue
 
             if msg.error():
-                if (
-                    msg.error().code()
-                    == KafkaError._PARTITION_EOF
-                ):
+                if (msg.error().code() == KafkaError._PARTITION_EOF):
                     continue
 
                 logger.error(
@@ -75,21 +73,14 @@ def consume_ui_events():
                 )
                 continue
 
-            incoming_key = int(
-                msg.key().decode("utf-8")
-            )
+            incoming_key = int(msg.key().decode("utf-8"))
 
             topic = msg.topic()
 
             try:
-                payload = json.loads(
-                    msg.value().decode("utf-8")
-                )
+                payload = json.loads(msg.value().decode("utf-8"))
 
-            except (
-                UnicodeDecodeError,
-                json.JSONDecodeError,
-            ):
+            except (UnicodeDecodeError, json.JSONDecodeError,):
                 logger.exception(
                     "Invalid Kafka message"
                 )
@@ -103,10 +94,7 @@ def consume_ui_events():
             # committed and the Dashboard may safely refresh.
             # =====================================================
 
-            if (
-                incoming_key
-                == Message.DB_COMMITTED.value
-            ):
+            if (incoming_key == Message.DB_COMMITTED.value):
                 committed_payload = payload.get(
                     "data",
                     {},
@@ -140,11 +128,7 @@ def consume_ui_events():
             # for the database consumer.
             # =====================================================
 
-            event_type = (
-                TOPIC_TO_UI_EVENT.get(
-                    topic
-                )
-            )
+            event_type = (TOPIC_TO_UI_EVENT.get(topic))
 
             if event_type is None:
                 logger.warning(

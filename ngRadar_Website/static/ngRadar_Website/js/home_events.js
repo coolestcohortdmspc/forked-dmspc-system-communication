@@ -41,6 +41,9 @@ const HOME_EVENTS = {
 
     dsoc_changed:
         "dsocChanged",
+
+    progress_changed:
+        "progressChanged",
 };
 
 

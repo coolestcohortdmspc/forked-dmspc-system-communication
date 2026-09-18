@@ -14,17 +14,14 @@ function setText(
         return;
     }
 
-    element.textContent =
-        value ?? fallback;
-}
+    element.textContent = value ?? fallback;}
 
 
 function setHidden(
     id,
     hidden
 ) {
-    const element =
-        document.getElementById(id);
+    const element = document.getElementById(id);
 
     if (!element) {
         return;
@@ -117,14 +114,196 @@ function updateGbtPanel(event) {
 
 function updateVlbaState(event) {
     const data = event.detail;
-    // @nicole:
-    // There is currently no dedicated VLBA panel
-    // on home.html, but VLBA state still changes
-    // the overall system status.
-    // But maybe we could add a VLBA panel like for the progress of each etransfer?
-    // And this would be where we SSE the VLBA state to update that panel.
     updateSystemStatus(
         data
+    );
+}
+
+// =========================================================
+// VLBA eTransfer Progress Rows
+// =========================================================
+
+function createProgressRow(
+    stationId,
+    stationName
+) {
+    const list =
+        document.getElementById(
+            "vlba-progress-list"
+        );
+
+    if (!list) {
+        return null;
+    }
+
+    const row =
+        document.createElement(
+            "div"
+        );
+
+    row.id =
+        `progress-${stationId}`;
+
+    row.className =
+        "mb-3";
+
+    row.innerHTML = `
+        <div
+            class="d-flex
+                   justify-content-between"
+        >
+            <strong>
+                VLBA-${stationName}
+            </strong>
+
+            <span
+                class="progress-bytes"
+            >
+                0 B / 0 B
+            </span>
+        </div>
+
+        <div
+            class="progress"
+            role="progressbar"
+            aria-valuemin="0"
+            aria-valuemax="100"
+        >
+            <div
+                class="progress-bar"
+                style="width: 0%"
+                aria-valuenow="0"
+            >
+                0%
+            </div>
+        </div>
+    `;
+
+    list.appendChild(row);
+
+    return row;
+}
+
+function updateProgressState(event) {
+    const data = event.detail;
+
+    console.log(
+        "[Home] Progress update:",
+        data
+    );
+
+    const stationId =
+        Number(data.station);
+
+    const stationName =
+        data.station_name;
+
+    if (
+        !stationId
+        || !stationName
+    ) {
+        console.error(
+            "[Home] Invalid progress payload:",
+            data
+        );
+
+        return;
+    }
+
+    let row =
+        document.getElementById(
+            `progress-${stationId}`
+        );
+
+    if (!row) {
+        row = createProgressRow(
+            stationId,
+            stationName
+        );
+    }
+
+    if (!row) {
+        return;
+    }
+
+    const percent =
+        Math.min(
+            100,
+            Math.max(
+                0,
+                Number(
+                    data.percent || 0
+                )
+            )
+        );
+
+    const bar =
+        row.querySelector(
+            ".progress-bar"
+        );
+
+    if (bar) {
+        bar.style.width =
+            `${percent}%`;
+
+        bar.setAttribute(
+            "aria-valuenow",
+            percent
+        );
+
+        bar.textContent =
+            `${percent.toFixed(1)}%`;
+    }
+
+    const bytes =
+        row.querySelector(
+            ".progress-bytes"
+        );
+
+    if (bytes) {
+        bytes.textContent =
+            `${formatBytes(
+                data.received_bytes
+            )} / ${formatBytes(
+                data.total_bytes
+            )}`;
+    }
+}
+
+
+function formatBytes(bytes) {
+    const value =
+        Number(bytes || 0);
+
+    if (value === 0) {
+        return "0 B";
+    }
+
+    const units = [
+        "B",
+        "KB",
+        "MB",
+        "GB",
+    ];
+
+    const index = Math.min(
+        Math.floor(
+            Math.log(value)
+            / Math.log(1024)
+        ),
+        units.length - 1
+    );
+
+    return (
+        (
+            value
+            / Math.pow(
+                1024,
+                index
+            )
+        ).toFixed(1)
+        + " "
+        + units[index]
     );
 }
 
@@ -149,7 +328,7 @@ function updateDsocPanel(event) {
 
 
 function showDsocImage(data) {
-    // TODO:
+    // TODO: @ T !!
     // Home receives the live DSOC COMPLETED event before the
     // DB consumer is guaranteed to have persisted ObservatoryEvent.
     //
@@ -330,4 +509,9 @@ document.body.addEventListener(
             unlockSubmitButton();
         }
     }
+);
+
+document.body.addEventListener(
+    "progressChanged",
+    updateProgressState
 );

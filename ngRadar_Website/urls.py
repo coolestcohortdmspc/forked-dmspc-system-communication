@@ -16,9 +16,6 @@ urlpatterns = [
     path("dashboard/latency-data/", views.latency_data, name="latency_data"),
 
     # SSE (Server-Sent Events) URLs:
-    # We have two separate SSE endpoints: one for progress updates and one for UI events,
-    # but maybe we can combine them into a single endpoint in the future so we can maintain a single connection to the server.
-    path("progress/stream/", views.progress_sse, name="progress_sse"),
     path("events/stream/", views.sse_stream, name="sse_stream"),
     
     # Authentication paths 
