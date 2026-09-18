@@ -480,6 +480,7 @@ services:
         condition: service_healthy
     networks:
       - ngradar_website_network
+    restart: unless-stopped
     environment:
       DB_KAFKA_TOPICS: "GBT_notif,VLBA_notif,DSOC_notif"
       DB_KAFKA_GROUP_ID: "ngradar-db"
