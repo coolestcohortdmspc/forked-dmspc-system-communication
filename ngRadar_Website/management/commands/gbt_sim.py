@@ -25,25 +25,16 @@ def process_msg(
     producer_topic,
     producer_config,
 ):
-    incoming_key = int(
-        msg.key().decode("utf-8")
-    )
+    incoming_key = int(msg.key().decode("utf-8"))
 
     # GBT only reacts to waveform requests
     # submitted by the UI.
-    if (
-        incoming_key
-        != Message.UI_EVENT.value
-    ):
+    if (incoming_key!= Message.UI_EVENT.value):
         return True
 
-    payload = json.loads(
-        msg.value().decode("utf-8")
-    )
+    payload = json.loads(msg.value().decode("utf-8"))
 
-    waveform = payload[
-        "tx_waveform"
-    ]
+    waveform = payload["tx_waveform"]
 
     ui_event_time = (
         datetime.fromisoformat(
@@ -63,43 +54,27 @@ def process_msg(
     # -------------------------------------------------
     # 1. Turn transmitter OFF
     # -------------------------------------------------
-
-    off_event_time = datetime.now(
-        timezone.utc
-    )
-
     print(
         "GBT transmitter OFF"
     )
 
     send_kafka_message(
-        message_type=(
-            Message.STATUS_UPDATE
-        ),
-
+        message_type=(Message.STATUS_UPDATE),
         producer_topic=producer_topic,
         producer_config=producer_config,
-
         station=Stations.GBT,
-
         gbt_uuid=gbt_uuid,
-
         object_id="30104",
         target="Moretus",
-
         tx_waveform="TX_OFF",
         rec_waveform="TX_OFF",
-
         status=None,
-
         xmit_station=Stations.GBT,
         rcvr_station=None,
-
         latency_ms=latency_calc(
             ui_event_time,
             Stations.GBT,
         ),
-
         message=(
             "GBT transmitter turned OFF "
             "for waveform change."
@@ -115,10 +90,7 @@ def process_msg(
     # -------------------------------------------------
     # 3. Turn transmitter ON with new waveform
     # -------------------------------------------------
-
-    gbt_event_time = datetime.now(
-        timezone.utc
-    )
+    gbt_event_time = datetime.now(timezone.utc)
 
     print(
         "GBT transmitter ON with "
@@ -126,37 +98,23 @@ def process_msg(
     )
 
     event_uuid = send_kafka_message(
-        message_type=(
-            Message.GBT_TX
-        ),
-
+        message_type=(Message.GBT_TX),
         producer_topic=producer_topic,
         producer_config=producer_config,
-
         station=Stations.GBT,
-
         gbt_uuid=gbt_uuid,
-
-        gbt_event_time=(
-            gbt_event_time.isoformat()
-        ),
-
+        gbt_event_time=(gbt_event_time.isoformat()),
         object_id="30104",
         target="Moretus",
-
         tx_waveform=waveform,
         rec_waveform=waveform,
-
         status=None,
-
         xmit_station=Stations.GBT,
         rcvr_station=None,
-
         latency_ms=latency_calc(
             ui_event_time,
             Stations.GBT,
         ),
-
         message=(
             "GBT transmitting waveform "
             f"{waveform}."

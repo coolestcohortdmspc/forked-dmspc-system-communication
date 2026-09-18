@@ -1,36 +1,21 @@
-from datetime import datetime
-
-import io
 import json
-import os
 import time
-import uuid
-
 from pathlib import Path
-
-import matplotlib
-import matplotlib.pyplot as plt
-import numpy as np
-
 from django.core.management.base import BaseCommand
-
 from confluent_kafka import (
     Consumer,
     KafkaError,
     Producer,
 )
-
 from ngRadar_Website.enums import (
     Stations,
     Status,
     Message,
 )
-
 from ngRadar_Website.utils import (
     bootstrap,
     consumer_group_has_members,
     send_kafka_message,
-    write_transfer_progress,
 )
 
 
@@ -47,15 +32,6 @@ This simulator:
 - Stores the DDM image in SeaweedFS.
 - Sends DSOC state/workflow events to Kafka.
 
-This simulator does NOT write directly to:
-
-- gbtEvent
-- dsocEvent
-- ETransferEvent
-- ObservatoryEvent
-
-The db_consumer is solely responsible for persisting
-Kafka events to ObservatoryEvent.
 """
 
 
@@ -75,25 +51,20 @@ def process_msg(
     producer_topic,
     producer_config,
 ):
-    incoming_key = int(
-        msg.key().decode("utf-8")
-    )
+    incoming_key = int(msg.key().decode("utf-8"))
 
-    payload = json.loads(
-        msg.value().decode("utf-8")
-    )
+    payload = json.loads(msg.value().decode("utf-8"))
 
     if incoming_key == Message.VLBA_TRANSFERRING.value:
         # Add the transfer to the list of active transfers
-        # add two fields in the payload for last_progress_at and received bytes to track when the last progress was made for this transfer
+        # add two fields in the payload for last_progress_at and
+        # received bytes to track when the last progress was made for this transfer
         payload["last_progress_at"] = time.monotonic()
         payload["last_received_bytes"] = 0
         active_transfers.append(payload)
 
     else:
-        print(
-            "Invalid Kafka Message Key!"
-        )
+        print("Invalid Kafka Message Key!")
 
     return True
 
@@ -123,21 +94,13 @@ def progress_consume(
             "enable.auto.commit": False,
         }
 
-    consumer = Consumer(
-        config
-    )
-
-    consumer.subscribe(
-        topic
-    )
-
+    consumer = Consumer(config)
+    consumer.subscribe(topic)
     active_transfers = []
 
     try:
         while True:
-            msg = consumer.poll(
-                1.0
-            )
+            msg = consumer.poll(1.0)
 
             if msg is None:
 
@@ -154,26 +117,18 @@ def progress_consume(
                 for transfer in completed_transfers:
                     active_transfers.remove(transfer)
 
-
                 #     check_transfer_progress(transfer)
-
-
 
                     # if transfer is complete, remove from active transfer list and send kafka message to DSOC that transfer### data is ready for processing
 
                 # continue after checking instantaneous progress for all active transfers
-
-
 
                 continue
 
             if msg.error():
                 error = msg.error()
 
-                if (
-                    error.code()
-                    == KafkaError._PARTITION_EOF
-                ):
+                if (error.code() == KafkaError._PARTITION_EOF):
                     print(
                         "Consumer reached "
                         "partition EOF."
@@ -194,13 +149,8 @@ def progress_consume(
                 producer_config,
             )
 
-            if (
-                manual_commit
-                and succeeded
-            ):
-                consumer.commit(
-                    msg
-                )
+            if (manual_commit and succeeded):
+                consumer.commit(msg)
 
     finally:
         consumer.close()
@@ -330,9 +280,7 @@ class Command(BaseCommand):
         *args,
         **options,
     ):
-        print(
-            "Starting e-transfer progress tracking simulator"
-        )
+        print("Starting e-transfer progress tracking simulator")
 
         (
             producer_topic,
