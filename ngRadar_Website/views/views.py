@@ -131,10 +131,12 @@ def get_dashboard_context(message_number=None):
     ObservatoryEvent is the only source of truth here.
     """
 
-    if(message_number):
+    if message_number is not None:
         records_to_display=message_number
     elif(message_number==None):
         records_to_display=RECORDS_TO_DISPLAY
+    print("Number to Display")
+    print(records_to_display)
 
     latest_events = list(
         ObservatoryEvent.objects
@@ -644,6 +646,7 @@ def dashboard_view(request):
     else:
         message_number = int(request.session.get('message_number', RECORDS_TO_DISPLAY))
 
+    print("VIEW message_number:", message_number)
     context = get_dashboard_context(message_number=message_number)
 
     context['selected_number'] = message_number
@@ -667,14 +670,12 @@ def event_table_partial(request):
     This reads committed ObservatoryEvent rows only.
     """
 
+    message_number = int(request.session.get('message_number', RECORDS_TO_DISPLAY))
 
     return render(
         request,
-        (
-            "ngRadar_Website/"
-            "partials/dashboard_updates.html"
-        ),
-        get_dashboard_context(),
+            "ngRadar_Website/partials/dashboard_updates.html",
+            get_dashboard_context(message_number=message_number),
     )
 
 
