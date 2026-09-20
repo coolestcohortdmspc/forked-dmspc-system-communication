@@ -379,6 +379,51 @@
 
 </div>
 
+<div
+    id="dsoc-image-table-container"
+    class = "mt-4 border rounded pt-3 pb-3 bg-white ps-3 pe-3 mx-auto"
+    style="max-width: 50rem;"
+>
+    <h5 class = "fw-bold text-center">
+         VLBA DDM Images
+    </h5>
+
+    <table class = "table">
+        <thead>
+            <tr>
+                <th> Station</th>
+                <th> Thumbnail</th>
+                <th> Link</th>
+            </tr>
+        </thead>
+        <tbody id="dsoc-image-table-body">
+            {% for event in latest_image_events %}
+                <tr id="ddm-row-{{event.rcvr_station}}">
+                    <td> {{ event.get_rcvr_station_display }} </td>
+                    <td>
+                        <img
+                            src="{% url 'serve_image' event.uuid %}"
+                            alt="DDM thumbnail"
+                            style="max-width: 100px;"
+                        >
+                    </td>
+                    <td>
+                        <a 
+                            href="{% url 'serve_image' event.uuid %}" 
+                            target="_blank"
+                            rel="noopener"
+                            >
+                            View Full Image
+                        </a>
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    
+
+</div>
+
 
 <!-- Reload when returning via browser back/forward cache -->
 <script>

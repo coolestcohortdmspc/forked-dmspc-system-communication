@@ -271,6 +271,8 @@ function updateProgressState(event) {
 }
 
 
+
+
 function formatBytes(bytes) {
     const value =
         Number(bytes || 0);
@@ -485,6 +487,8 @@ document.body.addEventListener(
 );
 
 
+
+
 // A waveform submission starts a new operation.
 // GBT activity confirms that processing has begun.
 
@@ -515,3 +519,5 @@ document.body.addEventListener(
     "progressChanged",
     updateProgressState
 );
+
+

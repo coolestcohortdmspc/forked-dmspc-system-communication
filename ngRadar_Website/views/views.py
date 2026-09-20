@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
-#from django.contrib.auth.decorators import login_not_required
+from django.contrib.auth.decorators import login_not_required
 from django.core.cache import cache
 from django.db.models import Avg
 from django.http import (
@@ -79,6 +79,39 @@ def get_latest_image_event():
         .first()
     )
 
+def get_latest_image_events():
+    """
+    Return the most recent events with a SeaweedFS image (from 10 vlba etransfers).
+    """
+
+    vlba_stations = [
+        Stations.HN,
+        Stations.LA,
+        Stations.BR,
+        Stations.OV,
+        Stations.PT,
+        Stations.KP,
+        Stations.SC,
+        Stations.FD,
+        Stations.NL,
+        Stations.MK,]
+
+    events = [] 
+
+    for station in vlba_stations:
+        event = (
+            ObservatoryEvent.objects
+            .filter(rcvr_station=station)
+            .exclude(image_key__isnull=True)
+            .exclude(image_key="")
+            .order_by("-event_time", "-uuid")
+            .first()
+        )
+        if event:
+            events.append(event)
+
+    return events
+
 
 def get_current_waveform():
     """
@@ -121,6 +154,7 @@ def get_home_context():
         "dsoc_event": get_latest_station_event(Stations.DSOC),
         "current_waveform": get_current_waveform(),
         "latest_image_event": get_latest_image_event(),
+        "latest_image_events": get_latest_image_events(),
     }
 
 
@@ -368,8 +402,6 @@ def serve_image(request, uuid):
    
 
     try:
-        create_s3_client(station=Stations.DSOC)
-
         presigned_url = create_presigned_url(event)
         return redirect(presigned_url)
 
@@ -531,7 +563,7 @@ def submit_waveform(request):
 # Authentication
 # ============================================================
 
-#@login_not_required
+@login_not_required
 @cache_control(
     no_cache=True,
     must_revalidate=True,
