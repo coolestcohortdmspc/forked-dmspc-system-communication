@@ -358,31 +358,41 @@ def consume(
             "enable.auto.commit": False,
         }
 
-        consumer = Consumer(config)
+    consumer = Consumer(config)
 
-        consumer.subscribe(topic)
+    consumer.subscribe(topic)
 
     try:
         while True:
-            #consumer polls the topic and prints any incoming messages
-            msg = consumer.poll(1.0) #polls for messages for 1 second
-            
+            msg = consumer.poll(1.0)
+
             if msg is None:
                 continue
 
             if msg.error():
                 error = msg.error()
 
-                if error.code() == KafkaError._PARTITION_EOF:
-                    print("Consumer reached partition EOF")
+                if (error.code() == KafkaError._PARTITION_EOF):
+                    print(
+                        "Consumer reached "
+                        "partition EOF."
+                    )
                     continue
 
-                print("Consumer error:", error)
+                print(
+                    "Consumer error:",
+                    error,
+                )
+
                 break
 
-            succeeded = process_msg(msg, producer_topic, producer_config)
+            succeeded = process_msg(
+                msg,
+                producer_topic,
+                producer_config,
+            )
 
-            if manual_commit and succeeded:
+            if (manual_commit and succeeded):
                 consumer.commit(msg)
 
     finally:
@@ -911,74 +921,7 @@ def etc_send(frame_path):
             return_code,
             process.args,
         )
-def publish_status_obsEvents(station, status, msg):
-      """
-      Function to be used by all sims to publish failure status and message to the ObservatoryEvent database table.
-      """
 
-      data = {
-          "object_id": 30104,
-          "target": "Moretus",
-          "rcvr_station": station,
-          "xmit_station": Stations.GBT,
-          "event_time": datetime.now(timezone.utc),
-          "latency_ms": 0.00,
-          "status": status,
-          "message": msg,
-      }
-
-      try:
-          record = ObservatoryEvent.objects.create(**data)
-          print("Status saved to database successfully.")
-
-      except Exception as e:
-          print(f"Database error: {e}")
-
-def produce(station, topic, config, key, value):
-    delivery_error = None
-
-    def delivery_report(err, msg):
-        nonlocal delivery_error
-
-        if err is not None:
-            delivery_error = err
-
-    try:
-        # creates a new producer instance
-        producer = Producer(config)
-
-        # producing a message to the specified topic 
-        producer.produce(topic, key=key, value=value, callback=delivery_report)
-
-        # Give Kafka a limited amount of time to deliver the message
-        remaining = producer.flush(2)
-
-        if delivery_error is not None:
-            publish_status_obsEvents(
-                station=station,
-                status=Status.FAILED,
-                msg=f"{delivery_error}",
-            )
-            return False
-
-        if remaining > 0:
-            publish_status_obsEvents(
-                station=station,
-                status=Status.FAILED,
-                msg="Kafka broker did not respond.",
-            )
-            return False
-
-        print(f"Produced message to topic {topic} with key {key}.")
-        return True
-
-    except Exception as exc:
-        publish_status_obsEvents(
-            station=station,
-            status=Status.FAILED,
-            msg=f"{exc}",
-        )
-        return False
 
 # =============================================================
 # FILE / STORAGE HELPERS

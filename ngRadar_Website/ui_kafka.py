@@ -36,7 +36,7 @@ def consume_ui_events():
 
     consumer_config = {
         "bootstrap.servers": os.getenv(
-            "BOOTSTRAP_SERVER",
+            "KAFKA_BOOTSTRAP_SERVERS",
             "kafka-broker:29092",
         ),
         "group.id": os.getenv(

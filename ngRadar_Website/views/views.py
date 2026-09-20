@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
-from django.contrib.auth.decorators import login_not_required
+#from django.contrib.auth.decorators import login_not_required
 from django.core.cache import cache
 from django.db.models import Avg
 from django.http import (
@@ -391,7 +391,7 @@ def serve_image(request, uuid):
 
 @require_GET
 def lock_status(request):
-    """
+    """status_partial
     Submission lock fallback endpoint.
 
     A submission remains locked until a DSOC COMPLETED
@@ -531,7 +531,7 @@ def submit_waveform(request):
 # Authentication
 # ============================================================
 
-@login_not_required
+#@login_not_required
 @cache_control(
     no_cache=True,
     must_revalidate=True,

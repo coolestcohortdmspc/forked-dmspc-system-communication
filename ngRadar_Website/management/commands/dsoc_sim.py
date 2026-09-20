@@ -213,151 +213,151 @@ def verify_incoming_transfer(
 # E-TRANSFER PROGRESS
 # =============================================================
 
-def track_etransfer_progress(
-    payload,
-    incoming_file: Path,
-):
-    """
-    Track bytes arriving from VLBA.
+# def track_etransfer_progress(
+#     payload,
+#     incoming_file: Path,
+# ):
+#     """
+#     Track bytes arriving from VLBA.
 
-    This no longer checks ETransferEvent to decide whether the
-    transfer should continue. Kafka/workflow state and the actual
-    incoming file are now the source of truth.
-    """
+#     This no longer checks ETransferEvent to decide whether the
+#     transfer should continue. Kafka/workflow state and the actual
+#     incoming file are now the source of truth.
+#     """
 
-    transfer_uuid = payload[
-        "transfer_uuid"
-    ]
+#     transfer_uuid = payload[
+#         "transfer_uuid"
+#     ]
 
-    station = payload["station"]
-    vlba_station = Stations(station)
+#     station = payload["station"]
+#     vlba_station = Stations(station)
 
-    num_bytes = int(
-        payload["num_bytes"]
-    )
+#     num_bytes = int(
+#         payload["num_bytes"]
+#     )
 
-    if num_bytes <= 0:
-        raise ValueError(
-            "Expected transfer size must "
-            "be greater than zero."
-        )
+#     if num_bytes <= 0:
+#         raise ValueError(
+#             "Expected transfer size must "
+#             "be greater than zero."
+#         )
 
-    received_bytes = 0
+#     received_bytes = 0
 
-    # Reset the progress display.
-    write_transfer_progress(
-        received_bytes=0,
-        total_bytes=num_bytes,
-        percent=0,
-        transfer_id=str(
-            transfer_uuid
-        ),
-    )
+#     # Reset the progress display.
+#     write_transfer_progress(
+#         received_bytes=0,
+#         total_bytes=num_bytes,
+#         percent=0,
+#         transfer_id=str(
+#             transfer_uuid
+#         ),
+#     )
 
-    print(
-        "Transfer in progress..."
-    )
+#     print(
+#         "Transfer in progress..."
+#     )
 
-    last_progress_at = (
-        time.monotonic()
-    )
+#     last_progress_at = (
+#         time.monotonic()
+#     )
 
-    while True:
+#     while True:
 
-        if incoming_file.exists():
-            current_bytes = (
-                incoming_file
-                .stat()
-                .st_size
-            )
+#         if incoming_file.exists():
+#             current_bytes = (
+#                 incoming_file
+#                 .stat()
+#                 .st_size
+#             )
 
-            if (
-                current_bytes
-                > received_bytes
-            ):
-                last_progress_at = (
-                    time.monotonic()
-                )
+#             if (
+#                 current_bytes
+#                 > received_bytes
+#             ):
+#                 last_progress_at = (
+#                     time.monotonic()
+#                 )
 
-            received_bytes = (
-                current_bytes
-            )
+#             received_bytes = (
+#                 current_bytes
+#             )
 
-            percent = (
-                received_bytes
-                / num_bytes
-                * 100
-            )
+#             percent = (
+#                 received_bytes
+#                 / num_bytes
+#                 * 100
+#             )
 
-            write_transfer_progress(
-                received_bytes=(
-                    received_bytes
-                ),
-                total_bytes=num_bytes,
-                percent=f"{percent:.1f}",
-                transfer_id=str(
-                    transfer_uuid
-                ),
-            )
+#             write_transfer_progress(
+#                 received_bytes=(
+#                     received_bytes
+#                 ),
+#                 total_bytes=num_bytes,
+#                 percent=f"{percent:.1f}",
+#                 transfer_id=str(
+#                     transfer_uuid
+#                 ),
+#             )
 
-        if (
-            received_bytes
-            >= num_bytes
-        ):
-            print(
-                "Transfer of "
-                f"<{transfer_uuid}.bin> "
-                "COMPLETE."
-            )
+#         if (
+#             received_bytes
+#             >= num_bytes
+#         ):
+#             print(
+#                 "Transfer of "
+#                 f"<{transfer_uuid}.bin> "
+#                 "COMPLETE."
+#             )
 
-            break
+#             break
 
-        # -----------------------------------------------------
-        # No bytes have arrived recently.
-        #
-        # Ask Kafka whether the VLBA consumer is still alive.
-        # -----------------------------------------------------
-        if (
-            time.monotonic()
-            - last_progress_at
-            > STALL_TIMEOUT_SECONDS
-        ):
-            vlba_consumer_group = (
-                f"{vlba_station.name.lower()}"
-                "-consumer-group"
-            )
+#         # -----------------------------------------------------
+#         # No bytes have arrived recently.
+#         #
+#         # Ask Kafka whether the VLBA consumer is still alive.
+#         # -----------------------------------------------------
+#         if (
+#             time.monotonic()
+#             - last_progress_at
+#             > STALL_TIMEOUT_SECONDS
+#         ):
+#             vlba_consumer_group = (
+#                 f"{vlba_station.name.lower()}"
+#                 "-consumer-group"
+#             )
 
-            if consumer_group_has_members(
-                vlba_consumer_group
-            ):
-                # VLBA is alive. The transfer may
-                # simply be slow.
-                last_progress_at = (
-                    time.monotonic()
-                )
+#             if consumer_group_has_members(
+#                 vlba_consumer_group
+#             ):
+#                 # VLBA is alive. The transfer may
+#                 # simply be slow.
+#                 last_progress_at = (
+#                     time.monotonic()
+#                 )
 
-            else:
-                vlba_station = Stations(station)
-                raise RuntimeError(
-                    f"{vlba_station.label} "
-                    "went offline "
-                    "mid-transfer. "
-                    "Transfer interrupted."
-                )
+#             else:
+#                 vlba_station = Stations(station)
+#                 raise RuntimeError(
+#                     f"{vlba_station.label} "
+#                     "went offline "
+#                     "mid-transfer. "
+#                     "Transfer interrupted."
+#                 )
 
-        time.sleep(0.5)
+#         time.sleep(0.5)
 
-    if (
-        received_bytes
-        != num_bytes
-    ):
-        raise ValueError(
-            "Transfer progress halted "
-            "before all expected bytes "
-            "were received."
-        )
+#     if (
+#         received_bytes
+#         != num_bytes
+#     ):
+#         raise ValueError(
+#             "Transfer progress halted "
+#             "before all expected bytes "
+#             "were received."
+#         )
 
-    return received_bytes
+#     return received_bytes
 
 
 # =============================================================

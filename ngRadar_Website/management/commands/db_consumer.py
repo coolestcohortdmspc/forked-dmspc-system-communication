@@ -125,16 +125,23 @@ class Command(BaseCommand):
     help = "Consume Kafka domain events and persist them to ObservatoryEvent."
 
     def handle(self, *args, **options):
-        topics = os.getenv(
-            "DB_KAFKA_TOPICS",
-            "GBT_notif,VLBA_notif,DSOC_notif",
-        ).split(",")
+        bootstrap_servers = os.environ["KAFKA_BOOTSTRAP_SERVERS"]
+
+        topics = [
+            topic.strip()
+            for topic in os.getenv(
+                "DB_KAFKA_TOPICS",
+                (
+                    "GBT_notif,"
+                    "VLBA_notif,"
+                    "DSOC_notif"
+                ),
+            ).split(",")
+            if topic.strip()
+        ]
 
         consumer_config = {
-            "bootstrap.servers": os.getenv(
-                "BOOTSTRAP_SERVER",
-                "kafka-broker:29092",
-            ),
+            "bootstrap.servers": bootstrap_servers,
             "group.id": os.getenv(
                 "DB_KAFKA_GROUP_ID",
                 "ngradar-db",
@@ -144,18 +151,19 @@ class Command(BaseCommand):
         }
 
         producer_config = {
-            "bootstrap.servers": os.getenv(
-                "BOOTSTRAP_SERVER",
-                "kafka-broker:29092",
-            ),
+            "bootstrap.servers": bootstrap_servers,
             "message.max.bytes": MAX_BYTES,
             "message.timeout.ms": 2000,
-            "client.id": "db-consumer-producer",
+            "client.id":
+                "db-consumer-producer",
         }
 
         self.stdout.write(
             self.style.SUCCESS(
-                f"Starting DB consumer for topics: {topics}"
+                "DB consumer starting\n"
+                f"  brokers: {bootstrap_servers}\n"
+                f"  topics: {topics}\n"
+                "  group: ngradar-db"
             )
         )
 
