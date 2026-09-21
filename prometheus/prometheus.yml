@@ -12,16 +12,25 @@ scrape_configs:
   - job_name: "traefik"
     static_configs:
       - targets:
-          - "traefik-metrics:8082"  # allow prometheus to scrape website
+          - "traefik-metrics:8082"
 
   - job_name: "postgres"
     static_configs:
       - targets:
-          - "postgres_exporter:9187"  # allow prometheus to scrape postgres 
+          - "postgres_exporter:9187"
 
-  - job_name: "kafka"
+  # Kafka cluster-level metrics:
+  # topics, partitions, consumer groups, offsets, lag, broker count
+  - job_name: "kafka-exporter"
     static_configs:
       - targets:
-            - "kafka-node-1:7071"   # allow prometheus to scrape kafka metrics such as topics / partitions / consumer groups / lag
-            - "kafka-node-2:7071"
-            - "kafka-node-3:7071"
+          - "kafka-exporter:9308"
+
+  # Kafka broker-level JMX metrics:
+  # throughput, replication, controller and JVM/broker health
+  - job_name: "kafka-jmx"
+    static_configs:
+      - targets:
+          - "kafka-node-1:7071"
+          - "kafka-node-2:7071"
+          - "kafka-node-3:7071"
