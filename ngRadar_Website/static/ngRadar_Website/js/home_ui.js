@@ -270,6 +270,114 @@ function updateProgressState(event) {
     }
 }
 
+// build one blank row that looks right 
+function createDdmRow(stationId) {
+    const body = 
+        document.getElementById(
+            "dsoc-image-table-body"
+        );
+        
+    if (!body) {
+        return null;
+    }
+
+    const row =
+        document.createElement(
+            "tr"
+        );
+
+    row.id =
+        `ddm-row-${stationId}`;
+
+    row.innerHTML = `
+        <td>
+            Station ${stationId}
+        </td>
+        <td>
+            <img
+                class="ddm-thumbnail"
+                alt="DDM thumbnail"
+                style="max-width: 100px;"
+            />
+        </td>
+        <td>
+            <a
+                class="ddm-link"
+                target="_blank"
+                rel = "noopener"
+                >
+                View Full image
+
+            </a>
+        </td>
+    `;
+
+    body.appendChild(row);
+
+    return row;
+}
+
+// decide if update is relevant (has an image)
+// find station if belong to, find that row and update it 
+function updateDdmTable(event) {
+    const data = event.detail;
+    // for debugging:
+    // console.log("[Home] DDM event:", data.image_key, data.rcvr_station);
+
+    if (!data.image_key) {
+        return;
+    }
+
+    // for debugging:
+    const stationId = Number(data.rcvr_station);
+
+    if (!stationId) {
+        return;
+    }
+
+    let row =
+        document.getElementById(
+            `ddm-row-${stationId}`
+        );
+
+    // for debugging:
+    // console.log("[Home] row found?", row);
+
+    // build a new row if not exist (when some of vlba stations have not submitted any image yet)
+    if (!row) {
+        row = createDdmRow(
+            stationId
+        );
+    }
+
+    if (!row) {
+        return;
+    }
+
+    const imageUrl = 
+        `/home/image/${data.event_uuid}/`;
+
+    const img =
+        row.querySelector(
+            ".ddm-thumbnail"
+        );
+
+    // for debugging:
+    // console.log("[Home] img element found?", img);
+
+    if (img) {
+        img.src = imageUrl;
+    }
+    
+    const link =
+        row.querySelector(
+            ".ddm-link"
+        );
+
+    if (link) {
+        link.href = imageUrl;
+    }
+}
 
 function formatBytes(bytes) {
     const value =
@@ -369,6 +477,7 @@ function showDsocImage(data) {
             "DDM updated from DSOC";
     }
 }
+
 
 
 // =========================================================
@@ -485,6 +594,8 @@ document.body.addEventListener(
 );
 
 
+
+
 // A waveform submission starts a new operation.
 // GBT activity confirms that processing has begun.
 
@@ -514,4 +625,20 @@ document.body.addEventListener(
 document.body.addEventListener(
     "progressChanged",
     updateProgressState
+);
+
+document.body.addEventListener(
+    "observatoryEventCreated",
+    updateDdmTable
+);
+
+document.body.addEventListener(
+    "observatoryEventCreated",
+    (event) =>{
+        const data = event.detail;
+
+        if(data.image_key){
+            showDsocImage(data);
+        }
+    }
 );
