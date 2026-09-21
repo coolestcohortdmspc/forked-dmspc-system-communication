@@ -402,6 +402,7 @@
                     <td> {{ event.get_rcvr_station_display }} </td>
                     <td>
                         <img
+                            class="ddm-thumbnail"
                             src="{% url 'serve_image' event.uuid %}"
                             alt="DDM thumbnail"
                             style="max-width: 100px;"
@@ -409,6 +410,7 @@
                     </td>
                     <td>
                         <a 
+                            class="ddm-link"
                             href="{% url 'serve_image' event.uuid %}" 
                             target="_blank"
                             rel="noopener"
