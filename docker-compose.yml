@@ -854,7 +854,7 @@ services:
       - "traefik.http.routers.seaweedfs.entrypoints=${HTTP_ENTRYPOINT:-web}"
       - "traefik.http.routers.seaweedfs.service=seaweedfs"
       - "traefik.http.routers.seaweedfs.tls=${TLS:-false}" #false when local, true on droplet
-      - "${CERTRESOLVER}" # reads dummy label when local, and certificate resolver when deployed on droplets with HTTPS
+      - "${SEAWEEDFS_CERTRESOLVER}" # reads dummy label when local, and certificate resolver when deployed on droplets with HTTPS
       - "traefik.http.services.seaweedfs.loadbalancer.server.port=8333"
 
 
