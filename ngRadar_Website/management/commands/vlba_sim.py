@@ -147,7 +147,7 @@ def process_msg(
                 rec_waveform=rec_waveform,
                 num_bytes=num_bytes,
                 filename=frame_path.name,
-                xmit_station=STATION,
+                xmit_station=STATION, #NOTE fix this? test first...
                 rcvr_station=Stations.DSOC,
                 message=(
                     "VLBA requested a storage "
