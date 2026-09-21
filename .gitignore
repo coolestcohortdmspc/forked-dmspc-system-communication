@@ -11,3 +11,5 @@ env/
 mock_assets/progress.json
 .coverage
 letsencrypt
+# JetBrains IDE files
+.idea/

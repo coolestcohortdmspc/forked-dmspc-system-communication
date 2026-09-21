@@ -35,11 +35,9 @@ with patch("pathlib.Path.read_text", return_value=mock_env_data):
         etc_send,
         watch_for_file,
         produce,
-        record_transfer_event,
         send_kafka_message,
         get_folder_size,
         write_transfer_progress,
-        publish_status_obsEvents,
         upload_seaweedfs,
 
     )
