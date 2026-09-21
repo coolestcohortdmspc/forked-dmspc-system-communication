@@ -39,6 +39,7 @@ with patch("pathlib.Path.read_text", return_value=mock_env_data):
         get_folder_size,
         write_transfer_progress,
         upload_seaweedfs,
+        MAX_BYTES
 
     )
 
@@ -106,8 +107,6 @@ def test_latency_calc_gbt(seconds, expected):
 # 2. config_func
 # ==============================================================================
 
-# NOTE I attempted to make these two scenarios into one test with parametrize, but because they have a different number of variables/outputs, it was too awkward
-
 def test_config_func_GBT():
     """Scenario 1: sim is GBT"""
     sim = Stations.GBT
@@ -115,35 +114,36 @@ def test_config_func_GBT():
 
     producer_topic, producer_config, consumer_topic, consumer_config = config_func(sim, bootstrap)
 
-    assert producer_topic == "GBT_data"
+    assert producer_topic == "GBT_notif"
     assert producer_config == {
-            "bootstrap.servers": bootstrap,
-            "client.id": "gbt-producer",
-            "acks": "all",
-            "enable.idempotence": True,
-            "retries": 10,
-            "delivery.timeout.ms": 120000,
-            "request.timeout.ms": 30000,
-            "reconnect.backoff.ms": 100,
-            "reconnect.backoff.max.ms": 10000,
-        }
-    assert consumer_topic == ["user_input"]
+                    "bootstrap.servers": (bootstrap),
+                    "message.max.bytes": (MAX_BYTES),
+                    "message.timeout.ms": 2000,
+                    "client.id": (
+                        f"{sim.name.lower()}"
+                        "-producer"
+                    ),
+                }
+    assert consumer_topic == ["GBT_notif"]
     assert consumer_config == {
-            "bootstrap.servers": bootstrap,
-            "client.id": "gbt-consumer",
-            "group.id": "gbt-consumer-group",
-            "session.timeout.ms": 45000,
-            "heartbeat.interval.ms": 15000,
-            "socket.timeout.ms": 30000,
-            "reconnect.backoff.ms": 100,
-            "reconnect.backoff.max.ms": 10000,
-
-            # Usually useful for clients that must discover changed leaders
-            "topic.metadata.refresh.interval.ms": 300000,
-            "metadata.max.age.ms": 300000,
-
-            "enable.auto.commit": False,
-        }
+                    "bootstrap.servers": (bootstrap),
+                    "client.id": (
+                        f"{sim.name.lower()}"
+                        "-consumer"
+                    ),
+                    "group.id": (
+                        f"{sim.name.lower()}"
+                        "-consumer-group"
+                    ),
+                    "session.timeout.ms": 45000,
+                    "heartbeat.interval.ms": 15000,
+                    "socket.timeout.ms": 30000,
+                    "reconnect.backoff.ms": 100,
+                    "reconnect.backoff.max.ms": 10000,
+                    "topic.metadata.refresh.interval.ms": 300000,
+                    "metadata.max.age.ms": 300000,
+                    "enable.auto.commit": False,
+                }
 
 
 @pytest.mark.parametrize("sim", [
@@ -159,33 +159,37 @@ def test_config_func_VLBA(sim):
 
     assert producer_topic == "VLBA_notif"
     assert producer_config == {
-            "bootstrap.servers": bootstrap,
-            "client.id": f"{sim.name.lower()}-producer",
-            "acks": "all",
-            "enable.idempotence": True,
-            "retries": 10,
-            "delivery.timeout.ms": 120000,
-            "request.timeout.ms": 30000,
-            "reconnect.backoff.ms": 100,
-            "reconnect.backoff.max.ms": 10000,
-        }
-    assert consumer_topic == ["GBT_data", "DSOC_notif"]
+                    "bootstrap.servers": (bootstrap),
+                    "message.max.bytes": (MAX_BYTES),
+                    "message.timeout.ms": 2000,
+                    "client.id": (
+                        f"{sim.name.lower()}"
+                        "-producer"
+                    ),
+                }
+    assert consumer_topic == [
+                    "GBT_notif",
+                    "DSOC_notif",
+                ]
     assert consumer_config == {
-            "bootstrap.servers": bootstrap,
-            "client.id": f"{sim.name.lower()}-consumer",
-            "group.id": f"{sim.name.lower()}-consumer-group",
-            "session.timeout.ms": 45000,
-            "heartbeat.interval.ms": 15000,
-            "socket.timeout.ms": 30000,
-            "reconnect.backoff.ms": 100,
-            "reconnect.backoff.max.ms": 10000,
-
-            # Usually useful for clients that must discover changed leaders
-            "topic.metadata.refresh.interval.ms": 300000,
-            "metadata.max.age.ms": 300000,
-
-            "enable.auto.commit": False,
-        }
+                    "bootstrap.servers": (bootstrap),
+                    "client.id": (
+                        f"{sim.name.lower()}"
+                        "-consumer"
+                    ),
+                    "group.id": (
+                        f"{sim.name.lower()}"
+                        "-consumer-group"
+                    ),
+                    "session.timeout.ms": 45000,
+                    "heartbeat.interval.ms": 15000,
+                    "socket.timeout.ms": 30000,
+                    "reconnect.backoff.ms": 100,
+                    "reconnect.backoff.max.ms": 10000,
+                    "topic.metadata.refresh.interval.ms": 300000,
+                    "metadata.max.age.ms": 300000,
+                    "enable.auto.commit": False,
+                }
 
 
 def test_config_func_DSOC():
@@ -196,36 +200,38 @@ def test_config_func_DSOC():
 
     producer_topic, producer_config, consumer_topic, consumer_config = config_func(sim, bootstrap)
 
-
     assert producer_topic == "DSOC_notif"
     assert producer_config == {
-            "bootstrap.servers": bootstrap,
-            "client.id": f"{sim.name.lower()}-producer",
-            "acks": "all",
-            "enable.idempotence": True,
-            "retries": 10,
-            "delivery.timeout.ms": 120000,
-            "request.timeout.ms": 30000,
-            "reconnect.backoff.ms": 100,
-            "reconnect.backoff.max.ms": 10000,
-        }
-    assert consumer_topic == ["VLBA_notif"]
+                    "bootstrap.servers": (bootstrap),
+                    "message.max.bytes": (MAX_BYTES),
+                    "message.timeout.ms": 2000,
+                    "client.id": (
+                        f"{sim.name.lower()}"
+                        "-producer"
+                    ),
+                }
+    assert consumer_topic == [
+                "VLBA_notif",
+            ]
     assert consumer_config == {
-            "bootstrap.servers": bootstrap,
-            "client.id": f"{sim.name.lower()}-consumer",
-            "group.id": f"{sim.name.lower()}-consumer-group",
-            "session.timeout.ms": 45000,
-            "heartbeat.interval.ms": 15000,
-            "socket.timeout.ms": 30000,
-            "reconnect.backoff.ms": 100,
-            "reconnect.backoff.max.ms": 10000,
-
-            # Usually useful for clients that must discover changed leaders
-            "topic.metadata.refresh.interval.ms": 300000,
-            "metadata.max.age.ms": 300000,
-
-            "enable.auto.commit": False,
-        }
+                    "bootstrap.servers": (bootstrap),
+                    "client.id": (
+                        f"{sim.name.lower()}"
+                        "-consumer"
+                    ),
+                    "group.id": (
+                        f"{sim.name.lower()}"
+                        "-consumer-group"
+                    ),
+                    "session.timeout.ms": 45000,
+                    "heartbeat.interval.ms": 15000,
+                    "socket.timeout.ms": 30000,
+                    "reconnect.backoff.ms": 100,
+                    "reconnect.backoff.max.ms": 10000,
+                    "topic.metadata.refresh.interval.ms": 300000,
+                    "metadata.max.age.ms": 300000,
+                    "enable.auto.commit": False,
+                }
 
     
 def test_config_func_UI():
@@ -236,10 +242,13 @@ def test_config_func_UI():
 
     topic, config = config_func(sim, bootstrap)
 
-    assert topic == "user_input"
+    assert topic == "GBT_notif"
     assert config == {
-            "bootstrap.servers": bootstrap,
-            "client.id": f"{sim.name.lower()}-producer",
+            "bootstrap.servers": (bootstrap),
+            "client.id": (
+                f"{sim.name.lower()}"
+                "-producer"
+            ),
             "acks": "all",
             "enable.idempotence": True,
             "retries": 10,
@@ -248,7 +257,6 @@ def test_config_func_UI():
             "reconnect.backoff.ms": 100,
             "reconnect.backoff.max.ms": 10000,
         }
-
 
 # ==============================================================================
 # 3. bootstrap Test
@@ -333,8 +341,7 @@ def test_bootstrap_none(mock_os_getenv, mock_config_func, mock_load_dotenv):
 # ==============================================================================
 
 @patch("ngRadar_Website.utils.Consumer")
-@patch("ngRadar_Website.utils.publish_status_obsEvents")
-def test_consume_exception(mock_publish, mock_Consumer):
+def test_consume_exception(mock_Consumer):
     """Scenario 1: msg is Not None and error is None on FIRST loop, breaks out with exception on SECOND loop"""
 
     # mock the results of the Consumer and subscribe calls:
@@ -354,20 +361,14 @@ def test_consume_exception(mock_publish, mock_Consumer):
 
     #call the function to use our fake values:
     with pytest.raises(RuntimeError):
-        consume(Stations.GBT, "topic", "config", mock_process_msg)
+        consume("topic", "config", mock_process_msg)
 
     mock_Consumer.assert_called_once_with("config")
     mock_consumer.subscribe.assert_called_once_with("topic")
     mock_process_msg.assert_called_once_with(mock_msg, None, None)
-    mock_publish.assert_called_once_with(
-            station=Stations.GBT,
-            status=Status.FAILED,
-            msg="Waiting to recover Kafka connection...",
-        )
 
 @patch("ngRadar_Website.utils.Consumer")
-@patch("ngRadar_Website.utils.publish_status_obsEvents")
-def test_consume_error(mock_publish, mock_Consumer):
+def test_consume_error(mock_Consumer):
     """Scenario 2: msg is Not None and error is Not None"""
 
     # mock the results of the Consumer and subscribe calls:
@@ -381,20 +382,14 @@ def test_consume_error(mock_publish, mock_Consumer):
     mock_msg.error.return_value = "fake_error"
 
     #call the function to use our fake values:
-    consume(Stations.GBT, "topic", "config", mock_process_msg)
+    consume("topic", "config", mock_process_msg)
 
     mock_Consumer.assert_called_once_with("config")
     mock_consumer.subscribe.assert_called_once_with("topic")
     mock_process_msg.assert_not_called()
-    mock_publish.assert_called_once_with(
-            station=Stations.GBT,
-            status=Status.FAILED,
-            msg="Waiting to recover Kafka connection...",
-        )
 
 @patch("ngRadar_Website.utils.Consumer")
-@patch("ngRadar_Website.utils.publish_status_obsEvents")
-def test_consume_manual(mock_publish, mock_Consumer):
+def test_consume_manual(mock_Consumer):
     """Scenario 3: Manual Commit is True"""
 
     # mock the results of the Consumer and subscribe calls:
@@ -409,20 +404,14 @@ def test_consume_manual(mock_publish, mock_Consumer):
 
     mock_config = MagicMock()
     #call the function to use our fake values:
-    consume(Stations.DSOC, "topic", mock_config, mock_process_msg, manual_commit=True)
+    consume("topic", mock_config, mock_process_msg, manual_commit=True)
 
     mock_Consumer.assert_called_once_with({'enable.auto.commit': False})
     mock_consumer.subscribe.assert_called_once_with("topic")
     mock_process_msg.assert_not_called()
-    mock_publish.assert_called_once_with(
-            station=Stations.DSOC,
-            status=Status.FAILED,
-            msg="Waiting to recover Kafka connection...",
-        )
 
 @patch("ngRadar_Website.utils.Consumer")
-@patch("ngRadar_Website.utils.publish_status_obsEvents")
-def test_consume_partition_error(mock_publish, mock_Consumer, capsys):
+def test_consume_partition_error(mock_Consumer, capsys):
     """Scenario 4: msg is Not None and error is KafkaError._PARTITION_EOF"""
 
     # mock the results of the Consumer and subscribe calls:
@@ -444,17 +433,12 @@ def test_consume_partition_error(mock_publish, mock_Consumer, capsys):
 
     #call the function to use our fake values:
     with pytest.raises(RuntimeError):
-        consume(Stations.PT, "topic", "config", mock_process_msg)
+        consume("topic", "config", mock_process_msg)
 
     captured = capsys.readouterr()
 
     mock_Consumer.assert_called_once_with("config")
     mock_consumer.subscribe.assert_called_once_with("topic")
-    mock_publish.assert_called_once_with(
-            station=Stations.PT,
-            status=Status.FAILED,
-            msg="Waiting to recover Kafka connection...",
-        )
     assert captured.out.strip() == "Consumer reached partition EOF"
 
 # ==============================================================================
