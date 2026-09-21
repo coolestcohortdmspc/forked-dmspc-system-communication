@@ -439,7 +439,7 @@ def test_consume_partition_error(mock_Consumer, capsys):
 
     mock_Consumer.assert_called_once_with("config")
     mock_consumer.subscribe.assert_called_once_with("topic")
-    assert captured.out.strip() == "Consumer reached partition EOF"
+    assert captured.out.strip() == "Consumer reached partition EOF."
 
 # ==============================================================================
 # X. create_file Test
@@ -465,7 +465,7 @@ def test_delete_observation_data_exist(tmp_path):
 
     assert temp_file.exists()
 
-    delete_observation_data(temp_file_name, dir=tmp_path)
+    delete_observation_data(temp_file_name, directory=tmp_path)
 
     assert not temp_file.exists()
 
@@ -473,7 +473,7 @@ def test_delete_observation_data_exist(tmp_path):
 def test_delete_observation_data_not_exist(capsys, tmp_path):
     temp_file_name = "test_fail.bin"
 
-    delete_observation_data(temp_file_name, dir=tmp_path)
+    delete_observation_data(temp_file_name, directory=tmp_path)
 
     captured = capsys.readouterr()
 
@@ -529,8 +529,7 @@ def test_create_s3_client_success(mock_Config, mock_ensure_bucket, mock_boto3):
 @patch("ngRadar_Website.utils.time.sleep")
 @patch("ngRadar_Website.utils.ensure_bucket_exists")
 @patch("ngRadar_Website.utils.Config")
-@patch("ngRadar_Website.utils.publish_status_obsEvents")
-def test_create_s3_client_connection_error(mock_publish, mock_Config, mock_ensure_bucket, mock_sleep, mock_boto3):
+def test_create_s3_client_connection_error(mock_Config, mock_ensure_bucket, mock_sleep, mock_boto3):
     """Scenario 2: connection error"""
     mock_s3 = MagicMock()
     mock_boto3.return_value = mock_s3
@@ -540,8 +539,6 @@ def test_create_s3_client_connection_error(mock_publish, mock_Config, mock_ensur
 
     config_value = "fake_config"
     mock_Config.return_value = config_value
-
-    mock_publish.return_value = None
 
     mock_sleep.return_value = None
 
@@ -555,26 +552,10 @@ def test_create_s3_client_connection_error(mock_publish, mock_Config, mock_ensur
         aws_access_key_id="fake_key",
         aws_secret_access_key="fake_secret",
         region_name="us-east-1",
-                config=config_value
+        config=config_value,
     )
     mock_ensure_bucket.assert_not_called()
     assert mock_s3.list_buckets.call_count == 3
-
-    #just testing the first two calls:
-    first = mock_publish.call_args_list[0]
-    second = mock_publish.call_args_list[1]
-    assert mock_publish.call_count == 3
-    assert first.kwargs == {
-        "station": Stations.GBT,
-        "status": Status.POLLING,
-        "msg": f"Waiting for SeaweedFS... ({0 + 1}/3)",
-    }
-    assert second.kwargs == {
-            "station": Stations.GBT,
-            "status": Status.POLLING,
-            "msg": f"Waiting for SeaweedFS... ({1 + 1}/3)",
-        }
-
 
 @patch.dict(
     "os.environ",
@@ -779,7 +760,7 @@ def test_produce(mock_Producer):
     mock_producer = mock_Producer.return_value
     mock_producer.flush.return_value = 0
 
-    result = produce(Stations.GBT, topic, config, key, value)
+    result = produce(topic, config, key, value)
 
     assert result == True
     mock_Producer.assert_called_once_with(config)
@@ -787,8 +768,7 @@ def test_produce(mock_Producer):
     mock_producer.flush.assert_called_once_with(2)
 
 @patch("ngRadar_Website.utils.Producer")
-@patch("ngRadar_Website.utils.publish_status_obsEvents")
-def test_produce_delivery_error(mock_publish, mock_Producer):
+def test_produce_delivery_error(mock_Producer):
     """Scenario 2: Delivery error"""
     topic = "topic"
     config = "config"
@@ -804,17 +784,15 @@ def test_produce_delivery_error(mock_publish, mock_Producer):
 
     mock_producer.produce.side_effect = produce_side_effect
 
-    result = produce(Stations.DSOC, topic, config, key, value)
+    result = produce(topic, config, key, value)
 
     assert result == False
     mock_Producer.assert_called_once_with(config)
     mock_producer.produce.assert_called_once_with(topic, key=key, value=value, callback=mock_producer.produce.call_args.kwargs["callback"])
     mock_producer.flush.assert_called_once_with(2)
-    mock_publish.assert_called_once_with(station=Stations.DSOC, status=Status.FAILED, msg="Delivery failed")
 
 @patch("ngRadar_Website.utils.Producer")
-@patch("ngRadar_Website.utils.publish_status_obsEvents")
-def test_produce_delivery_flush_error(mock_publish, mock_Producer):
+def test_produce_delivery_flush_error(mock_Producer):
     """Scenario 3: Flush error"""
     topic = "topic"
     config = "config"
@@ -824,17 +802,15 @@ def test_produce_delivery_flush_error(mock_publish, mock_Producer):
     mock_producer = mock_Producer.return_value
     mock_producer.flush.return_value = 1
 
-    result = produce(Stations.PT, topic, config, key, value)
+    result = produce(topic, config, key, value)
 
     assert result == False
     mock_Producer.assert_called_once_with(config)
     mock_producer.produce.assert_called_once_with(topic, key=key, value=value, callback=mock_producer.produce.call_args.kwargs["callback"])
     mock_producer.flush.assert_called_once_with(2)
-    mock_publish.assert_called_once_with(station=Stations.PT, status=Status.FAILED, msg="Kafka broker did not respond.")
 
 @patch("ngRadar_Website.utils.Producer")
-@patch("ngRadar_Website.utils.publish_status_obsEvents")
-def test_produce_delivery_exception(mock_publish, mock_Producer):
+def test_produce_delivery_exception(mock_Producer):
     """Scenario 4: Exception raised"""
     topic = "topic"
     config = "config"
@@ -846,98 +822,56 @@ def test_produce_delivery_exception(mock_publish, mock_Producer):
 
     mock_producer.produce.side_effect = Exception("Kafka Exception")
 
-    result = produce(Stations.HN, topic, config, key, value)
+    result = produce(topic, config, key, value)
 
     assert result == False
     mock_Producer.assert_called_once_with(config)
     mock_producer.produce.assert_called_once_with(topic, key=key, value=value, callback=mock_producer.produce.call_args.kwargs["callback"])
     mock_producer.flush.assert_not_called()
-    mock_publish.assert_called_once_with(station=Stations.HN, status=Status.FAILED, msg="Failed to send Kafka message: Kafka Exception")
-
 
 # ==============================================================================
-# 7. record_transfer_event Test
-# ==============================================================================
-
-@patch("ngRadar_Website.utils.gbtEvent")
-@patch("ngRadar_Website.utils.ETransferEvent")
-def test_record_transfer_event(mock_etr_event, mock_gbt_event):
-
-    mock_gbt_data = MagicMock()
-    mock_gbt_data.object_id = "123"
-    mock_gbt_data.target = "Venus"
-
-    mock_gbt_event.objects.get.return_value = mock_gbt_data
-
-    etr_record = MagicMock()
-    mock_etr_event.objects.create.return_value = etr_record
-
-    record_transfer_event(
-        transfer_uuid="transfer-uuid",
-        gbt_uuid="gbt-uuid",
-        station=Stations.DSOC,
-        status=Status.TRANSFERRED,
-        num_bytes=2048,
-        latency_ms=500,
-        message="Test message")
-
-    mock_gbt_event.objects.get.assert_called_once_with(uuid="gbt-uuid")
-    mock_etr_event.objects.create.assert_called_once_with(
-        transfer_uuid="transfer-uuid",
-        gbt_uuid="gbt-uuid",
-        object_id="123",
-        target="Venus",
-        station=Stations.DSOC,
-        event_time=mock_etr_event.objects.create.call_args[1]['event_time'],
-        latency_ms=500,
-        num_bytes=2048,
-        status=Status.TRANSFERRED,
-        message="Test message")
-
-# ==============================================================================
-# 8. send_kafka_message Test
+# 7. send_kafka_message Test
 # ==============================================================================
 
 @patch("ngRadar_Website.utils.produce")
 @patch("ngRadar_Website.utils.datetime")
-def test_send_kafka_message(mock_datetime, mock_produce):
-    key=1
-    producer_topic="test_topic"
-    producer_config="test_config"
-    transfer_uuid="test_transfer_uuid"
-    gbt_uuid="test_gbt_uuid"
-    status=Status.TRANSFERRING
-    num_bytes=2048
-    filename="mock.filename"
-    station=Stations.GBT
-    message=1
-
-    mock_produce.return_value = None
+@patch("ngRadar_Website.utils.uuid.uuid4")
+def test_send_kafka_message(mock_uuid, mock_datetime, mock_produce):
+    message_type=MagicMock()
 
     fake_datetime = MagicMock()
     fake_datetime.isoformat.return_value = "2026-08-12T12:34:56+00:00"
     mock_datetime.now.return_value = fake_datetime
 
-    send_kafka_message(
-        key=key,
-        producer_topic=producer_topic,
-        producer_config=producer_config,
-        transfer_uuid=transfer_uuid,
-        gbt_uuid=gbt_uuid,
-        status=status,
-        num_bytes=num_bytes,
-        filename=filename, 
-        station=station,
-        message=message,
+    mock_uuid.return_value = "12345"
+
+    event_uuid = send_kafka_message(
+        message_type=message_type,
+        producer_topic="test_topic",
+        producer_config="test_config",
+        station=Stations.GBT,
+        gbt_uuid="test_gbt_uuid",
+        gbt_event_time="2026-08-12T12:34:56+00:00",
+        transfer_uuid="test_transfer_uuid",
+        retry_count=0,
+        status=Status.TRANSFERRING,
+        object_id="test object",
+        target="test target",
+        tx_waveform="Sinewave",
+        rec_waveform="Sinewave",
+        product_type=None,
+        product_id=None,
+        num_bytes=2048,
+        latency_ms=0.0,
+        message="test message",
+        xmit_station=Stations.GBT,
+        rcvr_station=Stations.PT,
+        image_key=None,
+        filename="mock.filename",
     )
 
-    mock_produce.assert_called_once_with(
-        station,
-        producer_topic,
-        producer_config,
-        key,
-        f'{{"transfer_uuid": "test_transfer_uuid", "gbt_uuid": "test_gbt_uuid", "status": 4, "num_bytes": 2048, "filename": "mock.filename", "event_time": "2026-08-12T12:34:56+00:00", "message": 1, "station": {station}}}',
-    )
+    mock_produce.assert_called_once()
+    assert event_uuid == "12345"
 
 
 # ==============================================================================
@@ -1027,59 +961,3 @@ def test_write_transfer_progress(
         "/service/mock_assets/progress.json.tmp",
         "/service/mock_assets/progress.json"
     )
-
-
-# ==============================================================================
-# 11. publish_status_obsEvents Test
-# ==============================================================================
-
-@patch("ngRadar_Website.utils.datetime")
-@patch("ngRadar_Website.utils.ObservatoryEvent")
-def test_publish_status_obsEvents(mock_obs_event, mock_datetime):
-    """Scenario 1: no errors"""
-    station=Stations.PT
-    status="fake_status"
-    msg="fake_msg"
-
-    fake_datetime = MagicMock()
-    mock_datetime.now.return_value = fake_datetime
-
-    publish_status_obsEvents(station, status, msg)
-
-    mock_datetime.now.assert_called_once_with(timezone.utc)
-    mock_obs_event.objects.create.assert_called_once_with(object_id = 30104,
-                                                          target = "Moretus",
-                                                          rcvr_station = station,
-                                                          xmit_station = Stations.GBT,
-                                                          event_time=fake_datetime, 
-                                                          latency_ms=0.00, 
-                                                          status=status, 
-                                                          message=msg)
-
-@patch("ngRadar_Website.utils.datetime")
-@patch("ngRadar_Website.utils.ObservatoryEvent")
-def test_publish_status_obsEvents_error(mock_obs_event, mock_datetime, capsys):
-    """Scenario 2: database error"""
-    station=Stations.PT
-    status="fake_status"
-    msg="fake_msg"
-
-    fake_datetime = MagicMock()
-    mock_datetime.now.return_value = fake_datetime
-
-    mock_obs_event.objects.create.side_effect = Exception("Database error")
-
-    publish_status_obsEvents(station, status, msg)
-
-    captured=capsys.readouterr()
-
-    mock_datetime.now.assert_called_once_with(timezone.utc)
-    mock_obs_event.objects.create.assert_called_once_with(object_id = 30104,
-                                                          target = "Moretus",
-                                                          rcvr_station = station,
-                                                          xmit_station = Stations.GBT,
-                                                          event_time=fake_datetime, 
-                                                          latency_ms=0.00, 
-                                                          status=status, 
-                                                          message=msg)
-    assert captured.out.strip() == "Database error: Database error"
