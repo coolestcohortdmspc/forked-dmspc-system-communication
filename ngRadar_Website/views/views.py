@@ -44,8 +44,7 @@ logger = logging.getLogger(__name__)
 # Constants
 # ============================================================
 
-RECORDS_TO_DISPLAY = 30
-LAST_RECORDS = 5
+RECORDS_TO_DISPLAY = 10
 
 
 # ============================================================
@@ -158,17 +157,23 @@ def get_home_context():
     }
 
 
-def get_dashboard_context():
+def get_dashboard_context(message_number=None):
     """
     Persisted history for dashboard.html.
 
     ObservatoryEvent is the only source of truth here.
     """
 
+    # use the default value if none is specified from the button
+    if message_number is not None:
+        records_to_display=message_number
+    elif(message_number==None):
+        records_to_display=RECORDS_TO_DISPLAY
+
     latest_events = list(
         ObservatoryEvent.objects
         .order_by("-event_time", "-uuid")
-        [:RECORDS_TO_DISPLAY]
+        [:records_to_display]
     )
 
     avg_latency = (
@@ -648,11 +653,23 @@ def dashboard_view(request):
     """
     Dashboard represents persisted ObservatoryEvent history.
     """
+    #handle requests made from drop down button
+    if request.method == 'POST':
+        message_number = int(request.POST.get('message_number',RECORDS_TO_DISPLAY))
+        #save number from button through page reloads
+        request.session['message_number'] = message_number
+    else:
+        message_number = int(request.session.get('message_number', RECORDS_TO_DISPLAY))
+
+    #send message number back to function
+    context = get_dashboard_context(message_number=message_number)
+
+    context['selected_number'] = message_number
 
     return render(
         request,
         "ngRadar_Website/dashboard.html",
-        get_dashboard_context(),
+        context,
     )
 
 
@@ -668,13 +685,12 @@ def event_table_partial(request):
     This reads committed ObservatoryEvent rows only.
     """
 
+    message_number = int(request.session.get('message_number', RECORDS_TO_DISPLAY))
+
     return render(
         request,
-        (
-            "ngRadar_Website/"
-            "partials/dashboard_updates.html"
-        ),
-        get_dashboard_context(),
+            "ngRadar_Website/partials/dashboard_updates.html",
+            get_dashboard_context(message_number=message_number),
     )
 
 
@@ -683,11 +699,14 @@ def event_table_partial(request):
 # ============================================================
 @require_GET
 def latency_data(request):
+    
+    message_number = int(request.session.get("message_number", RECORDS_TO_DISPLAY))
+
     database_events = (
         ObservatoryEvent.objects
         .exclude(tx_waveform="Tx_OFF")
         .order_by("-event_time")
-        [:RECORDS_TO_DISPLAY]
+        [:message_number]
     )
 
     latest_events = list(
