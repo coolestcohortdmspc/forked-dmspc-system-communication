@@ -33,6 +33,7 @@ from ngRadar_Website.utils import (
     create_s3_client,
     send_kafka_message,
     write_transfer_progress,
+    create_presigned_url,
 )
 
 
@@ -78,6 +79,39 @@ def get_latest_image_event():
         .first()
     )
 
+def get_latest_image_events():
+    """
+    Return the most recent events with a SeaweedFS image (from 10 vlba etransfers).
+    """
+
+    vlba_stations = [
+        Stations.HN,
+        Stations.LA,
+        Stations.BR,
+        Stations.OV,
+        Stations.PT,
+        Stations.KP,
+        Stations.SC,
+        Stations.FD,
+        Stations.NL,
+        Stations.MK,]
+
+    events = [] 
+
+    for station in vlba_stations:
+        event = (
+            ObservatoryEvent.objects
+            .filter(rcvr_station=station)
+            .exclude(image_key__isnull=True)
+            .exclude(image_key="")
+            .order_by("-event_time", "-uuid")
+            .first()
+        )
+        if event:
+            events.append(event)
+
+    return events
+
 
 def get_current_waveform():
     """
@@ -120,6 +154,7 @@ def get_home_context():
         "dsoc_event": get_latest_station_event(Stations.DSOC),
         "current_waveform": get_current_waveform(),
         "latest_image_event": get_latest_image_event(),
+        "latest_image_events": get_latest_image_events(),
     }
 
 
@@ -364,29 +399,11 @@ def serve_image(request, uuid):
         return HttpResponseNotFound(
             "Image not available."
         )
+   
 
     try:
-        bucket = os.environ[
-            "WEED_S3_BUCKET"
-        ]
-
-        s3 = create_s3_client(station=Stations.DSOC)
-
-        # presigned_url = get_presigned_url(s3, event)
-        # return redirect(presigned_url)
-
-        obj = s3.get_object(
-            Bucket=bucket,
-            Key=event.image_key,
-        )
-
-        return HttpResponse(
-            obj["Body"].read(),
-            content_type=obj.get(
-                "ContentType",
-                "image/png",
-            ),
-        )
+        presigned_url = create_presigned_url(event)
+        return redirect(presigned_url)
 
     except Exception as exc:
         logger.exception(
