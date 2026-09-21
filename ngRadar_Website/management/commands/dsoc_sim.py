@@ -67,7 +67,7 @@ MAX_STORAGE_RETRIES = 15
 # DDM IMAGE GENERATION
 # =============================================================
 
-def create_img(station, tx_waveform):
+def create_img(station, tx_waveform, waveform_requester):
     """
     Generate a simulated DSOC DDM product.
     """
@@ -79,7 +79,8 @@ def create_img(station, tx_waveform):
     plt.scatter(x_data,y_data,color="red")
     plt.axhline(0,color="black",linewidth=0.5)
     plt.axvline(0,color="black",linewidth=0.5)
-    plt.title(f"[Station {Stations(station).name}] DDM for {tx_waveform}",size=20)
+    plt.suptitle(f"[Station {Stations(station).name}] DDM for {tx_waveform}",size=20)
+    plt.title(f"Requested by {waveform_requester}")
     plt.xlabel("Doppler Freq (Hz)")
     plt.ylabel("Range (km)")
     plt.grid(True)
@@ -152,6 +153,7 @@ def verify_incoming_transfer(
     expected_num_bytes,
     producer_topic,
     producer_config,
+    waveform_requester,
     gbt_event_time,
     gbt_uuid,
     object_id,
@@ -179,6 +181,7 @@ def verify_incoming_transfer(
                 send_kafka_message(
                     producer_topic=(producer_topic),
                     producer_config=(producer_config),
+                    waveform_requester=waveform_requester,
                     message_type=(Message.STATUS_UPDATE),
                     transfer_uuid=(transfer_uuid),
                     gbt_uuid=gbt_uuid,
@@ -400,6 +403,8 @@ def process_msg(
 
     target = payload.get("target")
 
+    waveform_requester = payload.get("waveform_requester")
+
     tx_waveform = payload.get("tx_waveform")
 
     rec_waveform = payload.get("rec_waveform")
@@ -479,6 +484,7 @@ def process_msg(
                 send_kafka_message(
                     producer_topic=(producer_topic),
                     producer_config=(producer_config),
+                    waveform_requester=waveform_requester,
                     message_type=(Message.DSOC_RESPOND_STORAGE),
                     transfer_uuid=(transfer_uuid),
                     gbt_uuid=gbt_uuid,
@@ -522,6 +528,7 @@ def process_msg(
             send_kafka_message(
                 producer_topic=(producer_topic),
                 producer_config=(producer_config),
+                waveform_requester=waveform_requester,
                 message_type=(Message.DSOC_RESPOND_STORAGE),
                 transfer_uuid=(transfer_uuid),
                 gbt_uuid=gbt_uuid,
@@ -560,6 +567,7 @@ def process_msg(
             send_kafka_message(
                 producer_topic=(producer_topic),
                 producer_config=(producer_config),
+                waveform_requester=waveform_requester,
                 message_type=(Message.DSOC_RESPOND_STORAGE),
                 transfer_uuid=(transfer_uuid),
                 gbt_uuid=gbt_uuid,
@@ -603,6 +611,7 @@ def process_msg(
         send_kafka_message(
             producer_topic=(producer_topic),
             producer_config=(producer_config),
+            waveform_requester=waveform_requester,
             message_type=(Message.STATUS_UPDATE),
             transfer_uuid=(transfer_uuid),
             gbt_uuid=gbt_uuid,
@@ -634,6 +643,7 @@ def process_msg(
 
                 producer_topic=producer_topic,
                 producer_config=producer_config,
+                waveform_requester=waveform_requester,
 
                 gbt_event_time=gbt_event_time,
                 gbt_uuid=gbt_uuid,
@@ -652,6 +662,7 @@ def process_msg(
             send_kafka_message(
                 producer_topic=(producer_topic),
                 producer_config=(producer_config),
+                waveform_requester=waveform_requester,
                 message_type=(Message.STATUS_UPDATE),
                 transfer_uuid=(transfer_uuid),
                 gbt_uuid=gbt_uuid,
@@ -697,7 +708,8 @@ def process_msg(
             image_file, image_num_bytes = (
                 create_img(
                     station,
-                    tx_waveform
+                    tx_waveform,
+                    waveform_requester=waveform_requester
                 )
             )
 
@@ -720,6 +732,7 @@ def process_msg(
             send_kafka_message(
                 producer_topic=(producer_topic),
                 producer_config=(producer_config),
+                waveform_requester=waveform_requester,
                 message_type=(Message.STATUS_UPDATE),
                 transfer_uuid=(transfer_uuid),
                 gbt_uuid=gbt_uuid,
@@ -755,6 +768,7 @@ def process_msg(
         send_kafka_message(
             producer_topic=(producer_topic),
             producer_config=(producer_config),
+            waveform_requester=waveform_requester,
             message_type=(Message.VLBA_DELETE),
             transfer_uuid=(transfer_uuid),
             gbt_uuid=gbt_uuid,

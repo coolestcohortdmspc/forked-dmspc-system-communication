@@ -253,6 +253,7 @@ def get_transfer_progress(
         send_kafka_message(
             producer_topic=producer_topic,
             producer_config=producer_config,
+            waveform_requester=payload["waveform_requester"],
             message_type=Message.PROGRESS_COMPLETE,
             transfer_uuid=transfer_uuid,
             gbt_uuid=payload["gbt_uuid"],

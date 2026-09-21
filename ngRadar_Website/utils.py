@@ -408,6 +408,7 @@ def send_kafka_message(
     message_type,
     producer_topic,
     producer_config,
+    waveform_requester,
     station,
     gbt_uuid=None,
     gbt_event_time=None,
@@ -465,6 +466,11 @@ def send_kafka_message(
         "target": (
             target
             if target is not None
+            else None
+        ),
+        "waveform_requester": (
+            waveform_requester
+            if waveform_requester is not None
             else None
         ),
         "tx_waveform": (

@@ -38,6 +38,7 @@ def test_process_msg(mock_sleep, mock_kafka, mock_uuid, mock_json):
     mock_payload = {
         "tx_waveform": "99",
         "event_time": "2026-07-15T12:00:00+00:00",
+        "waveform_requester": "user",
     }
     mock_json.return_value = mock_payload
 
