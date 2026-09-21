@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
-#from django.contrib.auth.decorators import login_not_required
+from django.contrib.auth.decorators import login_required, login_not_required
 from django.core.cache import cache
 from django.db.models import Avg
 from django.http import (
@@ -474,6 +474,7 @@ def lock_status(request):
 # UI -> Kafka waveform submission
 # ============================================================
 
+@login_required
 @require_POST
 def submit_waveform(request):
     """
@@ -484,9 +485,8 @@ def submit_waveform(request):
     UI -> GBT_notif -> GBT
     """
 
-    waveform = request.POST.get(
-        "waveform"
-    )
+    waveform = request.POST.get("waveform")
+    user = request.user.username
 
     if not waveform:
         messages.error(
@@ -505,16 +505,14 @@ def submit_waveform(request):
 
         producer_topic=producer_topic,
         producer_config=producer_config,
+        waveform_requester=user,
 
         station=Stations.UI,
 
         tx_waveform=waveform,
         rec_waveform=waveform,
 
-        message=(
-            f"User submitted waveform "
-            f"{waveform}."
-        ),
+        message=(f"{user} submitted waveform {waveform}."),
     )
 
     if event_uuid is None:
@@ -546,7 +544,7 @@ def submit_waveform(request):
 # Authentication
 # ============================================================
 
-#@login_not_required
+@login_not_required
 @cache_control(
     no_cache=True,
     must_revalidate=True,

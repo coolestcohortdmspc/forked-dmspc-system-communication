@@ -219,6 +219,7 @@ def test_process_msg_VLBA_REQUEST_STORAGE(
             "gbt_uuid": (gbt_uuid),
             "object_id": str("fake_object_id"),
             "target": str("fake_target"),
+            "waveform_requester": str("user"),
             "tx_waveform": str("fake_tx_waveform"),
             "rec_waveform": str("fake_rec_waveform"),
             "gbt_event_time": str("2026-07-15T12:00:00+00:00"),
@@ -241,6 +242,7 @@ def test_process_msg_VLBA_REQUEST_STORAGE(
     mock_send_kafka_message.assert_called_once_with(
                 producer_topic=(producer_topic),
                 producer_config=(producer_config),
+                waveform_requester=str("user"),
                 message_type=(Message.DSOC_RESPOND_STORAGE),
                 transfer_uuid=(transfer_uuid),
                 gbt_uuid=gbt_uuid,
