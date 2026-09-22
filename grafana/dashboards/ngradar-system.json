@@ -565,7 +565,7 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum by (topic) (rate(kafka_server_brokertopicmetrics_messagesin_total{job=\"kafka\",topic=~\"GBT_notif|VLBA_notif|DSOC_notif|progress_tracking\"}[1m]))",
+                        "expr": "sum by (topic) (rate(kafka_server_brokertopicmetrics_messagesin_total{job=\"kafka-jmx\",topic=~\"GBT_notif|VLBA_notif|DSOC_notif|progress_tracking\"}[1m]))",
                         "instant": false,
                         "legendFormat": "{{topic}}",
                         "range": true
@@ -803,7 +803,7 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(kafka_server_replicamanager_underreplicatedpartitions{job=\"kafka\"})",
+                        "expr": "sum(kafka_server_replicamanager_underreplicatedpartitions{job=\"kafka-jmx\"})",
                         "instant": false,
                         "legendFormat": "under-replicated",
                         "range": true
@@ -889,7 +889,7 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "max(kafka_controller_kafkacontroller_offlinepartitionscount{job=\"kafka\"})",
+                        "expr": "max(kafka_controller_kafkacontroller_offlinepartitionscount{job=\"kafka-jmx\"})",
                         "instant": false,
                         "legendFormat": "offline",
                         "range": true
@@ -975,7 +975,7 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(up{job=\"kafka\"})",
+                        "expr": "sum(up{job=\"kafka-jmx\"})",
                         "instant": false,
                         "legendFormat": "brokers scraped",
                         "range": true
@@ -1065,7 +1065,7 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(rate(kafka_server_brokertopicmetrics_bytesin_total{job=\"kafka\"}[1m]))",
+                        "expr": "sum(rate(kafka_server_brokertopicmetrics_bytesin_total{job=\"kafka-jmx\"}[1m]))",
                         "instant": false,
                         "legendFormat": "in",
                         "range": true
@@ -1087,7 +1087,7 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(rate(kafka_server_brokertopicmetrics_bytesout_total{job=\"kafka\"}[1m]))",
+                        "expr": "sum(rate(kafka_server_brokertopicmetrics_bytesout_total{job=\"kafka-jmx\"}[1m]))",
                         "instant": false,
                         "legendFormat": "out",
                         "range": true
@@ -1206,7 +1206,7 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum by (instance) (rate(kafka_server_brokertopicmetrics_bytesin_total{job=\"kafka\"}[1m]))",
+                        "expr": "sum by (instance) (rate(kafka_server_brokertopicmetrics_bytesin_total{job=\"kafka-jmx\"}[1m]))",
                         "instant": false,
                         "legendFormat": "{{instance}}",
                         "range": true
@@ -1325,7 +1325,7 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum by (instance) (rate(kafka_server_brokertopicmetrics_bytesout_total{job=\"kafka\"}[1m]))",
+                        "expr": "sum by (instance) (rate(kafka_server_brokertopicmetrics_bytesout_total{job=\"kafka-jmx\"}[1m]))",
                         "instant": false,
                         "legendFormat": "{{instance}}",
                         "range": true
@@ -1444,7 +1444,7 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "rate(process_network_receive_bytes_total{job=\"kafka\"}[1m])",
+                        "expr": "rate(process_network_receive_bytes_total{job=\"kafka-jmx\"}[1m])",
                         "instant": false,
                         "legendFormat": "Kafka {{instance}}",
                         "range": true
@@ -1607,7 +1607,7 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "rate(process_network_transmit_bytes_total{job=\"kafka\"}[1m])",
+                        "expr": "rate(process_network_transmit_bytes_total{job=\"kafka-jmx\"}[1m])",
                         "instant": false,
                         "legendFormat": "Kafka {{instance}}",
                         "range": true

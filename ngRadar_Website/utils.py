@@ -34,6 +34,8 @@ from ngRadar_Website.enums import (
     Status,
 )
 
+from ngRadar_Website.models.models import ObservatoryEvent
+
 
 # =============================================================
 # CONSTANTS
@@ -406,6 +408,7 @@ def send_kafka_message(
     message_type,
     producer_topic,
     producer_config,
+    waveform_requester,
     station,
     gbt_uuid=None,
     gbt_event_time=None,
@@ -463,6 +466,11 @@ def send_kafka_message(
         "target": (
             target
             if target is not None
+            else None
+        ),
+        "waveform_requester": (
+            waveform_requester
+            if waveform_requester is not None
             else None
         ),
         "tx_waveform": (
@@ -676,6 +684,24 @@ def ensure_bucket_exists(s3):
         "Bucket created."
     )
 
+# generate a presigned URL for downloading an object from SeaweedFS S3.
+def create_presigned_url(event):
+    bucket = os.environ["WEED_S3_BUCKET"]
+    key = event.image_key 
+
+    return boto3.client(
+        "s3", 
+        aws_access_key_id=os.environ["WEED_S3_ACCESS_KEY"], 
+        aws_secret_access_key=os.environ["WEED_S3_SECRET_KEY"], 
+        endpoint_url=os.environ["WEED_S3_PUBLIC_ENDPOINT"],
+        region_name="us-east-1",
+        config=Config(signature_version="s3v4", s3={"addressing_style": "path"})
+        ).generate_presigned_url(
+
+        'get_object',
+        Params={'Bucket': bucket, 'Key': key},
+        ExpiresIn=3600
+    )
 
 def upload_seaweedfs(s3, image_key, file_data,):
     """

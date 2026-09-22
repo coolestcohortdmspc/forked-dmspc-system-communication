@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
-#from django.contrib.auth.decorators import login_not_required
+from django.contrib.auth.decorators import login_required, login_not_required
 from django.core.cache import cache
 from django.db.models import Avg
 from django.http import (
@@ -33,6 +33,7 @@ from ngRadar_Website.utils import (
     create_s3_client,
     send_kafka_message,
     write_transfer_progress,
+    create_presigned_url,
 )
 
 
@@ -43,8 +44,7 @@ logger = logging.getLogger(__name__)
 # Constants
 # ============================================================
 
-RECORDS_TO_DISPLAY = 30
-LAST_RECORDS = 5
+RECORDS_TO_DISPLAY = 10
 
 
 # ============================================================
@@ -77,6 +77,39 @@ def get_latest_image_event():
         .order_by("-event_time", "-uuid")
         .first()
     )
+
+def get_latest_image_events():
+    """
+    Return the most recent events with a SeaweedFS image (from 10 vlba etransfers).
+    """
+
+    vlba_stations = [
+        Stations.HN,
+        Stations.LA,
+        Stations.BR,
+        Stations.OV,
+        Stations.PT,
+        Stations.KP,
+        Stations.SC,
+        Stations.FD,
+        Stations.NL,
+        Stations.MK,]
+
+    events = [] 
+
+    for station in vlba_stations:
+        event = (
+            ObservatoryEvent.objects
+            .filter(rcvr_station=station)
+            .exclude(image_key__isnull=True)
+            .exclude(image_key="")
+            .order_by("-event_time", "-uuid")
+            .first()
+        )
+        if event:
+            events.append(event)
+
+    return events
 
 
 def get_current_waveform():
@@ -120,20 +153,27 @@ def get_home_context():
         "dsoc_event": get_latest_station_event(Stations.DSOC),
         "current_waveform": get_current_waveform(),
         "latest_image_event": get_latest_image_event(),
+        "latest_image_events": get_latest_image_events(),
     }
 
 
-def get_dashboard_context():
+def get_dashboard_context(message_number=None):
     """
     Persisted history for dashboard.html.
 
     ObservatoryEvent is the only source of truth here.
     """
 
+    # use the default value if none is specified from the button
+    if message_number is not None:
+        records_to_display=message_number
+    elif(message_number==None):
+        records_to_display=RECORDS_TO_DISPLAY
+
     latest_events = list(
         ObservatoryEvent.objects
         .order_by("-event_time", "-uuid")
-        [:RECORDS_TO_DISPLAY]
+        [:records_to_display]
     )
 
     avg_latency = (
@@ -364,29 +404,11 @@ def serve_image(request, uuid):
         return HttpResponseNotFound(
             "Image not available."
         )
+   
 
     try:
-        bucket = os.environ[
-            "WEED_S3_BUCKET"
-        ]
-
-        s3 = create_s3_client(station=Stations.DSOC)
-
-        # presigned_url = get_presigned_url(s3, event)
-        # return redirect(presigned_url)
-
-        obj = s3.get_object(
-            Bucket=bucket,
-            Key=event.image_key,
-        )
-
-        return HttpResponse(
-            obj["Body"].read(),
-            content_type=obj.get(
-                "ContentType",
-                "image/png",
-            ),
-        )
+        presigned_url = create_presigned_url(event)
+        return redirect(presigned_url)
 
     except Exception as exc:
         logger.exception(
@@ -474,6 +496,7 @@ def lock_status(request):
 # UI -> Kafka waveform submission
 # ============================================================
 
+@login_required
 @require_POST
 def submit_waveform(request):
     """
@@ -484,9 +507,8 @@ def submit_waveform(request):
     UI -> GBT_notif -> GBT
     """
 
-    waveform = request.POST.get(
-        "waveform"
-    )
+    waveform = request.POST.get("waveform")
+    user = request.user.username
 
     if not waveform:
         messages.error(
@@ -505,16 +527,14 @@ def submit_waveform(request):
 
         producer_topic=producer_topic,
         producer_config=producer_config,
+        waveform_requester=user,
 
         station=Stations.UI,
 
         tx_waveform=waveform,
         rec_waveform=waveform,
 
-        message=(
-            f"User submitted waveform "
-            f"{waveform}."
-        ),
+        message=(f"{user} submitted waveform {waveform}."),
     )
 
     if event_uuid is None:
@@ -546,7 +566,7 @@ def submit_waveform(request):
 # Authentication
 # ============================================================
 
-#@login_not_required
+@login_not_required
 @cache_control(
     no_cache=True,
     must_revalidate=True,
@@ -633,11 +653,23 @@ def dashboard_view(request):
     """
     Dashboard represents persisted ObservatoryEvent history.
     """
+    #handle requests made from drop down button
+    if request.method == 'POST':
+        message_number = int(request.POST.get('message_number',RECORDS_TO_DISPLAY))
+        #save number from button through page reloads
+        request.session['message_number'] = message_number
+    else:
+        message_number = int(request.session.get('message_number', RECORDS_TO_DISPLAY))
+
+    #send message number back to function
+    context = get_dashboard_context(message_number=message_number)
+
+    context['selected_number'] = message_number
 
     return render(
         request,
         "ngRadar_Website/dashboard.html",
-        get_dashboard_context(),
+        context,
     )
 
 
@@ -653,13 +685,12 @@ def event_table_partial(request):
     This reads committed ObservatoryEvent rows only.
     """
 
+    message_number = int(request.session.get('message_number', RECORDS_TO_DISPLAY))
+
     return render(
         request,
-        (
-            "ngRadar_Website/"
-            "partials/dashboard_updates.html"
-        ),
-        get_dashboard_context(),
+            "ngRadar_Website/partials/dashboard_updates.html",
+            get_dashboard_context(message_number=message_number),
     )
 
 
@@ -668,11 +699,14 @@ def event_table_partial(request):
 # ============================================================
 @require_GET
 def latency_data(request):
+    
+    message_number = int(request.session.get("message_number", RECORDS_TO_DISPLAY))
+
     database_events = (
         ObservatoryEvent.objects
         .exclude(tx_waveform="Tx_OFF")
         .order_by("-event_time")
-        [:RECORDS_TO_DISPLAY]
+        [:message_number]
     )
 
     latest_events = list(

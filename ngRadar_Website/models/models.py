@@ -24,6 +24,7 @@ class ObservatoryEvent(models.Model):
         blank=True,
         null=True,
     )
+    waveform_requester = models.CharField(max_length=100, blank=True, null=True)
     tx_waveform = models.CharField(max_length=100, blank=True, null=True)
     rec_waveform = models.CharField(max_length=100, blank=True, null=True)
     product_type = models.CharField(max_length=50, blank=True, null=True)

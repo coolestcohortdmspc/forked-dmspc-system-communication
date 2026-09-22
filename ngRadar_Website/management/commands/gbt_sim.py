@@ -35,6 +35,7 @@ def process_msg(
     payload = json.loads(msg.value().decode("utf-8"))
 
     waveform = payload["tx_waveform"]
+    waveform_requester = payload["waveform_requester"]
 
     ui_event_time = (
         datetime.fromisoformat(
@@ -62,6 +63,7 @@ def process_msg(
         message_type=(Message.STATUS_UPDATE),
         producer_topic=producer_topic,
         producer_config=producer_config,
+        waveform_requester=waveform_requester,
         station=Stations.GBT,
         gbt_uuid=gbt_uuid,
         object_id="30104",
@@ -101,6 +103,7 @@ def process_msg(
         message_type=(Message.GBT_TX),
         producer_topic=producer_topic,
         producer_config=producer_config,
+        waveform_requester=waveform_requester,
         station=Stations.GBT,
         gbt_uuid=gbt_uuid,
         gbt_event_time=(gbt_event_time.isoformat()),

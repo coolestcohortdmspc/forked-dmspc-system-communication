@@ -32,7 +32,8 @@ def test_create_img_output():
     """Ensure the function returns a BytesIO object with non-zero content."""
     station = 94
     tx_waveform = "SineWave"
-    img_file, num_bytes = create_img(station, tx_waveform)
+    waveform_requester = "user"
+    img_file, num_bytes = create_img(station, tx_waveform, waveform_requester=waveform_requester)
     
     assert isinstance(img_file, bytes)
     assert num_bytes > 0
@@ -113,6 +114,7 @@ def test_verify_incoming_transfer_success(mock_sleep, mock_kafka):
     gbt_uuid = "gbt uuid"
     object_id = "object_id"
     target = "target"
+    waveform_requester = "user"
     tx_waveform = "SineWave"
     rec_waveform = "SineWave"
     filename = "fake_filename.png"
@@ -125,6 +127,7 @@ def test_verify_incoming_transfer_success(mock_sleep, mock_kafka):
         expected_num_bytes=expected_num_bytes,
         producer_topic=producer_topic,
         producer_config=producer_config,
+        waveform_requester=waveform_requester,
         gbt_event_time=gbt_event_time,
         gbt_uuid=gbt_uuid,
         object_id=object_id,
@@ -152,6 +155,7 @@ def test_verify_incoming_transfer_nofile(mock_sleep):
     gbt_uuid = "gbt uuid"
     object_id = "object_id"
     target = "target"
+    waveform_requester = "user"
     tx_waveform = "SineWave"
     rec_waveform = "SineWave"
     filename = "fake_filename.png"
@@ -165,6 +169,7 @@ def test_verify_incoming_transfer_nofile(mock_sleep):
             expected_num_bytes=expected_num_bytes,
             producer_topic=producer_topic,
             producer_config=producer_config,
+            waveform_requester=waveform_requester,
             gbt_event_time=gbt_event_time,
             gbt_uuid=gbt_uuid,
             object_id=object_id,
@@ -219,6 +224,7 @@ def test_process_msg_VLBA_REQUEST_STORAGE(
             "gbt_uuid": (gbt_uuid),
             "object_id": str("fake_object_id"),
             "target": str("fake_target"),
+            "waveform_requester": str("user"),
             "tx_waveform": str("fake_tx_waveform"),
             "rec_waveform": str("fake_rec_waveform"),
             "gbt_event_time": str("2026-07-15T12:00:00+00:00"),
@@ -241,6 +247,7 @@ def test_process_msg_VLBA_REQUEST_STORAGE(
     mock_send_kafka_message.assert_called_once_with(
                 producer_topic=(producer_topic),
                 producer_config=(producer_config),
+                waveform_requester=str("user"),
                 message_type=(Message.DSOC_RESPOND_STORAGE),
                 transfer_uuid=(transfer_uuid),
                 gbt_uuid=gbt_uuid,
@@ -297,6 +304,7 @@ def test_process_msg_VLBA_REQUEST_STORAGE_Retry(
             "gbt_uuid": (gbt_uuid),
             "object_id": str("fake_object_id"),
             "target": str("fake_target"),
+            "waveform_requester": str("user"),
             "tx_waveform": str("fake_tx_waveform"),
             "rec_waveform": str("fake_rec_waveform"),
             "gbt_event_time": str("2026-07-15T12:00:00+00:00"),
@@ -319,6 +327,7 @@ def test_process_msg_VLBA_REQUEST_STORAGE_Retry(
     mock_send_kafka_message.assert_called_once_with(
                 producer_topic=(producer_topic),
                 producer_config=(producer_config),
+                waveform_requester=str("user"),
                 message_type=(Message.DSOC_RESPOND_STORAGE),
                 transfer_uuid=(transfer_uuid),
                 gbt_uuid=gbt_uuid,
@@ -375,6 +384,7 @@ def test_process_msg_VLBA_REQUEST_STORAGE_Failed(
             "gbt_uuid": (gbt_uuid),
             "object_id": str("fake_object_id"),
             "target": str("fake_target"),
+            "waveform_requester": str("user"),
             "tx_waveform": str("fake_tx_waveform"),
             "rec_waveform": str("fake_rec_waveform"),
             "gbt_event_time": str("2026-07-15T12:00:00+00:00"),
@@ -397,6 +407,7 @@ def test_process_msg_VLBA_REQUEST_STORAGE_Failed(
     mock_send_kafka_message.assert_called_once_with(
                 producer_topic=(producer_topic),
                 producer_config=(producer_config),
+                waveform_requester=str("user"),
                 message_type=(Message.DSOC_RESPOND_STORAGE),
                 transfer_uuid=(transfer_uuid),
                 gbt_uuid=gbt_uuid,
@@ -467,6 +478,7 @@ def test_process_msg_Message_PROGRESS_COMPLETE_value_success(
             "gbt_uuid": (gbt_uuid),
             "object_id": str("fake_object_id"),
             "target": str("fake_target"),
+            "waveform_requester": str("user"),
             "tx_waveform": str("fake_tx_waveform"),
             "rec_waveform": str("fake_rec_waveform"),
             "gbt_event_time": str("2026-07-15T12:00:00+00:00"),
@@ -501,6 +513,7 @@ def test_process_msg_Message_PROGRESS_COMPLETE_value_success(
                     expected_num_bytes=mock_payload["num_bytes"],
                     producer_topic=producer_topic,
                     producer_config=producer_config,
+                    waveform_requester=str("user"),
                     gbt_event_time=str("2026-07-15T12:00:00+00:00"),
                     gbt_uuid=gbt_uuid,
                     object_id=str("fake_object_id"),
@@ -511,7 +524,7 @@ def test_process_msg_Message_PROGRESS_COMPLETE_value_success(
                     transfer_uuid=transfer_uuid,
                 )      
     mock_latency.assert_called_once_with(datetime.fromisoformat("2026-07-15T12:00:00+00:00"), Stations.DSOC)
-    mock_create_img.assert_called_once_with(Stations.PT, str("fake_tx_waveform"))
+    mock_create_img.assert_called_once_with(Stations.PT, str("fake_tx_waveform"), waveform_requester=str("user"))
     mock_uuid.assert_called_once()
     mock_save_img.assert_called_once_with(
                     str("fake_target"),
@@ -522,6 +535,7 @@ def test_process_msg_Message_PROGRESS_COMPLETE_value_success(
         call(
             producer_topic=(producer_topic),
             producer_config=(producer_config),
+            waveform_requester=str("user"),
             message_type=(Message.STATUS_UPDATE),
             transfer_uuid=(transfer_uuid),
             gbt_uuid=gbt_uuid,
@@ -544,6 +558,7 @@ def test_process_msg_Message_PROGRESS_COMPLETE_value_success(
         call(
             producer_topic=(producer_topic),
             producer_config=(producer_config),
+            waveform_requester=str("user"),
             message_type=(Message.VLBA_DELETE),
             transfer_uuid=(transfer_uuid),
             gbt_uuid=gbt_uuid,
@@ -619,6 +634,7 @@ def test_process_msg_PROGRESS_COMPLETE_verificationFAILED(
             "gbt_uuid": (gbt_uuid),
             "object_id": str("fake_object_id"),
             "target": str("fake_target"),
+            "waveform_requester": str("user"),
             "tx_waveform": str("fake_tx_waveform"),
             "rec_waveform": str("fake_rec_waveform"),
             "gbt_event_time": str("2026-07-15T12:00:00+00:00"),
@@ -643,6 +659,7 @@ def test_process_msg_PROGRESS_COMPLETE_verificationFAILED(
                 expected_num_bytes=mock_payload["num_bytes"],
                 producer_topic=producer_topic,
                 producer_config=producer_config,
+                waveform_requester=str("user"),
                 gbt_event_time=str("2026-07-15T12:00:00+00:00"),
                 gbt_uuid=gbt_uuid,
                 object_id=str("fake_object_id"),
@@ -661,6 +678,7 @@ def test_process_msg_PROGRESS_COMPLETE_verificationFAILED(
             call(
                 producer_topic=(producer_topic),
                 producer_config=(producer_config),
+                waveform_requester=str("user"),
                 message_type=(Message.STATUS_UPDATE),
                 transfer_uuid=(transfer_uuid),
                 gbt_uuid=gbt_uuid,
@@ -683,6 +701,7 @@ def test_process_msg_PROGRESS_COMPLETE_verificationFAILED(
             call(
                 producer_topic=(producer_topic),
                 producer_config=(producer_config),
+                waveform_requester=str("user"),
                 message_type=(Message.STATUS_UPDATE),
                 transfer_uuid=(transfer_uuid),
                 gbt_uuid=gbt_uuid,
@@ -747,6 +766,7 @@ def test_process_msg_PROGRESS_COMPLETE_processingFAILED(
             "gbt_uuid": (gbt_uuid),
             "object_id": str("fake_object_id"),
             "target": str("fake_target"),
+            "waveform_requester": str("user"),
             "tx_waveform": str("fake_tx_waveform"),
             "rec_waveform": str("fake_rec_waveform"),
             "gbt_event_time": str("2026-07-15T12:00:00+00:00"),
@@ -781,6 +801,7 @@ def test_process_msg_PROGRESS_COMPLETE_processingFAILED(
                     expected_num_bytes=mock_payload["num_bytes"],
                     producer_topic=producer_topic,
                     producer_config=producer_config,
+                    waveform_requester=str("user"),
                     gbt_event_time=str("2026-07-15T12:00:00+00:00"),
                     gbt_uuid=gbt_uuid,
                     object_id=str("fake_object_id"),
@@ -791,7 +812,7 @@ def test_process_msg_PROGRESS_COMPLETE_processingFAILED(
                     transfer_uuid=transfer_uuid,
                 )      
     mock_latency.assert_called_once_with(datetime.fromisoformat("2026-07-15T12:00:00+00:00"), Stations.DSOC)
-    mock_create_img.assert_called_once_with(Stations.PT, str("fake_tx_waveform"))
+    mock_create_img.assert_called_once_with(Stations.PT, str("fake_tx_waveform"), waveform_requester=str("user"))
     mock_uuid.assert_called_once()
     mock_save_img.assert_called_once_with(
                     str("fake_target"),
@@ -802,6 +823,7 @@ def test_process_msg_PROGRESS_COMPLETE_processingFAILED(
         call(
             producer_topic=(producer_topic),
             producer_config=(producer_config),
+            waveform_requester=str("user"),
             message_type=(Message.STATUS_UPDATE),
             transfer_uuid=(transfer_uuid),
             gbt_uuid=gbt_uuid,
@@ -824,6 +846,7 @@ def test_process_msg_PROGRESS_COMPLETE_processingFAILED(
         call(
             producer_topic=(producer_topic),
             producer_config=(producer_config),
+            waveform_requester=str("user"),
             message_type=(Message.STATUS_UPDATE),
             transfer_uuid=(transfer_uuid),
             gbt_uuid=gbt_uuid,

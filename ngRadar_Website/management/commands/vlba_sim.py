@@ -108,6 +108,8 @@ def process_msg(
 
         target = payload.get("target")
 
+        waveform_requester = payload.get("waveform_requester")
+
         tx_waveform = payload.get("tx_waveform")
 
         rec_waveform = payload.get("rec_waveform")
@@ -135,6 +137,7 @@ def process_msg(
             send_kafka_message(
                 producer_topic=producer_topic,
                 producer_config=producer_config,
+                waveform_requester=waveform_requester,
                 message_type=(Message.VLBA_REQUEST_STORAGE),
                 transfer_uuid=transfer_uuid,
                 gbt_uuid=gbt_uuid,
@@ -167,6 +170,7 @@ def process_msg(
             send_kafka_message(
                 producer_topic=producer_topic,
                 producer_config=producer_config,
+                waveform_requester=waveform_requester,
                 message_type=(Message.VLBA_FAILED),
                 transfer_uuid=transfer_uuid,
                 gbt_uuid=gbt_uuid,
@@ -218,6 +222,7 @@ def process_msg(
         gbt_event_time = payload.get("gbt_event_time")
         object_id = payload.get("object_id")
         target = payload.get("target")
+        waveform_requester = payload.get("waveform_requester")
         tx_waveform = payload.get("tx_waveform")
         rec_waveform = payload.get("rec_waveform")
         num_bytes = int(payload.get(
@@ -265,6 +270,7 @@ def process_msg(
                     send_kafka_message(
                         producer_topic=("progress_tracking"),
                         producer_config=(producer_config),
+                        waveform_requester=waveform_requester,
                         message_type=(Message.VLBA_TRANSFERRING),
                         transfer_uuid=(transfer_uuid),
                         gbt_uuid=gbt_uuid,
@@ -336,6 +342,7 @@ def process_msg(
                     send_kafka_message(
                         producer_topic=(producer_topic),
                         producer_config=(producer_config),
+                        waveform_requester=waveform_requester,
                         message_type=(Message.VLBA_FAILED),
                         transfer_uuid=(transfer_uuid),
                         gbt_uuid=gbt_uuid,
@@ -397,6 +404,7 @@ def process_msg(
                     send_kafka_message(
                         producer_topic=(producer_topic),
                         producer_config=(producer_config),
+                        waveform_requester=waveform_requester,
                         message_type=(Message.VLBA_FAILED),
                         transfer_uuid=(transfer_uuid),
                         gbt_uuid=gbt_uuid,
@@ -444,6 +452,7 @@ def process_msg(
             send_kafka_message(
                 producer_topic=producer_topic,
                 producer_config=producer_config,
+                waveform_requester=waveform_requester,
                 message_type=(Message.VLBA_REQUEST_STORAGE),
                 retry_count=retry_count,
                 transfer_uuid=transfer_uuid,

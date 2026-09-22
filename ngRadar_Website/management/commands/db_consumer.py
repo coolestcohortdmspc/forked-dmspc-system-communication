@@ -78,6 +78,7 @@ def record_obs_event(payload):
                 "transfer_uuid": payload.get("transfer_uuid"),
                 "object_id": payload.get("object_id"),
                 "target": payload.get("target"),
+                "waveform_requester": payload.get("waveform_requester"),
                 "tx_waveform": payload.get("tx_waveform"),
                 "rec_waveform": payload.get("rec_waveform"),
                 "product_type": payload.get("product_type"),
