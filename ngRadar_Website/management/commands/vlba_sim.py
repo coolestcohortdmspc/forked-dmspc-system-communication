@@ -150,8 +150,8 @@ def process_msg(
                 rec_waveform=rec_waveform,
                 num_bytes=num_bytes,
                 filename=frame_path.name,
-                xmit_station=STATION, #NOTE fix this? test first...
-                rcvr_station=Stations.DSOC,
+                xmit_station=Stations.GBT,
+                rcvr_station=STATION,
                 message=(
                     "VLBA requested a storage "
                     "check at DSOC."
@@ -183,8 +183,8 @@ def process_msg(
                 num_bytes=0,
                 filename=frame_path.name,
                 station=STATION,
-                xmit_station=STATION,
-                rcvr_station=Stations.DSOC,
+                xmit_station=Stations.GBT,
+                rcvr_station=STATION,
                 message=(
                     "VLBA source file "
                     "does not exist."
@@ -283,8 +283,8 @@ def process_msg(
                         rec_waveform=(rec_waveform),
                         num_bytes=num_bytes,
                         filename=filename,
-                        xmit_station=(STATION),
-                        rcvr_station=(Stations.DSOC),
+                        xmit_station=Stations.GBT,
+                        rcvr_station=STATION,
                         message=(
                             "Hancock VLBA has "
                             "started sending the "
@@ -355,8 +355,8 @@ def process_msg(
                         rec_waveform=(rec_waveform),
                         num_bytes=num_bytes,
                         filename=filename,
-                        xmit_station=(STATION),
-                        rcvr_station=(Stations.DSOC),
+                        xmit_station=Stations.GBT,
+                        rcvr_station=STATION,
                         message=(failure_message),
                     )
 
@@ -417,8 +417,8 @@ def process_msg(
                         rec_waveform=(rec_waveform),
                         num_bytes=num_bytes,
                         filename=filename,
-                        xmit_station=(STATION),
-                        rcvr_station=(Stations.DSOC),
+                        xmit_station=Stations.GBT,
+                        rcvr_station=STATION,
                         message=(
                             "The e-transfer "
                             "failed unexpectedly "
@@ -466,8 +466,8 @@ def process_msg(
                 rec_waveform=rec_waveform,
                 num_bytes=num_bytes,
                 filename=filename,
-                xmit_station=STATION,
-                rcvr_station=Stations.DSOC,
+                xmit_station=Stations.GBT,
+                rcvr_station=STATION,
                 message=(
                     "Waiting for DSOC "
                     "storage availability."
