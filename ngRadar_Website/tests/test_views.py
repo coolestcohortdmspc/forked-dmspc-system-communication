@@ -9,6 +9,7 @@ from django.urls import reverse
 from django.http import HttpResponse, HttpResponseRedirect
 from django.contrib.auth.models import User
 from django.contrib.sessions.middleware import SessionMiddleware
+from unittest.mock import call
 
 import json
 import uuid
@@ -31,6 +32,9 @@ with patch("pathlib.Path.read_text", return_value=mock_env_data):
         dashboard_view,
         event_table_partial,
         RECORDS_TO_DISPLAY,
+        get_latest_image_events,
+        get_dashboard_context,
+        latency_data,
     )
 
 # ==============================================================================
@@ -369,3 +373,90 @@ def test_event_table_partial(mock_get_dashboard_context, mock_render):
 
     assert output == response
     mock_render.assert_called_once_with(request, "ngRadar_Website/partials/dashboard_updates.html", mock_get_dashboard_context.return_value)
+
+# ==============================================================================
+# 11. get_latest_image_events Test
+# ==============================================================================
+
+@patch("ngRadar_Website.views.views.ObservatoryEvent")
+def test_get_latest_image_events(mock_ObservatoryEvent):
+    mock_ObservatoryEvent.objects.filter.return_value.exclude.return_value.exclude.return_value.order_by.return_value.first.return_value = "event"
+
+    result = get_latest_image_events()
+
+    assert len(result) == 10
+    assert result == ["event"] * 10
+
+# ==============================================================================
+# 12. get_dashboard_context Test
+# ==============================================================================
+
+@patch("ngRadar_Website.views.views.ObservatoryEvent")
+@patch("ngRadar_Website.views.views.get_current_waveform")
+@patch("ngRadar_Website.views.views.get_latest_image_event")
+def test_get_dashboard_context(mock_latest_image, mock_current_wf, mock_ObservatoryEvent):
+    """Scenario 1: message_number is None"""
+
+    message_number = None
+
+    # latest_events
+    latest_event = MagicMock()
+    latest_event.transfer_uuid = "transfer-123"
+    
+    latest_events = [latest_event, MagicMock()]
+    mock_ObservatoryEvent.objects.order_by.return_value.__getitem__.return_value = (
+        latest_events
+    )
+    # avg latency
+    mock_ObservatoryEvent.objects.exclude.return_value.aggregate.return_value = {
+        "avg": 25.5
+    }
+    # transfer events
+    transfer_events = ["transfer1", "transfer2"]
+    mock_ObservatoryEvent.objects.filter.return_value.order_by.return_value = (
+        transfer_events
+    )
+    # transferring count
+    mock_ObservatoryEvent.objects.filter.return_value.count.return_value = 2
+
+    result = get_dashboard_context(message_number)
+
+    assert result == {
+                    "latest_events": latest_events,
+                    "latest_event": latest_event,
+                    "avg_latency": round(25.5, 2),
+                    "current_waveform": mock_current_wf(),
+                    "latest_image_event": mock_latest_image(),
+                    "transfer_events": transfer_events,
+                    "transfer_resumed": True,
+                }
+
+# ==============================================================================
+# 13. latency_data Test
+# ==============================================================================
+
+@patch("ngRadar_Website.views.views.ObservatoryEvent")
+def test_latency_data(mock_ObservatoryEvent):
+
+    factory = RequestFactory()
+    request = factory.get("/login/")
+    # Add session to the RequestFactory request
+    middleware = SessionMiddleware(lambda request: None)
+    middleware.process_request(request)
+
+    events = []
+    for _ in range(RECORDS_TO_DISPLAY):
+        event = MagicMock()
+        event.station = None
+        event.status = None
+        event.latency_ms = 10.123
+        event.event_time = datetime.now()
+        event.object_id = None
+        event.target = None
+        events.append(event)
+    mock_ObservatoryEvent.objects.exclude.return_value.order_by.return_value.__getitem__.return_value = events
+
+    result = latency_data(request)
+    data = json.loads(result.content)
+
+    assert len(data["latency_array"]) == RECORDS_TO_DISPLAY
