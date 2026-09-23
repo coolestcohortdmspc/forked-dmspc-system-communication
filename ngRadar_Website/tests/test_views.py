@@ -1,5 +1,6 @@
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, AsyncMock
+import pytest
 
 from ngRadar_Website.enums import Stations, Message, Status
 from datetime import datetime, timezone
@@ -35,6 +36,7 @@ with patch("pathlib.Path.read_text", return_value=mock_env_data):
         get_latest_image_events,
         get_dashboard_context,
         latency_data,
+        sse_stream,
     )
 
 # ==============================================================================
@@ -460,3 +462,49 @@ def test_latency_data(mock_ObservatoryEvent):
     data = json.loads(result.content)
 
     assert len(data["latency_array"]) == RECORDS_TO_DISPLAY
+
+# ==============================================================================
+# 14. sse_stream Test
+# ==============================================================================
+
+@pytest.mark.asyncio
+@patch("ngRadar_Website.views.views.sse_broker")
+async def test_sse_stream(mock_sse):
+
+    subscriber = MagicMock()
+    queue = MagicMock()
+
+    event = {
+        "type": "gbt_changed",
+        "data": {
+            "status": "ready"
+        },
+    }
+
+    queue.get = AsyncMock(return_value=event)
+
+    mock_sse.subscribe.return_value = (subscriber, queue)
+
+    factory = RequestFactory()
+    request = factory.get("/")
+
+    response = await sse_stream(request)
+
+    assert response["Content-Type"] == "text/event-stream"
+    assert response["Cache-Control"] == "no-cache"
+    assert response["X-Accel-Buffering"] == "no"
+
+    generator = response.streaming_content
+
+    # Actually starts executing event_generator()
+    retry = await generator.__anext__()
+
+    assert retry == b"retry: 3000\n\n"
+
+    # Executes the while-loop and queue.get()
+    message = await generator.__anext__()
+
+    assert message == (
+        b'event: gbt_changed\n'
+        b'data: {"status": "ready"}\n\n'
+    )

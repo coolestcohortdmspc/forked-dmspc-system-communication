@@ -39,7 +39,8 @@ with patch("pathlib.Path.read_text", return_value=mock_env_data):
         get_folder_size,
         write_transfer_progress,
         upload_seaweedfs,
-        MAX_BYTES
+        MAX_BYTES,
+        consumer_group_has_members,
 
     )
 
@@ -257,6 +258,47 @@ def test_config_func_UI():
             "reconnect.backoff.ms": 100,
             "reconnect.backoff.max.ms": 10000,
         }
+
+def test_config_func_PTW():
+    """Scenario 5: sim is progress tracker"""
+
+    sim = Stations.PTW
+    bootstrap = "12345"
+
+    producer_topic, producer_config, consumer_topic, consumer_config = config_func(sim, bootstrap)
+
+    assert producer_topic == "VLBA_notif"
+    assert producer_config == {
+                    "bootstrap.servers": (bootstrap),
+                    "message.max.bytes": (MAX_BYTES),
+                    "message.timeout.ms": 2000,
+                    "client.id": (
+                        f"{sim.name.lower()}"
+                        "-producer"
+                    ),
+                }
+    assert consumer_topic == [
+                "progress_tracking",
+            ]
+    assert consumer_config == {
+                    "bootstrap.servers": (bootstrap),
+                    "client.id": (
+                        f"{sim.name.lower()}"
+                        "-consumer"
+                    ),
+                    "group.id": (
+                        f"{sim.name.lower()}"
+                        "-consumer-group"
+                    ),
+                    "session.timeout.ms": 45000,
+                    "heartbeat.interval.ms": 15000,
+                    "socket.timeout.ms": 30000,
+                    "reconnect.backoff.ms": 100,
+                    "reconnect.backoff.max.ms": 10000,
+                    "topic.metadata.refresh.interval.ms": 300000,
+                    "metadata.max.age.ms": 300000,
+                    "enable.auto.commit": False,
+                }
 
 # ==============================================================================
 # 3. bootstrap Test
@@ -962,3 +1004,31 @@ def test_write_transfer_progress(
         "/service/mock_assets/progress.json.tmp",
         "/service/mock_assets/progress.json"
     )
+
+# ==============================================================================
+# 11. consumer_group_has_members Test
+# ==============================================================================
+
+@patch.dict(
+    "os.environ",
+    {
+        "BOOTSTRAP_SERVER": "fake_server",
+    },
+)
+@patch("ngRadar_Website.utils.AdminClient")
+def test_consumer_group_has_members(mock_adminclient):
+
+    group_id = "2"
+
+    group = MagicMock()
+    group.members = [MagicMock()]
+    mock_admin = mock_adminclient.return_value
+    mock_admin.describe_consumer_groups.return_value = {
+        group_id: MagicMock(
+            result=MagicMock(return_value=group)
+        )
+    }
+
+    result = consumer_group_has_members(group_id)
+
+    assert result == True
