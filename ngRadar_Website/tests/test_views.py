@@ -7,6 +7,8 @@ from ngRadar_Website.models.models import ObservatoryEvent
 from django.test import RequestFactory
 from django.urls import reverse
 from django.http import HttpResponse, HttpResponseRedirect
+from django.contrib.auth.models import User
+from django.contrib.sessions.middleware import SessionMiddleware
 
 import json
 import uuid
@@ -28,6 +30,7 @@ with patch("pathlib.Path.read_text", return_value=mock_env_data):
         home_view,
         dashboard_view,
         event_table_partial,
+        RECORDS_TO_DISPLAY,
     )
 
 # ==============================================================================
@@ -41,36 +44,30 @@ with patch("pathlib.Path.read_text", return_value=mock_env_data):
     },
 )
 @patch("ngRadar_Website.views.views.get_object_or_404")
-@patch("ngRadar_Website.views.views.create_s3_client")
-def test_serve_image(mock_create, mock_get_obj):
+@patch("ngRadar_Website.views.views.create_presigned_url")
+@patch("ngRadar_Website.views.views.redirect")
+def test_serve_image(mock_redirect, mock_presigned, mock_get_obj):
     """Scenario 1: no errors"""
 
     mock_event = MagicMock()
     mock_event.image_key = "images/test.png"
     mock_get_obj.return_value = mock_event
 
-    mock_s3 = MagicMock()
-    mock_create.return_value = mock_s3
-    mock_s3.get_object.return_value = {
-        "Body": MagicMock(
-            read=MagicMock(return_value=b"fake_image_data")
-        ),
-        "ContentType": "image/png",
-    }
+    mock_url = MagicMock()
+    mock_presigned.return_value = mock_url
+
+    mock_redirect.return_value = "output"
 
     #call the function:
-    response = serve_image(
+    result = serve_image(
             request="request",
             uuid="uuid",
         )
 
     mock_get_obj.assert_called_once_with(ObservatoryEvent, uuid="uuid")
-    mock_create.assert_called_once_with(station=Stations.DSOC)
-    mock_s3.get_object.assert_called_once_with(
-            Bucket="fake_bucket",
-            Key="images/test.png",
-        )
-    assert response.content == b"fake_image_data"
+    mock_presigned.assert_called_once_with(mock_event)
+    assert result == "output"
+    mock_redirect.assert_called_once_with(mock_url)
 
 @patch.dict(
     "os.environ",
@@ -79,17 +76,21 @@ def test_serve_image(mock_create, mock_get_obj):
     },
 )
 @patch("ngRadar_Website.views.views.get_object_or_404")
-@patch("ngRadar_Website.views.views.create_s3_client")
-def test_serve_image_error(mock_create, mock_get_obj, caplog):
+@patch("ngRadar_Website.views.views.create_presigned_url")
+def test_serve_image_error(mock_presigned, mock_get_obj, caplog):
     """Scenario 2: exception raised"""
 
-    mock_create.side_effect = Exception("Failed to connect.")
+    mock_event = MagicMock()
+    mock_event.image_key = "images/test.png"
+    mock_get_obj.return_value = mock_event
+
+    mock_presigned.side_effect = Exception("Failed to connect.")
 
     #call the function:
     serve_image(request = "request", uuid = "uuid")
 
     mock_get_obj.assert_called_once_with(ObservatoryEvent, uuid="uuid")
-    mock_create.assert_called_once_with(station=Stations.DSOC)
+    mock_presigned.assert_called_once_with(mock_event)
     assert "Failed to retrieve image from SeaweedFS." in caplog.text
 
 # ===============================================================================
@@ -113,6 +114,7 @@ def test_submit_waveform(mock_kafka, mock_bootstrap, Mock_ProgressBar, Mock_Cach
     #generate a mock post request
     factory = RequestFactory()
     myRequest = factory.post('home/submit-waveform/', data={'waveform':test_waveform})
+    myRequest.user = User(username="testuser")
 
     #mock a UI Event
     Mock_EVENT = MagicMock()
@@ -135,10 +137,11 @@ def test_submit_waveform(mock_kafka, mock_bootstrap, Mock_ProgressBar, Mock_Cach
         message_type=Message.UI_EVENT,
         producer_topic="test_topic",
         producer_config="test_config",
+        waveform_requester="testuser",
         station=Stations.UI,
         tx_waveform=test_waveform,
         rec_waveform=test_waveform,
-        message=f"User submitted waveform {test_waveform}.",
+        message=f"testuser submitted waveform {test_waveform}.",
     )
     mock_bootstrap.assert_called_once_with(Stations.UI)
 
@@ -352,13 +355,17 @@ def test_dashboard_view(mock_get_dashboard_context, mock_render):
 @patch("ngRadar_Website.views.views.render")
 @patch("ngRadar_Website.views.views.get_dashboard_context")
 def test_event_table_partial(mock_get_dashboard_context, mock_render):
-    request = MagicMock()
 
     response = HttpResponse("fake_response")
     mock_render.return_value = response
 
     request = RequestFactory().get("/lock-status/")
+
+    # Add session to the RequestFactory request
+    middleware = SessionMiddleware(lambda request: None)
+    middleware.process_request(request)
+
     output = event_table_partial(request)
 
     assert output == response
-    mock_render.assert_called_once_with(request, "ngRadar_Website/partials/dashboard_updates.html", mock_get_dashboard_context())
+    mock_render.assert_called_once_with(request, "ngRadar_Website/partials/dashboard_updates.html", mock_get_dashboard_context.return_value)
