@@ -61,6 +61,7 @@ def test_process_msg_GBT_TX(
         "target": "Moretus",
         "tx_waveform": "SineWave",
         "rec_waveform": "SineWave",
+        "waveform_requester": "username",
     }
 
     msg.value.return_value = json.dumps(payload).encode("utf-8")
@@ -96,6 +97,7 @@ def test_process_msg_GBT_TX(
     mock_send_kafka_message.assert_called_once_with(
         producer_topic=producer_topic,
         producer_config=producer_config,
+        waveform_requester="username",
         message_type=(Message.VLBA_REQUEST_STORAGE),
         transfer_uuid="12345",
         gbt_uuid="fake_uuid",
@@ -108,8 +110,8 @@ def test_process_msg_GBT_TX(
         rec_waveform="SineWave",
         num_bytes=500,
         filename=mock_frame_path.name,
-        xmit_station=Stations.PT,
-        rcvr_station=Stations.DSOC,
+        xmit_station=Stations.GBT,
+        rcvr_station=Stations.PT,
         message=(
             "VLBA requested a storage "
             "check at DSOC."
@@ -152,6 +154,7 @@ def test_process_msg_GBT_TX_FAILED(
         "target": "Moretus",
         "tx_waveform": "SineWave",
         "rec_waveform": "SineWave",
+        "waveform_requester": "username",
     }
 
     msg.value.return_value = json.dumps(payload).encode("utf-8")
@@ -186,6 +189,7 @@ def test_process_msg_GBT_TX_FAILED(
     mock_send_kafka_message.assert_called_once_with(
         producer_topic=producer_topic,
         producer_config=producer_config,
+        waveform_requester="username",
         message_type=(Message.VLBA_FAILED),
         transfer_uuid="12345",
         gbt_uuid="fake_uuid",
@@ -198,8 +202,8 @@ def test_process_msg_GBT_TX_FAILED(
         rec_waveform="SineWave",
         num_bytes=0,
         filename=mock_frame_path.name,
-        xmit_station=Stations.PT,
-        rcvr_station=Stations.DSOC,
+        xmit_station=Stations.GBT,
+        rcvr_station=Stations.PT,
         message=(
                     "VLBA source file "
                     "does not exist."
@@ -249,6 +253,7 @@ def test_process_msg_DSOC_RESPOND_STORAGE(
         "num_bytes": 500,
         "retry_count": 5,
         "status": Status.READY.value,
+        "waveform_requester": "username",
     }
 
     msg.value.return_value = json.dumps(payload).encode("utf-8")
@@ -285,6 +290,7 @@ def test_process_msg_DSOC_RESPOND_STORAGE(
     mock_send_kafka_message.assert_called_once_with(
         producer_topic="progress_tracking",
         producer_config=producer_config,
+        waveform_requester="username",
         message_type=(Message.VLBA_TRANSFERRING),
         transfer_uuid="12345",
         gbt_uuid="fake_uuid",
@@ -297,8 +303,8 @@ def test_process_msg_DSOC_RESPOND_STORAGE(
         rec_waveform="SineWave",
         num_bytes=500,
         filename="fake_filename.png",
-        xmit_station=Stations.PT,
-        rcvr_station=Stations.DSOC,
+        xmit_station=Stations.GBT,
+        rcvr_station=Stations.PT,
         message=(
                 "Hancock VLBA has "
                 "started sending the "

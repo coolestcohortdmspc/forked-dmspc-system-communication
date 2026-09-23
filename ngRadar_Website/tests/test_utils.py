@@ -849,6 +849,7 @@ def test_send_kafka_message(mock_uuid, mock_datetime, mock_produce):
         message_type=message_type,
         producer_topic="test_topic",
         producer_config="test_config",
+        waveform_requester="username",
         station=Stations.GBT,
         gbt_uuid="test_gbt_uuid",
         gbt_event_time="2026-08-12T12:34:56+00:00",
