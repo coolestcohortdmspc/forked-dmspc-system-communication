@@ -131,6 +131,10 @@ testcov)
     pytest --cov=ngRadar_Website --cov-report=term-missing
     ;;
 
+smoketest)
+    docker compose --profile loadtest run --rm k6
+    ;;
+
 hard-reset)
     read -p "This will DELETE your local database and containers. Continue? (y/N): " ANSWER
 
