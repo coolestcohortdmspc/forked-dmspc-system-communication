@@ -207,6 +207,7 @@ services:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
       - "--storage.tsdb.retention.time=15d"
+      - "--web.enable-remote-write-receiver"
 
 
   grafana:
@@ -227,6 +228,30 @@ services:
       - GF_USERS_ALLOW_SIGN_UP=false
     depends_on:
       - prometheus
+
+
+  k6:
+    image: grafana/k6:latest
+    container_name: k6
+    profiles:
+      - loadtest
+    networks:
+      - ngradar_website_network
+    volumes:
+      - ./k6:/scripts:ro
+    environment:
+      K6_PROMETHEUS_RW_SERVER_URL: http://prometheus:9090/api/v1/write
+      K6_PROMETHEUS_RW_TREND_STATS: p(95),p(99),min,max
+      # K6_PROMETHEUS_RW_TREND_AS_NATIVE_HISTOGRAM: "true"
+      K6_BASE_URL: ${K6_BASE_URL:-http://ngradar-website:8000}
+    command:
+      - run
+      - --out
+      - experimental-prometheus-rw
+      - /scripts/smoke.js
+    depends_on:
+      - prometheus
+      - ngradar_website
 
 
   postgres_exporter:
