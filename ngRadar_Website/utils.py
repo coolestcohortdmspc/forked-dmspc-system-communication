@@ -36,6 +36,30 @@ from ngRadar_Website.enums import (
 
 from ngRadar_Website.models.models import ObservatoryEvent
 
+# =============================================================
+# FUNCTIONS IN THIS FILE
+# =============================================================
+"""
+latency_calc
+config_func
+bootstrap
+produce
+consume
+send_kafka_message
+consumer_group_has_members
+create_s3_client
+ensure_bucket_exists
+create_presigned_url
+upload_seaweedfs
+write_transfer_progress
+parse_etc_progress
+wait_for_etd
+etc_send
+create_file
+watch_for_file
+delete_observation_data
+get_folder_size
+"""
 
 # =============================================================
 # CONSTANTS

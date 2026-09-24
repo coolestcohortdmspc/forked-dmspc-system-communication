@@ -258,8 +258,10 @@ services:
     # ports:
     #   - 8000:8000
     networks:
-      - ngradar_website_network
-      - proxy
+      ngradar_website_network:
+        aliases:
+          - ngradar-website # Prometheus does not like the target with an underscore so we need this container alias
+      proxy:
     environment:
       # this is what tells the ngradar_website service to run the UI Kafka consumer in a separate thread, which is what we want for the SSE functionality.
       ENABLE_UI_KAFKA_CONSUMER: "true"
@@ -327,7 +329,7 @@ services:
 # kafka related containers:
 #==========================
 
-  kafka-exporter: # Scrape all 3 brokers if possible
+  kafka-exporter: # Do we still need this if we're scraping kafka JMX now??
     image: danielqsj/kafka-exporter:v1.9.0
     container_name: kafka-exporter
     restart: unless-stopped
