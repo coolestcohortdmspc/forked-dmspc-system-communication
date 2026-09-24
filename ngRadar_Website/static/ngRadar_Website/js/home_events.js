@@ -45,8 +45,6 @@ const HOME_EVENTS = {
     progress_changed:
         "progressChanged",
 
-    observatory_event_created:
-        "observatoryEventCreated",
 };
 
 
