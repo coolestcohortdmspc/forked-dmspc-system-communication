@@ -231,7 +231,7 @@ services:
 
 
   k6:
-    image: grafana/k6:latest
+    image: grafana/k6:0.54.0
     container_name: k6
     profiles:
       - loadtest
@@ -244,11 +244,9 @@ services:
       K6_PROMETHEUS_RW_TREND_STATS: p(95),p(99),min,max
       # K6_PROMETHEUS_RW_TREND_AS_NATIVE_HISTOGRAM: "true"
       K6_BASE_URL: ${K6_BASE_URL:-http://ngradar-website:8000}
-    command:
-      - run
-      - --out
-      - experimental-prometheus-rw
-      - /scripts/smoke.js
+      K6_USERNAME: ${K6_USERNAME}
+      K6_PASSWORD: ${K6_PASSWORD}
+    entrypoint: ["k6"]
     depends_on:
       - prometheus
       - ngradar_website
