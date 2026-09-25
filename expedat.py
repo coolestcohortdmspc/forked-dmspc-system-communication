@@ -2,73 +2,135 @@ import subprocess
 import select
 import os
 from dotenv import load_dotenv
+import random
 
 load_dotenv()
 
 
-def expedat_send(mvd_filepath):
+def expedat_send(mvd_filepath, method):
     """
-    Send one raw-data file from one local directory to another using expedat.
+    Send one raw-data file from one directory/machine to another using expedat.
 
     movedat (mvd): sender
     servedat (svd): receiver
 
     """
 
-    master_fd, slave_fd = os.openpty()
-
     svd_password = os.environ["SVD_PASSWORD"]
     svd_ip = os.environ["SVD_IP"]
     svd_user = os.environ["SVD_USER"]
     recipient_directory = os.environ["RECIPIENT_DIR"]
 
-    terminal_command = [
-        "./movedat",
-        mvd_filepath,
-        f"{svd_user}:{svd_password}@{svd_ip}:{recipient_directory}",
-    ]
-
     #location where movedat is saved on my computer:
     mvd_location = os.environ["MVD_LOC"]
 
-    process = subprocess.Popen(
-        terminal_command,
-        stdin=slave_fd,
-        stdout=slave_fd,
-        stderr=slave_fd,
-        close_fds=True,
-        cwd=mvd_location
-    )
+    if method == "transfer":
 
-    os.close(slave_fd)
+        master_fd, slave_fd = os.openpty()
 
-    try:
-        while process.poll() is None:
-            readable, _, _ = select.select(
-                [master_fd],
-                [],
-                [],
-                0.5,
-            )
+        terminal_command = [
+                "./movedat",
+                mvd_filepath,
+                f"{svd_user}:{svd_password}@{svd_ip}:{recipient_directory}",
+            ]
+        
+        process = subprocess.Popen(
+            terminal_command,
+            stdin=slave_fd,
+            stdout=slave_fd,
+            stderr=slave_fd,
+            close_fds=True,
+            cwd=mvd_location
+        )
 
-            if not readable:
-                continue
+        os.close(slave_fd)
 
-            try:
+        try:
+            while process.poll() is None:
+                readable, _, _ = select.select(
+                    [master_fd],
+                    [],
+                    [],
+                    0.5,
+                )
+    
+                if not readable:
+                    continue
+    
+                try:
+    
+                    terminal_output = os.read(master_fd, 4096).decode(
+                        "utf-8",
+                        errors="replace",
+                    )
+    
+                except OSError:
+                    break
+    
+                # Print the actual etc output to Docker logs.
+                print(terminal_output, end="", flush=True)
+    
+        finally:
+            os.close(master_fd)
 
-                terminal_output = os.read(master_fd, 4096).decode(
-                    "utf-8",
-                    errors="replace",
+    elif method == "stream":
+
+        terminal_command = [
+                    "./movedat",
+                    "-",
+                    f"{svd_user}:{svd_password}@{svd_ip}:{recipient_directory}",
+                ]
+
+        process = subprocess.Popen(
+            terminal_command,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            cwd=mvd_location,
+        )
+        try:
+            file_size_bytes = 10 * 1024 * 1024
+            num_buffers = 100
+
+            buffer_size = file_size_bytes // num_buffers
+            remainder = file_size_bytes % num_buffers
+
+            for index in range(num_buffers):
+                size = buffer_size + (
+                    1 if index < remainder else 0
                 )
 
-            except OSError:
-                break
+                buffer = random.randbytes(size)
 
-            # Print the actual etc output to Docker logs.
-            print(terminal_output, end="", flush=True)
+                process.stdin.write(buffer)
+                process.stdin.flush()
 
-    finally:
-        os.close(master_fd)
+            # No more data is coming.
+            process.stdin.close()
+
+            # Read movedat output after sending the data.
+            for output in process.stdout:
+                print(
+                    output.decode(
+                        "utf-8",
+                        errors="replace",
+                    ),
+                    end="",
+                    flush=True,
+                )
+
+        finally:
+            if process.stdin and not process.stdin.closed:
+                process.stdin.close()
+
+            if process.stdout:
+                process.stdout.close()
+
+    else:
+        raise ValueError(
+            "Invalid method: expected "
+            "'transfer' or 'stream'."
+        )
 
     return_code = process.wait()
 
@@ -79,4 +141,5 @@ def expedat_send(mvd_filepath):
         )
 
 mvd_filepath = os.environ["MVD_FILEPATH"]
-expedat_send(mvd_filepath)
+method = "stream"
+expedat_send(mvd_filepath, method)
