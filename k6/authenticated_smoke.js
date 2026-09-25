@@ -74,11 +74,11 @@ export default function () {
       Boolean(r.cookies.sessionid),
   });
 
-  const dashboardResponse = http.get(`${baseUrl}/home/`, {
+  const homeResponse = http.get(`${baseUrl}/home/`, {
     tags: { endpoint: 'home' },
   });
 
-  check(dashboardResponse, {
+  check(homeResponse, {
     'home returns 200': (r) => r.status === 200,
     'home does not redirect to login': (r) =>
       !r.url.includes('/login/'),

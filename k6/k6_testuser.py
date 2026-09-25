@@ -1,9 +1,10 @@
 """
 DO NOT run this script directly. To create this test user, first run ./control.sh shell
-Then run python manage.py shell
+Then python manage.py shell
 Then paste this script into the shell and run.
 Add K6_USERNAME=k6-testuser and K6_PASSWORD=k6-password to .env
 Now you can run the k6 tests that require authentication, they will use this test user.
+Try running ./control.sh authtest as a smoke test to verify that this login works before heavy testing.
 """
 
 from django.contrib.auth import get_user_model

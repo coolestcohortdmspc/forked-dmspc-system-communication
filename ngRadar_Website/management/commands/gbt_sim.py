@@ -87,7 +87,7 @@ def process_msg(
     # 2. Remain OFF for five seconds
     # -------------------------------------------------
 
-    time.sleep(5)
+    #time.sleep(5)
 
     # -------------------------------------------------
     # 3. Turn transmitter ON with new waveform
