@@ -121,7 +121,7 @@ refresh)
     # Recreate containers so updated .env values are injected.
     # Images are reused; no rebuild is performed.
     docker compose up -d --force-recreate --no-build $START
-    docker compose $KAFKA_PROFILES up -d --force-recreate --no-build
+    docker compose up -d --force-recreate --no-build $KAFKA_SERVICES
     docker compose up -d --force-recreate --no-build $SIM_SERVICES
 
     ;;

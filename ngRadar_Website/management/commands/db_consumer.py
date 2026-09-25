@@ -1,5 +1,5 @@
 import json, os
-from ngRadar_Website.enums import Message
+from ngRadar_Website.enums import Message, UIEvent
 from ngRadar_Website.models.models import ObservatoryEvent
 from ngRadar_Website.utils import (
     MAX_BYTES,
@@ -16,29 +16,57 @@ def process_msg(
     producer_config,
 ):
     try:
-        incoming_key = int(msg.key().decode("utf-8"))
+        incoming_key = msg.key().decode("utf-8")
 
-        # Do not persist our own
-        # database acknowledgements.
-        if (incoming_key == Message.DB_COMMITTED.value):
+        # Do not consume our own
+        # database acknowledgements when we produce back into dsoc_notif.
+        if incoming_key == str(Message.DB_COMMITTED.value):
             return True
+        if incoming_key == UIEvent.IMAGE_CHANGED:
+            return True
+        
 
         topic = msg.topic()
 
         payload = json.loads(msg.value().decode("utf-8"))
 
+
         with transaction.atomic():
-            record_obs_event(payload)
+            event, created = record_obs_event(
+                payload
+            )
+
+           # Capture values needed for the UI event
+            event_uuid = str(event.uuid)
+            image_key = event.image_key
+            rcvr_station = event.rcvr_station
 
             transaction.on_commit(
                 lambda: publish_db_committed(
                     topic=topic,
-                    producer_config=(producer_config),
+                    producer_config=producer_config,
                     payload=payload,
                 )
             )
+            
+            # Only publish image_changed SSE event type when
+            # this event actually has an image.
+            if image_key:
+                transaction.on_commit(
+                    lambda: publish_ui_event(
+                        topic=topic,
+                        producer_config=producer_config,
+                        event_type=UIEvent.IMAGE_CHANGED,
+                        key=event_uuid,
+                        data={
+                            "event_uuid": event_uuid,
+                            "rcvr_station": rcvr_station,
+                        },
+                    )
+                )
 
         return True
+
 
     except json.JSONDecodeError as error:
         print(
@@ -118,6 +146,30 @@ def publish_db_committed(
         ),
         json.dumps(notification),
     )
+
+
+def publish_ui_event(
+    *,
+    topic,
+    producer_config,
+    event_type,
+    key,
+    data,
+):
+    notification = {
+        "event_type": event_type,
+        "key": key,
+        "data": data,
+    }
+
+    produce(
+        topic,
+        producer_config,
+        event_type,
+        json.dumps(notification),
+    )
+
+
 
 
 

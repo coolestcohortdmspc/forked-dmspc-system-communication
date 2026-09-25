@@ -2,7 +2,7 @@ import json
 import logging
 import os
 import threading
-from ngRadar_Website.enums import Message
+from ngRadar_Website.enums import Message, UIEvent
 from confluent_kafka import Consumer, KafkaError
 
 from .sse import sse_broker
@@ -73,7 +73,7 @@ def consume_ui_events():
                 )
                 continue
 
-            incoming_key = int(msg.key().decode("utf-8"))
+            incoming_key = msg.key().decode("utf-8")
 
             topic = msg.topic()
 
@@ -94,7 +94,7 @@ def consume_ui_events():
             # committed and the Dashboard may safely refresh.
             # =====================================================
 
-            if (incoming_key == Message.DB_COMMITTED.value):
+            if (incoming_key == str(Message.DB_COMMITTED.value)):
                 committed_payload = payload.get(
                     "data",
                     {},
@@ -115,6 +115,36 @@ def consume_ui_events():
                             "observatory_event_created"
                         ),
                         "data": committed_payload,
+                    }
+                )
+
+                continue
+
+            # =====================================================
+            # EXPLICIT UI EVENT
+            #
+            # image_changed is produced by the DB consumer only
+            # after the image-bearing ObservatoryEvent commits.
+            # =====================================================
+
+            if incoming_key == UIEvent.IMAGE_CHANGED:
+                image_payload = payload.get(
+                    "data",
+                    {},
+                )
+
+                logger.info(
+                    "Publishing image_changed "
+                    "for event %s",
+                    image_payload.get(
+                        "event_uuid"
+                    ),
+                )
+
+                sse_broker.publish(
+                    {
+                        "type": UIEvent.IMAGE_CHANGED,
+                        "data": image_payload,
                     }
                 )
 

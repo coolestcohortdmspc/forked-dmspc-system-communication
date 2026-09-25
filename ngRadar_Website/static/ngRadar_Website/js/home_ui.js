@@ -105,6 +105,32 @@ function updateGbtPanel(event) {
     updateSystemStatus(
         data
     );
+
+    updateWaveformRequester(
+        data.waveform_requester
+    );
+}
+
+function updateWaveformRequester(requester) {
+    setText(
+        "waveform-requester",
+        requester,
+        ""
+    );
+
+    const container =
+        document.getElementById(
+            "waveform-requester-container"
+        );
+
+    if (!container) {
+        return;
+    }
+
+    container.classList.toggle(
+        "d-none",
+        !requester
+    );
 }
 
 
@@ -187,11 +213,6 @@ function createProgressRow(
 function updateProgressState(event) {
     const data = event.detail;
 
-    console.log(
-        "[Home] Progress update:",
-        data
-    );
-
     const stationId =
         Number(data.station);
 
@@ -270,6 +291,47 @@ function updateProgressState(event) {
     }
 }
 
+function formatBytes(bytes) {
+    const value =
+        Number(bytes || 0);
+
+    if (value === 0) {
+        return "0 B";
+    }
+
+    const units = [
+        "B",
+        "KB",
+        "MB",
+        "GB",
+    ];
+
+    const index = Math.min(
+        Math.floor(
+            Math.log(value)
+            / Math.log(1024)
+        ),
+        units.length - 1
+    );
+
+    return (
+        (
+            value
+            / Math.pow(
+                1024,
+                index
+            )
+        ).toFixed(1)
+        + " "
+        + units[index]
+    );
+}
+
+
+// =========================================================
+// DSOC + DDM Panel
+// =========================================================
+
 // build one blank row that looks right 
 function createDdmRow(stationId) {
     const body = 
@@ -324,7 +386,7 @@ function updateDdmTable(event) {
     // for debugging:
     // console.log("[Home] DDM event:", data.image_key, data.rcvr_station);
 
-    if (!data.image_key) {
+    if (!data.event_uuid) {
         return;
     }
 
@@ -339,9 +401,6 @@ function updateDdmTable(event) {
         document.getElementById(
             `ddm-row-${stationId}`
         );
-
-    // for debugging:
-    // console.log("[Home] row found?", row);
 
     // build a new row if not exist (when some of vlba stations have not submitted any image yet)
     if (!row) {
@@ -362,9 +421,6 @@ function updateDdmTable(event) {
             ".ddm-thumbnail"
         );
 
-    // for debugging:
-    // console.log("[Home] img element found?", img);
-
     if (img) {
         img.src = imageUrl;
     }
@@ -377,42 +433,6 @@ function updateDdmTable(event) {
     if (link) {
         link.href = imageUrl;
     }
-}
-
-function formatBytes(bytes) {
-    const value =
-        Number(bytes || 0);
-
-    if (value === 0) {
-        return "0 B";
-    }
-
-    const units = [
-        "B",
-        "KB",
-        "MB",
-        "GB",
-    ];
-
-    const index = Math.min(
-        Math.floor(
-            Math.log(value)
-            / Math.log(1024)
-        ),
-        units.length - 1
-    );
-
-    return (
-        (
-            value
-            / Math.pow(
-                1024,
-                index
-            )
-        ).toFixed(1)
-        + " "
-        + units[index]
-    );
 }
 
 
@@ -433,51 +453,6 @@ function updateDsocPanel(event) {
         data
     );
 }
-
-
-function showDsocImage(data) {
-    // TODO: @ T !!
-    // Home receives the live DSOC COMPLETED event before the
-    // DB consumer is guaranteed to have persisted ObservatoryEvent.
-    //
-    // The image already exists in SeaweedFS, but serve_image()
-    // currently looks up image_key through ObservatoryEvent first.
-    // This creates a race between the live UI path and DB persistence.
-    //
-    // Home should eventually retrieve the DDM independently of the
-    // ObservatoryEvent persistence path.
-    const image =
-        document.getElementById(
-            "dsoc-image"
-        );
-
-    if (!image) {
-        return;
-    }
-
-    image.src =
-        `/home/image/${data.event_uuid}/`;
-
-    image.classList.remove(
-        "d-none"
-    );
-
-    setHidden(
-        "dsoc-image-empty",
-        true
-    );
-
-    const heading =
-        document.getElementById(
-            "dsoc-image-heading"
-        );
-
-    if (heading) {
-        heading.textContent =
-            "DDM updated from DSOC";
-    }
-}
-
 
 
 // =========================================================
@@ -628,17 +603,6 @@ document.body.addEventListener(
 );
 
 document.body.addEventListener(
-    "observatoryEventCreated",
+    "imageChanged",
     updateDdmTable
-);
-
-document.body.addEventListener(
-    "observatoryEventCreated",
-    (event) =>{
-        const data = event.detail;
-
-        if(data.image_key){
-            showDsocImage(data);
-        }
-    }
 );

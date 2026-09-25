@@ -267,7 +267,7 @@ def get_transfer_progress(
             num_bytes=payload["num_bytes"],
             filename=payload["filename"],
             xmit_station=payload["xmit_station"],
-            rcvr_station=Stations.DSOC,
+            rcvr_station=payload["rcvr_station"],
             message=(f"VLBA-{Stations(payload['station']).name} completed sending the data file to DSOC via e-transfer."),
 
         )

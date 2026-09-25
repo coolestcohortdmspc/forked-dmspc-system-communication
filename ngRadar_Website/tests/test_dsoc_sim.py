@@ -106,38 +106,26 @@ def test_verify_incoming_transfer_success(mock_sleep, mock_kafka):
     incoming_file = MagicMock()
     incoming_file.is_file.return_value = True
     incoming_file.stat.return_value.st_size = 500
-    expected_num_bytes = 500
-
-    producer_topic = "topic"
-    producer_config = "config"
-    gbt_event_time = "2023-01-01T00:00:00Z"
-    gbt_uuid = "gbt uuid"
-    object_id = "object_id"
-    target = "target"
-    waveform_requester = "user"
-    tx_waveform = "SineWave"
-    rec_waveform = "SineWave"
-    filename = "fake_filename.png"
-    transfer_uuid = "12345"
 
     mock_sleep.return_value = None
 
     result = verify_incoming_transfer(
         incoming_file=incoming_file,
-        expected_num_bytes=expected_num_bytes,
-        producer_topic=producer_topic,
-        producer_config=producer_config,
-        waveform_requester=waveform_requester,
-        gbt_event_time=gbt_event_time,
-        gbt_uuid=gbt_uuid,
-        object_id=object_id,
-        target=target,
-        tx_waveform=tx_waveform,
-        rec_waveform=rec_waveform,
-        filename=filename,
-        transfer_uuid=transfer_uuid)
+        expected_num_bytes=500,
+        producer_topic = "topic",
+        producer_config = "config",
+        gbt_event_time = "2023-01-01T00:00:00Z",
+        gbt_uuid = "gbt uuid",
+        object_id = "object_id",
+        target = "target",
+        waveform_requester = "user",
+        tx_waveform = "SineWave",
+        rec_waveform = "SineWave",
+        filename = "fake_filename.png",
+        transfer_uuid = "12345",
+        vlba_station = Stations.PT)
 
-    assert result == expected_num_bytes
+    assert result == 500
     mock_sleep.assert_not_called()
     mock_kafka.assert_called_once()
 
@@ -147,42 +135,30 @@ def test_verify_incoming_transfer_nofile(mock_sleep):
     incoming_file = MagicMock()
     incoming_file.is_file.return_value = True
     incoming_file.stat.return_value.st_size = 500
-    expected_num_bytes = 400
-
-    producer_topic = "topic"
-    producer_config = "config"
-    gbt_event_time = "2023-01-01T00:00:00Z"
-    gbt_uuid = "gbt uuid"
-    object_id = "object_id"
-    target = "target"
-    waveform_requester = "user"
-    tx_waveform = "SineWave"
-    rec_waveform = "SineWave"
-    filename = "fake_filename.png"
-    transfer_uuid = "12345"
 
     mock_sleep.return_value = None
 
     with pytest.raises(RuntimeError) as exc_info:
         verify_incoming_transfer(
             incoming_file=incoming_file,
-            expected_num_bytes=expected_num_bytes,
-            producer_topic=producer_topic,
-            producer_config=producer_config,
-            waveform_requester=waveform_requester,
-            gbt_event_time=gbt_event_time,
-            gbt_uuid=gbt_uuid,
-            object_id=object_id,
-            target=target,
-            tx_waveform=tx_waveform,
-            rec_waveform=rec_waveform,
-            filename=filename,
-            transfer_uuid=transfer_uuid)
+            expected_num_bytes=400,
+            producer_topic = "topic",
+            producer_config = "config",
+            gbt_event_time = "2023-01-01T00:00:00Z",
+            gbt_uuid = "gbt uuid",
+            object_id = "object_id",
+            target = "target",
+            waveform_requester = "user",
+            tx_waveform = "SineWave",
+            rec_waveform = "SineWave",
+            filename = "fake_filename.png",
+            transfer_uuid = "12345",
+            vlba_station = Stations.PT)
 
     assert mock_sleep.call_count == 10
     assert str(exc_info.value) == ("Transfer verification failed for "
             f"{incoming_file}. Expected "
-            f"{expected_num_bytes} bytes.")
+            "400 bytes.")
 
 
 # ==============================================================================
@@ -522,6 +498,7 @@ def test_process_msg_Message_PROGRESS_COMPLETE_value_success(
                     rec_waveform=str("fake_rec_waveform"),
                     filename=str("fake_filename.png"),
                     transfer_uuid=transfer_uuid,
+                    vlba_station=Stations.PT,
                 )      
     mock_latency.assert_called_once_with(datetime.fromisoformat("2026-07-15T12:00:00+00:00"), Stations.DSOC)
     mock_create_img.assert_called_once_with(Stations.PT, str("fake_tx_waveform"), waveform_requester=str("user"))
@@ -578,13 +555,13 @@ def test_process_msg_Message_PROGRESS_COMPLETE_value_success(
             xmit_station=(Stations.GBT),
             rcvr_station=(Stations.PT),
             message=(
-                    "DSOC verified the "
-                    "e-transfer, generated "
-                    "the DDM image, stored "
-                    "the image, and completed "
-                    "processing. VLBA may "
-                    "delete its raw data."
-                ),
+                f"DSOC verified {Stations.PT.label}'s "
+                "e-transfer, generated "
+                "the DDM image, stored "
+                "the image, and completed "
+                f"processing. {Stations.PT.label} may "
+                "delete its raw data."
+            ),
         ),
     ])
     assert mock_send_kafka_message.call_count == 2
@@ -668,6 +645,7 @@ def test_process_msg_PROGRESS_COMPLETE_verificationFAILED(
                 rec_waveform=str("fake_rec_waveform"),
                 filename=str("fake_filename.png"),
                 transfer_uuid=transfer_uuid,
+                vlba_station=Stations.PT,
             )     
     assert mock_latency.call_count == 0
     assert mock_create_img.call_count == 0
@@ -810,6 +788,7 @@ def test_process_msg_PROGRESS_COMPLETE_processingFAILED(
                     rec_waveform=str("fake_rec_waveform"),
                     filename=str("fake_filename.png"),
                     transfer_uuid=transfer_uuid,
+                    vlba_station=Stations.PT,
                 )      
     mock_latency.assert_called_once_with(datetime.fromisoformat("2026-07-15T12:00:00+00:00"), Stations.DSOC)
     mock_create_img.assert_called_once_with(Stations.PT, str("fake_tx_waveform"), waveform_requester=str("user"))
