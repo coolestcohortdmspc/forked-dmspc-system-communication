@@ -2,6 +2,7 @@
 DO NOT run this script directly. To create this test user, first run ./control.sh shell
 Then run python manage.py shell
 Then paste this script into the shell and run.
+Add K6_USERNAME=k6-testuser and K6_PASSWORD=k6-password to .env
 Now you can run the k6 tests that require authentication, they will use this test user.
 """
 
@@ -15,4 +16,4 @@ user = User.objects.create_user(
     password="k6-password",
 )
 
-print(user.username, user.is_staff, user.is_superuser, user.is_active)
+print(user.username, user.is_staff, user.is_superuser, user.is_active) # False False True
