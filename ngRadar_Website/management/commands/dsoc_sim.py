@@ -162,6 +162,7 @@ def verify_incoming_transfer(
     rec_waveform,
     filename,
     transfer_uuid,
+    vlba_station,
     attempts=10,
     delay_seconds=0.5,
 ):
@@ -195,7 +196,7 @@ def verify_incoming_transfer(
                     num_bytes=expected_num_bytes,
                     filename=filename,
                     xmit_station=(Stations.GBT),
-                    rcvr_station=(Stations.DSOC),  #NOTE this should be vlba, have to restructure a bit to get this here
+                    rcvr_station=vlba_station,
                     message=(
                         f"Verified incoming transfer of "
                         f"{filename} with "
@@ -656,6 +657,7 @@ def process_msg(
 
                 filename=filename,
                 transfer_uuid=transfer_uuid,
+                vlba_station=vlba_station,
             )
 
         except Exception as exc:
@@ -790,11 +792,11 @@ def process_msg(
             xmit_station=(Stations.GBT),
             rcvr_station=(vlba_station),
             message=(
-                "DSOC verified the "
+                f"DSOC verified {vlba_station.label}'s "
                 "e-transfer, generated "
                 "the DDM image, stored "
                 "the image, and completed "
-                "processing. VLBA may "
+                f"processing. {vlba_station.label} may "
                 "delete its raw data."
             ),
         )

@@ -63,4 +63,4 @@ class UIEvent:
     PROGRESS_CHANGED = "progress_changed"
     TRANSFER_CHANGED = "transfer_changed"
     LATENCY_CHANGED = "latency_changed"
-    IMAGE_READY = "image_ready"
+    IMAGE_CHANGED = "image_changed"
