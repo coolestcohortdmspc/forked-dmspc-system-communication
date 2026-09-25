@@ -1,6 +1,9 @@
 import subprocess
 import select
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 def expedat_send(mvd_filepath):
@@ -16,19 +19,25 @@ def expedat_send(mvd_filepath):
 
     svd_password = os.environ["SVD_PASSWORD"]
     svd_ip = os.environ["SVD_IP"]
+    svd_user = os.environ["SVD_USER"]
+    recipient_directory = os.environ["RECIPIENT_DIR"]
 
-    terminal_command = (
-        f"./movedat {mvd_filepath} lcallahan:'{svd_password}'@{svd_ip}:/Users/lcallahan/DMSPC_GitHub/Expedat_Resources/"
-    )
+    terminal_command = [
+        "./movedat",
+        mvd_filepath,
+        f"{svd_user}:'{svd_password}'@{svd_ip}:{recipient_directory}",
+    ]
+
+    #location where movedat is saved on my computer:
+    mvd_location = "/Users/lcallahan/DMSPC_GitHub/Expedat_Resources/"
 
     process = subprocess.Popen(
-        [
-            terminal_command,
-        ],
+        terminal_command,
         stdin=slave_fd,
         stdout=slave_fd,
         stderr=slave_fd,
         close_fds=True,
+        cwd=mvd_location
     )
 
     os.close(slave_fd)
