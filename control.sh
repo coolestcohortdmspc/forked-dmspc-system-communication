@@ -141,6 +141,11 @@ authtest)
         run --out experimental-prometheus-rw /scripts/authenticated_smoke.js
     ;;
 
+journeytest)
+    docker compose --profile loadtest run --rm k6 \
+        run --out experimental-prometheus-rw /scripts/journey.js
+    ;;
+
 hard-reset)
     read -p "This will DELETE your local database and containers. Continue? (y/N): " ANSWER
 

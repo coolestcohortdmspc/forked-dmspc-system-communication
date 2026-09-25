@@ -246,6 +246,7 @@ services:
       K6_BASE_URL: ${K6_BASE_URL:-http://ngradar-website:8000}
       K6_USERNAME: ${K6_USERNAME}
       K6_PASSWORD: ${K6_PASSWORD}
+      K6_IMAGE_ID: ${K6_IMAGE_ID} # give .env an image id that is in YOUR database
     entrypoint: ["k6"]
     depends_on:
       - prometheus
