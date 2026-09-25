@@ -792,11 +792,11 @@ def process_msg(
             xmit_station=(Stations.GBT),
             rcvr_station=(vlba_station),
             message=(
-                "DSOC verified the "
+                f"DSOC verified {vlba_station.label}'s "
                 "e-transfer, generated "
                 "the DDM image, stored "
                 "the image, and completed "
-                "processing. VLBA may "
+                f"processing. {vlba_station.label} may "
                 "delete its raw data."
             ),
         )

@@ -45,6 +45,9 @@ const HOME_EVENTS = {
     progress_changed:
         "progressChanged",
 
+    image_changed:
+        "imageChanged",
+
 };
 
 
