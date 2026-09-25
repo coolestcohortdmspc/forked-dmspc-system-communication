@@ -555,13 +555,13 @@ def test_process_msg_Message_PROGRESS_COMPLETE_value_success(
             xmit_station=(Stations.GBT),
             rcvr_station=(Stations.PT),
             message=(
-                    "DSOC verified the "
-                    "e-transfer, generated "
-                    "the DDM image, stored "
-                    "the image, and completed "
-                    "processing. VLBA may "
-                    "delete its raw data."
-                ),
+                f"DSOC verified {Stations.PT.label}'s "
+                "e-transfer, generated "
+                "the DDM image, stored "
+                "the image, and completed "
+                f"processing. {Stations.PT.label} may "
+                "delete its raw data."
+            ),
         ),
     ])
     assert mock_send_kafka_message.call_count == 2
