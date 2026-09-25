@@ -311,8 +311,10 @@ export default function () {
     }
   });
 
+  let finalHomeResponse;
+
   group('return-home', () => {
-    const finalHomeResponse = http.get(`${baseUrl}/home/`, {
+    finalHomeResponse = http.get(`${baseUrl}/home/`, {
       tags: {
         endpoint: 'home_final',
       },
@@ -326,6 +328,110 @@ export default function () {
         !r.url.includes('/login/'),
     });
   });
+
+  group('logout', () => {
+    const logoutCsrfToken = extractCsrfToken(
+      finalHomeResponse.body
+    );
+
+    if (!logoutCsrfToken) {
+      fail(
+        'Could not find Django CSRF token on final /home/'
+      );
+    }
+
+    const logoutResponse = http.post(
+      `${baseUrl}/logout/`,
+      {
+        csrfmiddlewaretoken: logoutCsrfToken,
+      },
+      {
+        headers: {
+          Referer: `${baseUrl}/home/`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        redirects: 0,
+        tags: {
+          endpoint: 'logout',
+        },
+      }
+    );
+
+    const location = logoutResponse.headers.Location || '';
+
+    check(logoutResponse, {
+      'logout returns redirect': (r) =>
+        r.status === 302 || r.status === 303,
+
+      'logout redirects to /login/': () =>
+        location === '/login/' ||
+        location.endsWith('/login/'),
+    });
+
+    if (
+      logoutResponse.status !== 302 &&
+      logoutResponse.status !== 303
+    ) {
+      fail(
+        `Logout failed with HTTP ${logoutResponse.status}`
+      );
+    }
+
+    if (
+      location !== '/login/' &&
+      !location.endsWith('/login/')
+    ) {
+      fail(
+        `Logout redirected to an unexpected location: ${location}`
+      );
+    }
+
+    const postLogoutHomeResponse = http.get(
+    `${baseUrl}/home/`,
+    {
+        redirects: 0,
+        tags: {
+        endpoint: 'home_after_logout',
+        },
+    }
+    );
+
+    const postLogoutLocation_home =
+    postLogoutHomeResponse.headers.Location || '';
+
+    check(postLogoutHomeResponse, {
+    'home is not accessible after logout': (r) =>
+        r.status === 302 || r.status === 303,
+
+    'home redirects to login after logout': () =>
+        postLogoutLocation_home === '/login/?next=/home/' ||
+        postLogoutLocation_home.endsWith('/login/?next=/home/'),
+    });
+
+    const postLogoutDashboardResponse = http.get(
+    `${baseUrl}/dashboard/`,
+    {
+        redirects: 0,
+        tags: {
+        endpoint: 'dashboard_after_logout',
+        },
+    }
+    );
+
+    const postLogoutLocation_dashboard =
+    postLogoutDashboardResponse.headers.Location || '';
+
+    check(postLogoutDashboardResponse, {
+    'dashboard is not accessible after logout': (r) =>
+        r.status === 302 || r.status === 303,
+
+    'dashboard redirects to login after logout': () =>
+        postLogoutLocation_dashboard === '/login/?next=/dashboard/' ||
+        postLogoutLocation_dashboard.endsWith('/login/?next=/dashboard/'),
+    });
+
+  });
+
 
   sleep(1);
 }
