@@ -10,6 +10,7 @@ load_dotenv()
 def expedat_send(mvd_filepath, method):
     """
     Send one raw-data file from one directory/machine to another using expedat.
+    Supports both Transfer and Stream methods
 
     movedat (mvd): sender
     servedat (svd): receiver
@@ -28,6 +29,7 @@ def expedat_send(mvd_filepath, method):
 
         master_fd, slave_fd = os.openpty()
 
+        # transfer method requires a filepath to retrieve the completed file
         terminal_command = [
                 "./movedat",
                 mvd_filepath,
@@ -75,12 +77,16 @@ def expedat_send(mvd_filepath, method):
 
     elif method == "stream":
 
+        # stream method uses "-" in place of filepath, because the file does not exist anywhere yet
         terminal_command = [
                     "./movedat",
                     "-",
                     f"{svd_user}:{svd_password}@{svd_ip}:{recipient_directory}/generated_file.txt",
                 ]
 
+        # Standard Input IN (stdin) and Standard Input OUT (stdout):
+        # creates a pipe connecting the Python process to the movedat process
+        # allows the Python file generation to inform movedat, and vice versa
         process = subprocess.Popen(
             terminal_command,
             stdin=subprocess.PIPE,
@@ -92,6 +98,8 @@ def expedat_send(mvd_filepath, method):
             file_size_bytes = 10 * 1024 * 1024
             num_buffers = 100
 
+            # X amount of buffers divides the file into X pieces to be
+            # sent to movedat as each piece is written
             buffer_size = file_size_bytes // num_buffers
             remainder = file_size_bytes % num_buffers
 
@@ -100,6 +108,7 @@ def expedat_send(mvd_filepath, method):
                     1 if index < remainder else 0
                 )
 
+                # the randomly generated data:
                 buffer = random.randbytes(size)
 
                 process.stdin.write(buffer)
