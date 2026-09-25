@@ -25,7 +25,7 @@ def expedat_send(mvd_filepath):
     terminal_command = [
         "./movedat",
         mvd_filepath,
-        f"{svd_user}:'{svd_password}'@{svd_ip}:{recipient_directory}",
+        f"{svd_user}:{svd_password}@{svd_ip}:{recipient_directory}",
     ]
 
     #location where movedat is saved on my computer:
