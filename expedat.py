@@ -29,7 +29,7 @@ def expedat_send(mvd_filepath):
     ]
 
     #location where movedat is saved on my computer:
-    mvd_location = "/Users/lcallahan/DMSPC_GitHub/Expedat_Resources/"
+    mvd_location = os.environ["MVD_LOC"]
 
     process = subprocess.Popen(
         terminal_command,
@@ -41,8 +41,6 @@ def expedat_send(mvd_filepath):
     )
 
     os.close(slave_fd)
-
-    buffer = ""
 
     try:
         while process.poll() is None:
@@ -80,4 +78,5 @@ def expedat_send(mvd_filepath):
             process.args,
         )
 
-expedat_send("/Users/lcallahan/Documents/ngRadar/Debbie.png")
+mvd_filepath = os.environ["MVD_FILEPATH"]
+expedat_send(mvd_filepath)
