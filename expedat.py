@@ -78,7 +78,7 @@ def expedat_send(mvd_filepath, method):
         terminal_command = [
                     "./movedat",
                     "-",
-                    f"{svd_user}:{svd_password}@{svd_ip}:{recipient_directory}",
+                    f"{svd_user}:{svd_password}@{svd_ip}:{recipient_directory}/generated_file.txt",
                 ]
 
         process = subprocess.Popen(
