@@ -22,7 +22,7 @@ DEBUG = os.environ.get('DJANGO_DEBUG', "False").lower() == "true"
 
 # Allow local Docker containers AND Render's domain depending on environment
 # This setting answers the question: "Is this Host header allowed?"
-ALLOWED_HOSTS = [host.strip() for host in os.environ.get('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',') if host.strip()]
+ALLOWED_HOSTS = [host.strip() for host in os.environ.get('DJANGO_ALLOWED_HOSTS', 'ngradar-website,localhost,127.0.0.1').split(',') if host.strip()]
 
 
 # This setting answers the question: "Is this HTTPS POST allowed to originate from this site?"
@@ -39,12 +39,14 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'ngRadar_Website.apps.apps.NgradarWebAppConfig',
+    "django_prometheus",
 ]
 
 
 MIDDLEWARE = [
     # the order of these is VERY important. 
     # if making changes, ensure the order is correct
+    "django_prometheus.middleware.PrometheusBeforeMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "ngRadar_Website.middleware.DatabaseUnavailableMiddleware",
@@ -56,6 +58,7 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "django.contrib.auth.middleware.LoginRequiredMiddleware",
     "ngRadar_Website.robots.RobotsMiddleware",
+    "django_prometheus.middleware.PrometheusAfterMiddleware",
 ]
 
 PASSWORD_HASHERS = [
