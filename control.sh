@@ -133,12 +133,7 @@ testcov)
 
 smoketest)
     docker compose --profile loadtest run --rm k6 \
-        run --out experimental-prometheus-rw /scripts/login_smoke.js
-    ;;
-
-authtest)
-    docker compose --profile loadtest run --rm k6 \
-        run --out experimental-prometheus-rw /scripts/authenticated_smoke.js
+        run --out experimental-prometheus-rw /scripts/smoke.js
     ;;
 
 journeytest)

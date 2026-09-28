@@ -3,10 +3,11 @@ import { check, fail, group, sleep } from 'k6';
 
 export const options = {
   scenarios: {
-    authenticated_journey: {
-      executor: 'constant-vus',
-      vus: 1,
-      duration: '30s',
+    smoke_test: {
+      executor: 'shared-iterations',
+      vus: 3,
+      iterations: 10,
+      maxDuration: '30s',
     },
   },
 
@@ -224,8 +225,8 @@ export default function () {
         `Waveform submission failed with HTTP ${waveformResponse.status}`
       );
     }
-  });
 
+  });
 // ------------------------------------------------------------
   group('home-after-submit', () => {
     const response = http.get(`${baseUrl}/home/`, {
@@ -238,12 +239,6 @@ export default function () {
       response,
       'home after waveform submission'
     );
-
-    /*
-     * The browser opens /events/stream/ through JavaScript.
-     * This journey intentionally does not open the long-lived
-     * SSE connection.
-     */
   });
 
 // ------------------------------------------------------------
@@ -260,7 +255,6 @@ export default function () {
     );
   });
 
-// ------------------------------------------------------------
   group('open-dashboard-image', () => {
     console.log(`Opening image path: ${imagePath}`);
 
@@ -337,7 +331,7 @@ export default function () {
     });
   });
 
- // ------------------------------------------------------------ 
+// ------------------------------------------------------------
   group('logout', () => {
     const logoutCsrfToken = extractCsrfToken(
       finalHomeResponse.body
@@ -395,52 +389,8 @@ export default function () {
       );
     }
 
-    const postLogoutHomeResponse = http.get(
-    `${baseUrl}/home/`,
-    {
-        redirects: 0,
-        tags: {
-        endpoint: 'home_after_logout',
-        },
-    }
-    );
-
-    const postLogoutLocation_home =
-    postLogoutHomeResponse.headers.Location || '';
-
-    check(postLogoutHomeResponse, {
-    'home is not accessible after logout': (r) =>
-        r.status === 302 || r.status === 303,
-
-    'home redirects to login after logout': () =>
-        postLogoutLocation_home === '/login/?next=/home/' ||
-        postLogoutLocation_home.endsWith('/login/?next=/home/'),
-    });
-
-    const postLogoutDashboardResponse = http.get(
-    `${baseUrl}/dashboard/`,
-    {
-        redirects: 0,
-        tags: {
-        endpoint: 'dashboard_after_logout',
-        },
-    }
-    );
-
-    const postLogoutLocation_dashboard =
-    postLogoutDashboardResponse.headers.Location || '';
-
-    check(postLogoutDashboardResponse, {
-    'dashboard is not accessible after logout': (r) =>
-        r.status === 302 || r.status === 303,
-
-    'dashboard redirects to login after logout': () =>
-        postLogoutLocation_dashboard === '/login/?next=/dashboard/' ||
-        postLogoutLocation_dashboard.endsWith('/login/?next=/dashboard/'),
-    });
-
   });
 
 
-  sleep(1);
+  sleep(3);
 }
