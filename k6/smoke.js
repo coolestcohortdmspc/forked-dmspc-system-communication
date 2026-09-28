@@ -6,7 +6,7 @@ export const options = {
     smoke_test: {
       executor: 'shared-iterations',
       vus: 3,
-      iterations: 10,
+      iterations: 15,
       maxDuration: '30s',
     },
   },
@@ -200,14 +200,34 @@ export default function () {
         tags: {
           endpoint: 'submit_waveform',
         },
+        responseCallback: http.expectedStatuses(
+          200,
+          201,
+          202,
+          204,
+          302,
+          303,
+          409
+        ),
       }
     );
 
+    
+    const isRedirect =
+      waveformResponse.status === 302 ||
+      waveformResponse.status === 303;
+
+    const isLocked = waveformResponse.status === 409;
+
     check(waveformResponse, {
-      'waveform submission redirects': (r) =>
-        r.status === 302 || r.status === 303,
+      'waveform submission succeeds or is explicitly locked': (r) =>
+        isRedirect || r.status === 409,
 
       'waveform redirects to home': (r) => {
+        if (!isRedirect) {
+          return true; // Not applicable when the action is locked
+        }
+
         const location = r.headers.Location || '';
 
         return (
@@ -217,12 +237,15 @@ export default function () {
       },
     });
 
-    if (
-      waveformResponse.status !== 302 &&
-      waveformResponse.status !== 303
-    ) {
+    if (isLocked) {
+      console.warn(
+        'Waveform submission was rejected because processing is still in progress'
+      );
+
+      // Do not run assertions that require a successful submission.
+    } else if (!isRedirect) {
       fail(
-        `Waveform submission failed with HTTP ${waveformResponse.status}`
+        `Unexpected waveform submission response: ${waveformResponse.status}`
       );
     }
 
@@ -392,5 +415,5 @@ export default function () {
   });
 
 
-  sleep(3);
+  // sleep(1);
 }

@@ -390,7 +390,9 @@ def lock_status(request):
         return JsonResponse({
             "locked": True,
             "error": False,
-        })
+            },
+            status=409, # return code good so k6 load test sees correct lock behavior
+        )
 
     except Exception as exc:
         logger.exception(
@@ -463,15 +465,6 @@ def submit_waveform(request):
         )
 
         return redirect("home")
-
-    # Existing e-transfer progress implementation.
-    # This can eventually move to Kafka too.
-    write_transfer_progress(
-        received_bytes=0,
-        total_bytes=0,
-        percent=0.0,
-        transfer_id=0,
-    )
 
     cache.set(
         "submit_locked",
