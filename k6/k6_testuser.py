@@ -4,7 +4,9 @@ Then python manage.py shell
 Then paste this script into the shell and run.
 Add K6_USERNAME=k6-testuser and K6_PASSWORD=k6-password to .env
 Now you can run the k6 tests that require authentication, they will use this test user.
-Try running ./control.sh authtest as a smoke test to verify that this login works before heavy testing.
+Don't forget to add K6_IMAGE_ID to your .env as well, grab an image id from YOUR database so the k6 user can test that opening images works.
+
+Now you can try running ./control.sh smoketest 
 """
 
 from django.contrib.auth import get_user_model
