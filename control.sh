@@ -113,9 +113,11 @@ rebuild)
 
     # Start simulator services
     docker compose $KAFKA_PROFILES up -d --force-recreate $SIM_SERVICES
-
     ;;
 
+rebuild-container)
+    docker compose up -d --build --force-recreate
+    ;;
 
 refresh)
     # Recreate containers so updated .env values are injected.
