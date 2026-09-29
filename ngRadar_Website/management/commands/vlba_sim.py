@@ -62,9 +62,7 @@ def process_msg(
     producer_config,
 ):
     STATION = Stations[os.environ.get("STATION_NAME")]
-    incoming_key = int(
-        msg.key().decode("utf-8")
-    )
+    incoming_key = msg.key().decode("utf-8")
 
     raw_data_path = Path("/raw_data")
 
@@ -74,18 +72,18 @@ def process_msg(
     #
     # Workflow consumers must ignore them.
     # ---------------------------------------------------------
-    if incoming_key == Message.DB_COMMITTED.value:
+    if incoming_key == str(Message.DB_COMMITTED.value):
         return True
 
     # Generic status-only events do not instruct VLBA
     # to perform any workflow action.
-    if incoming_key == Message.STATUS_UPDATE.value:
+    if incoming_key == str(Message.STATUS_UPDATE.value):
         return True
 
     # =========================================================
     # GBT -> VLBA
     # =========================================================
-    if incoming_key == Message.GBT_TX.value:
+    if incoming_key == str(Message.GBT_TX.value):
         print(
             "Received Kafka message from GBT."
         )
@@ -202,7 +200,7 @@ def process_msg(
     #
     # DSOC responded to our storage request.
     # =========================================================
-    elif (incoming_key == Message.DSOC_RESPOND_STORAGE.value):
+    elif (incoming_key == str(Message.DSOC_RESPOND_STORAGE.value)):
 
         payload = json.loads(msg.value().decode("utf-8"))
 
@@ -479,7 +477,7 @@ def process_msg(
     #
     # DSOC says the VLBA raw file can be deleted.
     # =========================================================
-    elif (incoming_key == Message.VLBA_DELETE.value):
+    elif (incoming_key == str(Message.VLBA_DELETE.value)):
         payload = json.loads(msg.value().decode("utf-8"))
         station = payload["rcvr_station"]
 

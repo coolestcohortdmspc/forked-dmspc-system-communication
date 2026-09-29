@@ -6,7 +6,29 @@ set -a
 source .env
 set +a
 
-START="traefik_http portainer ngradar_website postgres prometheus grafana postgres_exporter"
+# For local dev, should only need to run these commands to have everything you need:
+#  ./control.sh start      --> Will start website, db, routing services
+#  ./control.sh system-up  --> Will start kafka_services, sim_services, metric_services
+#  ./control.sh system-down
+#  ./control.sh stop
+#
+# For DO Droplets only, use these:
+#    To control all droplets from a remote device, use the following commands:
+#      ./control.sh droplets-up
+#      ./control.sh droplets-down
+#    If you are currently on a droplet, use one of the following commands:
+#      ./control.sh dsoc-up
+#      ./control.sh dsoc-down
+#      ./control.sh gbt-up
+#      ./control.sh gbt-down
+#      ./control.sh vlba-up VLBA_#_SERVICES
+#      ./control.sh vlba-down VLBA_#_SERVICES
+#      ./control.sh portainer-up
+#      ./control.sh agent-up
+
+
+
+START="traefik_http ngradar_website postgres"
 
 DSOC_DROPLET="root@${DSOC_DROPLET_IP}"
 VLBA_1_DROPLET="root@${VLBA_1_DROPLET_IP}"
@@ -19,8 +41,9 @@ REMOTE_DIR="/root/${REMOTE_REPO}"
 KAFKA_PROFILES="--profile kafka"
 
 # the order of these services matter!! learned the hard way..
-KAFKA_SERVICES="kafka-exporter kafka-node-1 kafka-node-2 kafka-node-3 kafka-init kafka-ui seaweedfs dsoc-volume-init db_consumer"
+KAFKA_SERVICES="kafka-node-1 kafka-node-2 kafka-node-3 kafka-ui seaweedfs dsoc-volume-init db_consumer"
 SIM_SERVICES="etr_daemon gbt vlba-sc vlba-hn vlba-nl vlba-fd vlba-la vlba-pt vlba-kp vlba-ov vlba-br vlba-mk dsoc progress_tracker"
+METRIC_SERVICES="portainer prometheus grafana postgres_exporter kafka-exporter k6"
 
 PORTAINER_SERVICE="portainer"
 AGENT_SERVICE="portainer_agent"
@@ -60,11 +83,14 @@ attach)
 kafka-up)
     echo "Starting Kafka infrastructure and storage..."
     docker compose $KAFKA_PROFILES up -d $KAFKA_SERVICES
+    echo "Initializing Kafka topics..."
+    docker compose $KAFKA_PROFILES up kafka-init
     ;;
 
 sims-up)
     echo "Starting simulator services..."
     docker compose $KAFKA_PROFILES up -d $SIM_SERVICES
+    docker compose up -d $METRIC_SERVICES
     ;;
 
 system-up)
@@ -74,28 +100,22 @@ system-up)
     "$0" sims-up
     ;;
 
-kafka-down)
-    echo "Stopping kafka infrastructure and storage..."
-    docker compose stop $KAFKA_SERVICES
-    docker compose rm -f $KAFKA_SERVICES
-    ;;
-
-sims-down)
-    echo "Stopping simulator services..."
-    docker compose stop $SIM_SERVICES
-    docker compose rm -f $SIM_SERVICES
-    ;;
-
 system-down)
     echo "Stopping kafka infrastructure and storage..."
     docker compose stop $KAFKA_SERVICES
     docker compose rm -f $KAFKA_SERVICES
+    docker compose stop kafka-init
+    docker compose rm -f kafka-init
     echo "Stopping simulator services..."
     docker compose stop $SIM_SERVICES
     docker compose rm -f $SIM_SERVICES
+    echo "Stopping metric services..."
+    docker compose stop $METRIC_SERVICES
+    docker compose rm -f $METRIC_SERVICES
     ;;
 
 rebuild)
+    # Will rebuild ALL containers for local dev used in start/system-up commands
     ./control.sh system-down
     ./control.sh stop
 
@@ -104,20 +124,17 @@ rebuild)
         | xargs -r docker volume rm || true
 
     # --no-cache ensures code changes are baked in cleanly
-    docker compose build --no-cache
+    docker compose build $KAFKA_SERVICES --no-cache
+    docker compose build $SIM_SERVICES --no-cache
+    docker compose build $METRIC_SERVICES --no-cache
+
     # --force-recreate guarantees .env variable updates  and config updates are pushed into the container upon rebuild
     docker compose up -d --force-recreate $START
-
-    # Start Kafka-profile services
-    docker compose $KAFKA_PROFILES up -d --force-recreate $KAFKA_SERVICES
-
-    # Start simulator services
-    docker compose $KAFKA_PROFILES up -d --force-recreate $SIM_SERVICES
+    docker compose up -d --force-recreate $KAFKA_SERVICES
+    docker compose up -d --force-recreate $SIM_SERVICES
+    docker compose up -d --force-recreate $METRIC_SERVICES
     ;;
 
-rebuild-container)
-    docker compose up -d --build --force-recreate
-    ;;
 
 refresh)
     # Recreate containers so updated .env values are injected.
@@ -125,6 +142,7 @@ refresh)
     docker compose up -d --force-recreate --no-build $START
     docker compose up -d --force-recreate --no-build $KAFKA_SERVICES
     docker compose up -d --force-recreate --no-build $SIM_SERVICES
+    docker compose up -d --force-recreate $METRIC_SERVICES
 
     ;;
 
@@ -163,7 +181,16 @@ hard-reset)
 
     docker system prune -f
 
-    docker compose build --no-cache && docker compose up -d
+     # --no-cache ensures code changes are baked in cleanly
+    docker compose build $KAFKA_SERVICES --no-cache
+    docker compose build $SIM_SERVICES --no-cache
+    docker compose build $METRIC_SERVICES --no-cache
+
+    # --force-recreate guarantees .env variable updates  and config updates are pushed into the container upon rebuild
+    docker compose up -d --force-recreate $START
+    docker compose up -d --force-recreate $KAFKA_SERVICES
+    docker compose up -d --force-recreate $SIM_SERVICES
+    docker compose up -d --force-recreate $METRIC_SERVICES
     ;;
 
 portainer-up)
@@ -273,7 +300,7 @@ droplets-down)
     echo "To make migrations and create superusers, use the shell:"
     echo "./control.sh shell"
     echo
-    echo "Utility commands to rebuild working environment:"
+    echo "Utility commands to rebuild local dev environment:"
     echo "./control.sh rebuild"
     echo "./control.sh hard-reset"
     echo
@@ -293,15 +320,6 @@ droplets-down)
     echo "./control.sh vlba-down VLBA_#_SERVICES"
     echo "./control.sh portainer-up"
     echo "./control.sh agent-up"
-    echo
-    echo "Other commands (rarely needed):"
-    echo "./control.sh sims-up"
-    echo "./control.sh sims-down"
-    echo "./control.sh kafka-up"
-    echo "./control.sh kafka-down"
-    echo "./control.sh logs"
-    echo "./control.sh attach"
-    # echo "./control.sh load-staging-data"
     exit 1
     ;;
 

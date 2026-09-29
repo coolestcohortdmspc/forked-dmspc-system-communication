@@ -390,9 +390,7 @@ def lock_status(request):
         return JsonResponse({
             "locked": True,
             "error": False,
-            },
-            status=409, # return code good so k6 load test sees correct lock behavior
-        )
+        })
 
     except Exception as exc:
         logger.exception(
@@ -427,6 +425,19 @@ def submit_waveform(request):
 
     UI -> GBT_notif -> GBT
     """
+
+    # Reject a new submission if one is already processing.
+    if cache.get("submit_locked") is not None:
+        return JsonResponse(
+            {
+                "error": True,
+                "message": (
+                    "A waveform is already "
+                    "being processed."
+                ),
+            },
+            status=409,
+        )
 
     waveform = request.POST.get("waveform")
     user = request.user.username
