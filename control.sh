@@ -143,6 +143,15 @@ journeytest)
         run --out experimental-prometheus-rw /scripts/journey.js
     ;;
 
+loadtest)
+    timestamp=$(date +%Y%m%d-%H%M%S)
+
+    docker compose --profile loadtest run --rm \
+        -e RUN_ID="load-${timestamp}" \
+        k6 run \
+        --out experimental-prometheus-rw /scripts/load.js
+        ;; 
+
 hard-reset)
     read -p "This will DELETE your local database and containers. Continue? (y/N): " ANSWER
 

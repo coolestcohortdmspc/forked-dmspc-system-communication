@@ -18,7 +18,7 @@ export const options = {
   },
 
   tags: {
-    test_type: 'journey',
+    test_type: 'smoke',
     service: 'ngradar_website',
   },
 };
@@ -415,5 +415,5 @@ export default function () {
   });
 
 
-  // sleep(1);
+  sleep(5);
 }

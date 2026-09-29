@@ -239,6 +239,7 @@ services:
       - ngradar_website_network
     volumes:
       - ./k6:/scripts:ro
+      - ./k6-results:/results
     environment:
       K6_PROMETHEUS_RW_SERVER_URL: http://prometheus:9090/api/v1/write
       K6_PROMETHEUS_RW_TREND_STATS: p(95),p(99),min,max
@@ -716,6 +717,7 @@ services:
     profiles: ["kafka"]
     environment:
       BOOTSTRAP_SERVER: ${KAFKA_BOOTSTRAP_SERVERS} #needs all 3 brokers
+      DSOC_VOLUME_SIZE: ${DSOC_VOLUME_SIZE}
     entrypoint:
         - python
         - manage.py
