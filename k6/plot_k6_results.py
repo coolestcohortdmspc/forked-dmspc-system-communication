@@ -1,3 +1,8 @@
+"""
+Run this script after you are done with a set of test runs.
+For example, I want to visualize the 5 load tests I just performed. The output got saved to the k6-results folder (gitignored). Running this script will aggregate ALL of the results in that folder unless you adjust the parameters toward the bottom of this script.
+"""
+
 import argparse
 import json
 from pathlib import Path
@@ -177,7 +182,7 @@ def main():
     parser.add_argument(
         "pattern",
         nargs="?",
-        default="k6-results/*.json",
+        default="k6-results/*.json", # Adjust this if you don't want to grab every file in the k6-results folder. Maybe you only want ones named stress*.json or load*.json
         help="File pattern for k6 result files.",
     )
 
