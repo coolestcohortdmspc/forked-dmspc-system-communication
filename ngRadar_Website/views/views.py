@@ -345,96 +345,68 @@ def serve_image(request, uuid):
 # Waveform submission lock
 # ============================================================
 
+def get_submission_lock_status():
+    """Return the current submission-lock status."""
+    lock_time = cache.get("submit_locked")
+
+    if lock_time is None:
+        return {"locked": False, "error": False}
+
+    observation_completed = (
+        ObservatoryEvent.objects
+        .filter(
+            station=Stations.DSOC,
+            status=Status.COMPLETED,
+            event_time__gt=lock_time,
+        )
+        .exists()
+    )
+
+    if observation_completed:
+        cache.delete("submit_locked")
+        return {"locked": False, "error": False}
+
+    return {"locked": True, "error": False}
+
+
 @require_GET
 def lock_status(request):
-    """status_partial
-    Submission lock fallback endpoint.
-
-    A submission remains locked until a DSOC COMPLETED
-    ObservatoryEvent occurs after the lock was created.
-
-    The browser can also unlock immediately from live SSE.
-    """
-
     try:
-        lock_time = cache.get(
-            "submit_locked"
-        )
-
-        if lock_time is None:
-            return JsonResponse({
-                "locked": False,
-                "error": False,
-            })
-
-        observation_completed = (
-            ObservatoryEvent.objects
-            .filter(
-                station=Stations.DSOC,
-                status=Status.COMPLETED,
-                event_time__gt=lock_time,
-            )
-            .exists()
-        )
-
-        if observation_completed:
-            cache.delete(
-                "submit_locked"
-            )
-
-            return JsonResponse({
-                "locked": False,
-                "error": False,
-            })
-
-        return JsonResponse({
-            "locked": True,
-            "error": False,
-        })
-
-    except Exception as exc:
-        logger.exception(
-            "Unable to determine "
-            "waveform submission lock."
-        )
-
+        return JsonResponse(get_submission_lock_status())
+    except Exception:
+        logger.exception("Unable to determine waveform submission lock.")
         return JsonResponse(
             {
                 "locked": True,
                 "error": True,
-                "message": (
-                    "Unable to determine "
-                    "lock status."
-                ),
+                "message": "Unable to determine lock status.",
             },
             status=503,
         )
 
-
 # ============================================================
 # UI -> Kafka waveform submission
 # ============================================================
-
 @login_required
 @require_POST
 def submit_waveform(request):
-    """
-    User waveform submission.
-
-    No uiEvent database write occurs here.
-
-    UI -> GBT_notif -> GBT
-    """
-
-    # Reject a new submission if one is already processing.
-    if cache.get("submit_locked") is not None:
+    try:
+        lock_status_data = get_submission_lock_status()
+    except Exception:
+        logger.exception("Unable to determine waveform submission lock.")
         return JsonResponse(
             {
                 "error": True,
-                "message": (
-                    "A waveform is already "
-                    "being processed."
-                ),
+                "message": "Unable to determine lock status.",
+            },
+            status=503,
+        )
+
+    if lock_status_data["locked"]:
+        return JsonResponse(
+            {
+                "error": True,
+                "message": "A waveform is already being processed.",
             },
             status=409,
         )
