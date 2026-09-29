@@ -125,12 +125,14 @@ rebuild)
 
     # --no-cache ensures code changes are baked in cleanly
     docker compose build $KAFKA_SERVICES --no-cache
+    docker compose build kafka-init --no-cache
     docker compose build $SIM_SERVICES --no-cache
     docker compose build $METRIC_SERVICES --no-cache
 
     # --force-recreate guarantees .env variable updates  and config updates are pushed into the container upon rebuild
     docker compose up -d --force-recreate $START
     docker compose up -d --force-recreate $KAFKA_SERVICES
+    docker compose up -d kafka-init --force-recreate
     docker compose up -d --force-recreate $SIM_SERVICES
     docker compose up -d --force-recreate $METRIC_SERVICES
     ;;
