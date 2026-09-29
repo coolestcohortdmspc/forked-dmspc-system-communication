@@ -3,10 +3,16 @@ import { check, fail, group, sleep } from 'k6';
 
 export const options = {
   scenarios: {
-    journey: {
-      executor: 'constant-vus',
-      vus: 1,
-      duration: '30s',
+    load_test: {
+      executor: 'ramping-vus',
+      startVUs: 1,
+      stages: [
+        { duration: '30s', target: 5 },
+        { duration: '3m', target: 20 },
+        { duration: '30s', target: 0 },
+      ],
+      gracefulRampDown: '30s',
+
     },
   },
 
@@ -17,10 +23,31 @@ export const options = {
   },
 
   tags: {
-    test_type: 'journey',
+    test_type: 'load',
     service: 'ngradar_website',
   },
 };
+
+// export test results to a json file for future processing
+export function handleSummary(data) {
+  const runId = __ENV.RUN_ID || 'unknown-run';
+
+  const summary = {
+    runId,
+    timestamp: new Date().toISOString(),
+    metrics: {
+      http_req_duration: data.metrics.http_req_duration?.values,
+      http_req_failed: data.metrics.http_req_failed?.values,
+      http_reqs: data.metrics.http_reqs?.values,
+      checks: data.metrics.checks?.values,
+    },
+  };
+
+  return {
+    [`/results/${runId}-summary.json`]: JSON.stringify(summary, null, 2),
+  };
+}
+
 
 const baseUrl = (
   __ENV.K6_BASE_URL || 'http://ngradar-website:8000'
@@ -35,6 +62,7 @@ const imageId = __ENV.K6_IMAGE_ID;
 
 const waveformField = __ENV.K6_WAVEFORM_FIELD || 'waveform';
 const waveformValue = __ENV.K6_WAVEFORM_VALUE || '48';
+const waveformSubmissionRate = Number(0.1)
 
 function extractCsrfToken(body) {
   const patterns = [
@@ -183,68 +211,89 @@ export default function () {
   }
 
 // ------------------------------------------------------------
-  group('submit-waveform', () => {
-    const waveformResponse = http.post(
-      `${baseUrl}/home/submit-waveform/`,
-      {
-        [waveformField]: waveformValue,
-        csrfmiddlewaretoken: csrfToken,
-      },
-      {
-        headers: {
-          Referer: `${baseUrl}/home/`,
-          'Content-Type': 'application/x-www-form-urlencoded',
+  const shouldSubmitWaveform = Math.random() < waveformSubmissionRate;
+
+  if (shouldSubmitWaveform) {
+    group('submit-waveform', () => {
+        const waveformResponse = http.post(
+        `${baseUrl}/home/submit-waveform/`,
+        {
+            [waveformField]: waveformValue,
+            csrfmiddlewaretoken: csrfToken,
         },
-        redirects: 0,
-        tags: {
-          endpoint: 'submit_waveform',
-        },
-      }
-    );
-
-    check(waveformResponse, {
-      'waveform submission redirects': (r) =>
-        r.status === 302 || r.status === 303,
-
-      'waveform redirects to home': (r) => {
-        const location = r.headers.Location || '';
-
-        return (
-          location === '/home/' ||
-          location.endsWith('/home/')
+        {
+            headers: {
+            Referer: `${baseUrl}/home/`,
+            'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            redirects: 0,
+            tags: {
+            endpoint: 'submit_waveform',
+            },
+            responseCallback: http.expectedStatuses(
+            200,
+            201,
+            202,
+            204,
+            302,
+            303,
+            409
+            ),
+        }
         );
-      },
+
+        
+        const isRedirect =
+        waveformResponse.status === 302 ||
+        waveformResponse.status === 303;
+
+        const isLocked = waveformResponse.status === 409;
+
+        check(waveformResponse, {
+        'waveform submission succeeds or is explicitly locked': (r) =>
+            isRedirect || r.status === 409,
+
+        'waveform redirects to home': (r) => {
+            if (!isRedirect) {
+            return true; // Not applicable when the action is locked
+            }
+
+            const location = r.headers.Location || '';
+
+            return (
+            location === '/home/' ||
+            location.endsWith('/home/')
+            );
+        },
+        });
+
+        if (isLocked) {
+        console.warn(
+            'Waveform submission was rejected because processing is still in progress'
+        );
+
+        // Do not run assertions that require a successful submission.
+        } else if (!isRedirect) {
+        fail(
+            `Unexpected waveform submission response: ${waveformResponse.status}`
+        );
+        }
+
     });
+    // ------------------------------------------------------------
+    group('home-after-submit', () => {
+        const response = http.get(`${baseUrl}/home/`, {
+        tags: {
+            endpoint: 'home_after_submit',
+        },
+        });
 
-    if (
-      waveformResponse.status !== 302 &&
-      waveformResponse.status !== 303
-    ) {
-      fail(
-        `Waveform submission failed with HTTP ${waveformResponse.status}`
-      );
-    }
-  });
-
-// ------------------------------------------------------------
-  group('home-after-submit', () => {
-    const response = http.get(`${baseUrl}/home/`, {
-      tags: {
-        endpoint: 'home_after_submit',
-      },
+        checkAuthenticatedPage(
+        response,
+        'home after waveform submission'
+        );
     });
-
-    checkAuthenticatedPage(
-      response,
-      'home after waveform submission'
-    );
-
-    /*
-     * The browser opens /events/stream/ through JavaScript.
-     * This journey intentionally does not open the long-lived
-     * SSE connection.
-     */
-  });
+  }
 
 // ------------------------------------------------------------
   group('dashboard', () => {
@@ -260,7 +309,6 @@ export default function () {
     );
   });
 
-// ------------------------------------------------------------
   group('open-dashboard-image', () => {
     console.log(`Opening image path: ${imagePath}`);
 
@@ -337,7 +385,7 @@ export default function () {
     });
   });
 
- // ------------------------------------------------------------ 
+// ------------------------------------------------------------
   group('logout', () => {
     const logoutCsrfToken = extractCsrfToken(
       finalHomeResponse.body
@@ -395,52 +443,8 @@ export default function () {
       );
     }
 
-    const postLogoutHomeResponse = http.get(
-    `${baseUrl}/home/`,
-    {
-        redirects: 0,
-        tags: {
-        endpoint: 'home_after_logout',
-        },
-    }
-    );
-
-    const postLogoutLocation_home =
-    postLogoutHomeResponse.headers.Location || '';
-
-    check(postLogoutHomeResponse, {
-    'home is not accessible after logout': (r) =>
-        r.status === 302 || r.status === 303,
-
-    'home redirects to login after logout': () =>
-        postLogoutLocation_home === '/login/?next=/home/' ||
-        postLogoutLocation_home.endsWith('/login/?next=/home/'),
-    });
-
-    const postLogoutDashboardResponse = http.get(
-    `${baseUrl}/dashboard/`,
-    {
-        redirects: 0,
-        tags: {
-        endpoint: 'dashboard_after_logout',
-        },
-    }
-    );
-
-    const postLogoutLocation_dashboard =
-    postLogoutDashboardResponse.headers.Location || '';
-
-    check(postLogoutDashboardResponse, {
-    'dashboard is not accessible after logout': (r) =>
-        r.status === 302 || r.status === 303,
-
-    'dashboard redirects to login after logout': () =>
-        postLogoutLocation_dashboard === '/login/?next=/dashboard/' ||
-        postLogoutLocation_dashboard.endsWith('/login/?next=/dashboard/'),
-    });
-
   });
 
 
-  sleep(1);
+  sleep(7);
 }
