@@ -23,7 +23,7 @@ export const options = {
   },
 
   tags: {
-    test_type: 'load',
+    test_type: 'avg_load',
     service: 'ngradar_website',
   },
 };
