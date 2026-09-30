@@ -12,6 +12,7 @@ from ngRadar_Website.enums import (
     Stations,
     Status,
     Message,
+    UIEvent,
 )
 
 from ngRadar_Website.utils import (
@@ -66,18 +67,12 @@ def process_msg(
 
     raw_data_path = Path("/raw_data")
 
-    # ---------------------------------------------------------
-    # DB_COMMITTED messages are acknowledgements intended for
-    # the website/UI consumer.
-    #
-    # Workflow consumers must ignore them.
-    # ---------------------------------------------------------
-    if incoming_key == str(Message.DB_COMMITTED.value):
-        return True
-
-    # Generic status-only events do not instruct VLBA
-    # to perform any workflow action.
-    if incoming_key == str(Message.STATUS_UPDATE.value):
+    # ------------------------------------------------------------------
+    # DB_COMMITTED + IMAGE_CHANGED + STATUS_UPDATE kafka messages
+    # are acknowledgements intended for the website/UI consumers only.
+    # VLBAs should ignore these.
+    # ------------------------------------------------------------------
+    if incoming_key == str(Message.DB_COMMITTED.value) or incoming_key == UIEvent.IMAGE_CHANGED or incoming_key == str(Message.STATUS_UPDATE.value):
         return True
 
     # =========================================================
@@ -490,7 +485,8 @@ def process_msg(
         delete_observation_data(file_name)
 
     # =========================================================
-    # Unknown workflow message
+    # Encountered a message for a different VLBA station
+    # than whichever VLBA station is currently processing
     # =========================================================
     else:
         print(

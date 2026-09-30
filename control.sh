@@ -96,6 +96,8 @@ sims-up)
 system-up)
     echo "Starting Kafka infrastructure and storage..."
     "$0" kafka-up
+    echo "Starting website, db, traefik routing..."
+    "$0" start
     echo "Starting simulator services..."
     "$0" sims-up
     ;;
@@ -112,6 +114,9 @@ system-down)
     echo "Stopping metric services..."
     docker compose stop $METRIC_SERVICES
     docker compose rm -f $METRIC_SERVICES
+    echo "Stopping website, db, routing services..."
+    docker compose stop $START
+    docker compose rm -f $START
     ;;
 
 rebuild)
@@ -127,12 +132,13 @@ rebuild)
     docker compose build $KAFKA_SERVICES --no-cache
     docker compose build kafka-init --no-cache
     docker compose build $SIM_SERVICES --no-cache
+    docker compose build $START --no-cache
     docker compose build $METRIC_SERVICES --no-cache
 
     # --force-recreate guarantees .env variable updates  and config updates are pushed into the container upon rebuild
-    docker compose up -d --force-recreate $START
     docker compose up -d --force-recreate $KAFKA_SERVICES
     docker compose up -d kafka-init --force-recreate
+    docker compose up -d --force-recreate $START
     docker compose up -d --force-recreate $SIM_SERVICES
     docker compose up -d --force-recreate $METRIC_SERVICES
     ;;
@@ -141,9 +147,10 @@ rebuild)
 refresh)
     # Recreate containers so updated .env values are injected.
     # Images are reused; no rebuild is performed.
-    docker compose up -d --force-recreate --no-build $START
-    docker compose up -d --force-recreate --no-build $KAFKA_SERVICES
-    docker compose up -d --force-recreate --no-build $SIM_SERVICES
+    docker compose up -d --force-recreate $KAFKA_SERVICES
+    docker compose up -d kafka-init --force-recreate
+    docker compose up -d --force-recreate $START
+    docker compose up -d --force-recreate $SIM_SERVICES
     docker compose up -d --force-recreate $METRIC_SERVICES
 
     ;;
@@ -185,12 +192,15 @@ hard-reset)
 
      # --no-cache ensures code changes are baked in cleanly
     docker compose build $KAFKA_SERVICES --no-cache
+    docker compose build kafka-init --no-cache
     docker compose build $SIM_SERVICES --no-cache
+    docker compose build $START --no-cache
     docker compose build $METRIC_SERVICES --no-cache
 
     # --force-recreate guarantees .env variable updates  and config updates are pushed into the container upon rebuild
-    docker compose up -d --force-recreate $START
     docker compose up -d --force-recreate $KAFKA_SERVICES
+    docker compose up -d kafka-init --force-recreate
+    docker compose up -d --force-recreate $START
     docker compose up -d --force-recreate $SIM_SERVICES
     docker compose up -d --force-recreate $METRIC_SERVICES
     ;;
@@ -294,10 +304,8 @@ droplets-down)
     echo "HELP with ./control.sh usage:"
     echo
     echo "If developing locally, use the following commands to start/stop your environment:"
-    echo "./control.sh start"
     echo "./control.sh system-up"
     echo "./control.sh system-down"
-    echo "./control.sh stop"
     echo
     echo "To make migrations and create superusers, use the shell:"
     echo "./control.sh shell"
