@@ -8,7 +8,7 @@ export const options = {
       startVUs: 1,
       stages: [
         { duration: '30s', target: 5 },
-        { duration: '3m', target: 20 },
+        { duration: '5m', target: 10 },
         { duration: '30s', target: 0 },
       ],
       gracefulRampDown: '30s',
@@ -346,7 +346,7 @@ export default function () {
           'http://images.localhost/'
         ) ||
         location.startsWith(
-          'https://images.localhost/'
+          'https://images.ngradar.dedyn.io/'
         ),
 
       'image redirect contains signed URL': () =>
@@ -446,5 +446,5 @@ export default function () {
   });
 
 
-  sleep(7);
+  sleep(30);
 }

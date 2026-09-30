@@ -254,15 +254,14 @@ def config_func(
             f"{sim.name.lower()}"
             "-consumer-group"
         ),
-        # "auto.offset.reset": (
-        #     "earliest"
-        # ),
+
         # Consumer failover/recovery
         "session.timeout.ms": 45000,
         "heartbeat.interval.ms": 15000,
         "socket.timeout.ms": 30000,
         "reconnect.backoff.ms": 100,
         "reconnect.backoff.max.ms": 10000,
+        "auto.offset.reset": "earliest",
 
         # Usually useful for clients that must discover changed leaders
         "topic.metadata.refresh.interval.ms": 300000,
@@ -482,6 +481,7 @@ def send_kafka_message(
             else None
         ),
         "retry_count": (int(retry_count)),
+        
         "object_id": (
             object_id
             if object_id is not None
