@@ -27,7 +27,7 @@ def expedat_send(mvd_filepath, method):
 
     if method == "transfer":
 
-        master_fd, slave_fd = os.openpty()
+        master_fd, receiver_fd = os.openpty()
 
         # transfer method requires a filepath to retrieve the completed file
         terminal_command = [
@@ -38,14 +38,14 @@ def expedat_send(mvd_filepath, method):
         
         process = subprocess.Popen(
             terminal_command,
-            stdin=slave_fd,
-            stdout=slave_fd,
-            stderr=slave_fd,
+            stdin=receiver_fd,
+            stdout=receiver_fd,
+            stderr=receiver_fd,
             close_fds=True,
             cwd=mvd_location
         )
 
-        os.close(slave_fd)
+        os.close(receiver_fd)
 
         try:
             while process.poll() is None:

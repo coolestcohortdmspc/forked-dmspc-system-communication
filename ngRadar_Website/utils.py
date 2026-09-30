@@ -841,7 +841,7 @@ def etc_send(frame_path):
     #     transfer_id=transfer_id,
     # )
 
-    master_fd, slave_fd = os.openpty()
+    master_fd, receiver_fd = os.openpty()
 
     etd_host = os.environ["ETD_HOST"]
     etd_command_port = os.environ.get("ETD_COMMAND_PORT", "4004")
@@ -859,13 +859,13 @@ def etc_send(frame_path):
             etd_destination,
             "--resume",
         ],
-        stdin=slave_fd,
-        stdout=slave_fd,
-        stderr=slave_fd,
+        stdin=receiver_fd,
+        stdout=receiver_fd,
+        stderr=receiver_fd,
         close_fds=True,
     )
 
-    os.close(slave_fd)
+    os.close(receiver_fd)
 
     buffer = ""
 
