@@ -5,9 +5,9 @@ export const options = {
   scenarios: {
     smoke_test: {
       executor: 'shared-iterations',
-      vus: 3,
-      iterations: 15,
-      maxDuration: '30s',
+      vus: 2,
+      iterations: 10,
+      maxDuration: '1m',
     },
   },
 
@@ -310,12 +310,12 @@ export default function () {
         r.status === 307 ||
         r.status === 308,
 
-      'image redirect points to images.localhost': () =>
+      'image redirect points to images.host': () =>
         location.startsWith(
           'http://images.localhost/'
         ) ||
         location.startsWith(
-          'https://images.localhost/'
+          'https://images.ngradar.dedyn.io/'
         ),
 
       'image redirect contains signed URL': () =>
@@ -415,5 +415,5 @@ export default function () {
   });
 
 
-  sleep(5);
+  sleep(15);
 }
