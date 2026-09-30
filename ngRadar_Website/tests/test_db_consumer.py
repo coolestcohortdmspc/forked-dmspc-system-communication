@@ -1,6 +1,6 @@
 from unittest.mock import patch, MagicMock
 from ngRadar_Website.models.models import ObservatoryEvent
-from ngRadar_Website.enums import Message, Stations
+from ngRadar_Website.enums import Message, Stations, UIEvent
 import json
 
 # ==============================================================================
@@ -24,7 +24,7 @@ with patch("pathlib.Path.read_text", return_value=mock_env_data):
 @patch("ngRadar_Website.management.commands.db_consumer.publish_db_committed")
 @patch("ngRadar_Website.management.commands.db_consumer.transaction")
 def test_process_msg_db_success(mock_transaction, mock_publish, mock_record):
-    """Scenario 1: the 'try' is successful"""
+    """Scenario 1: the 'try' is successful."""
 
     msg = MagicMock()
 
@@ -33,29 +33,40 @@ def test_process_msg_db_success(mock_transaction, mock_publish, mock_record):
         "transfer_uuid": "12345",
     }
 
-    msg.value.return_value = json.dumps(payload).encode("utf-8")
-    
-    msg.key.return_value = str(
-        Message.DSOC_RESPOND_STORAGE.value
-    ).encode("utf-8")
+    msg.value.return_value = (json.dumps(payload).encode("utf-8"))
+
+    msg.key.return_value = str(Message.DSOC_RESPOND_STORAGE.value).encode("utf-8")
 
     msg.topic.return_value = "fake topic"
 
-    # Make `with transaction.atomic():` work
-    mock_transaction.atomic.return_value.__enter__.return_value = None
+    mock_event = MagicMock()
+    mock_event.uuid = ("11111111-1111-1111-1111-111111111111")
+    mock_event.image_key = None
+    mock_event.rcvr_station = None
 
-    # Make transaction.on_commit execute the callback
-    mock_transaction.on_commit.side_effect = (
-        lambda callback: callback()
+    mock_record.return_value = (mock_event, True,)
+
+    # Make `with transaction.atomic():` work.
+    mock_transaction.atomic.return_value.__enter__.return_value = (None)
+
+    # Execute on_commit callbacks immediately.
+    mock_transaction.on_commit.side_effect = (lambda callback: callback())
+
+    result = process_msg(
+        msg,
+        "fake topic",
+        "fake config",
     )
 
-    result = process_msg(msg, "fake topic", "fake config")
-
-    mock_publish.assert_called_once_with(topic="fake topic",
-                        producer_config="fake config",
-                        payload=payload)
     mock_record.assert_called_once_with(payload)
-    assert result == True
+
+    mock_publish.assert_called_once_with(
+        topic="fake topic",
+        producer_config="fake config",
+        payload=payload,
+    )
+
+    assert result is True
 
 
 @patch("ngRadar_Website.management.commands.db_consumer.record_obs_event")
@@ -159,3 +170,59 @@ def test_publish_db_committed(mock_produce):
                                                 "event_type": "db_committed",
                                                 "data": "payload",
                                             }))
+
+
+
+#===================================================
+# Test image_created sse produced from db_consumer
+# to DSOC_notif
+#===================================================
+@patch("ngRadar_Website.management.commands.db_consumer." "publish_ui_event")
+@patch("ngRadar_Website.management.commands.db_consumer." "record_obs_event")
+@patch("ngRadar_Website.management.commands.db_consumer." "publish_db_committed")
+@patch("ngRadar_Website.management.commands.db_consumer." "transaction")
+def test_process_msg_publishes_image_changed(mock_transaction, mock_publish_db, mock_record, mock_publish_ui):
+    msg = MagicMock()
+
+    payload = {
+        "event_uuid":
+            "11111111-1111-1111-1111-111111111111",
+        "image_key":
+            "ddm/Moretus/image.png",
+        "rcvr_station":
+            Stations.PT,
+    }
+
+    msg.value.return_value = (json.dumps(payload).encode("utf-8"))
+
+    msg.key.return_value = str(Message.DSOC_RESPOND_STORAGE.value).encode("utf-8")
+
+    msg.topic.return_value = "DSOC_notif"
+
+    mock_event = MagicMock()
+    mock_event.uuid = payload["event_uuid"]
+    mock_event.image_key = payload["image_key"]
+    mock_event.rcvr_station = Stations.PT
+
+    mock_record.return_value = (mock_event, True)
+
+    mock_transaction.on_commit.side_effect = (lambda callback: callback())
+
+    result = process_msg(
+        msg,
+        "DSOC_notif",
+        "fake config",
+    )
+
+    mock_publish_ui.assert_called_once_with(
+        topic="DSOC_notif",
+        producer_config="fake config",
+        event_type=UIEvent.IMAGE_CHANGED,
+        key=payload["event_uuid"],
+        data={
+            "event_uuid": payload["event_uuid"],
+            "rcvr_station": Stations.PT,
+        },
+    )
+
+    assert result is True
