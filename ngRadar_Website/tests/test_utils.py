@@ -713,8 +713,8 @@ def test_etc_send(mock_parse, mock_os_read, mock_select, mock_os_close, mock_pop
     mock_uuid.return_value = "fake_uuid"
 
     mock_master = "fake_master_fd"
-    mock_slave = "fake_slave_fd"
-    mock_os_open.return_value = (mock_master, mock_slave)
+    mock_receiver = "fake_receiver_fd"
+    mock_os_open.return_value = (mock_master, mock_receiver)
 
     mock_process = MagicMock()
     mock_popen.return_value = mock_process
@@ -741,9 +741,9 @@ def test_etc_send(mock_parse, mock_os_read, mock_select, mock_os_close, mock_pop
             "tcp://fake_host#4004:/dsoc/incoming/",
             "--resume",
         ],
-        stdin=mock_slave,
-        stdout=mock_slave,
-        stderr=mock_slave,
+        stdin=mock_receiver,
+        stdout=mock_receiver,
+        stderr=mock_receiver,
         close_fds=True,
     )
 
