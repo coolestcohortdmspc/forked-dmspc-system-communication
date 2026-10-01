@@ -73,7 +73,8 @@ const password = __ENV.K6_PASSWORD;
 const imageId = __ENV.K6_IMAGE_ID;
 
 const waveformField = __ENV.K6_WAVEFORM_FIELD || 'waveform';
-const waveformValue = __ENV.K6_WAVEFORM_VALUE || '48';
+// const waveformValue = __ENV.K6_WAVEFORM_VALUE || '48';
+const waveformValue = __ENV.K6_WAVEFORM_VALUE || 'W48';
 
 function extractCsrfToken(body) {
   const patterns = [
@@ -501,6 +502,74 @@ export function waveformUser() {
   }
 
 // ------------------------------------------------------------
+//   group('submit-waveform', () => {
+//     const waveformResponse = http.post(
+//       `${baseUrl}/home/submit-waveform/`,
+//       {
+//         [waveformField]: waveformValue,
+//         csrfmiddlewaretoken: csrfToken,
+//       },
+//       {
+//         headers: {
+//           Referer: `${baseUrl}/home/`,
+//           'Content-Type': 'application/x-www-form-urlencoded',
+//         },
+//         redirects: 0,
+//         tags: {
+//           endpoint: 'submit_waveform',
+//         },
+//         responseCallback: http.expectedStatuses(
+//           200,
+//           201,
+//           202,
+//           204,
+//           302,
+//           303,
+//           409
+//         ),
+//       }
+//     );
+//
+//
+//     const isRedirect =
+//       waveformResponse.status === 302 ||
+//       waveformResponse.status === 303;
+//
+//     const isLocked = waveformResponse.status === 409;
+//
+//     check(waveformResponse, {
+//       'waveform submission succeeds or is explicitly locked': (r) =>
+//         isRedirect || r.status === 409,
+//
+//       'waveform redirects to home': (r) => {
+//         if (!isRedirect) {
+//           return true; // Not applicable when the action is locked
+//         }
+//
+//         const location = r.headers.Location || '';
+//
+//         return (
+//           location === '/home/' ||
+//           location.endsWith('/home/')
+//         );
+//       },
+//     });
+//
+//     if (isLocked) {
+//       console.warn(
+//         'Waveform submission was rejected because processing is still in progress'
+//       );
+//
+//       // Do not run assertions that require a successful submission.
+//     } else if (!isRedirect) {
+//       fail(
+//         `Unexpected waveform submission response: ${waveformResponse.status}`
+//       );
+//     }
+//
+//   });
+
+  // ------------------------------------------------------------
   group('submit-waveform', () => {
     const waveformResponse = http.post(
       `${baseUrl}/home/submit-waveform/`,
@@ -518,54 +587,79 @@ export function waveformUser() {
           endpoint: 'submit_waveform',
         },
         responseCallback: http.expectedStatuses(
-          200,
-          201,
           202,
-          204,
-          302,
-          303,
           409
         ),
       }
     );
 
-    
-    const isRedirect =
-      waveformResponse.status === 302 ||
-      waveformResponse.status === 303;
+    const isAccepted =
+      waveformResponse.status === 202;
 
-    const isLocked = waveformResponse.status === 409;
+    const isLocked =
+      waveformResponse.status === 409;
 
     check(waveformResponse, {
-      'waveform submission succeeds or is explicitly locked': (r) =>
-        isRedirect || r.status === 409,
-
-      'waveform redirects to home': (r) => {
-        if (!isRedirect) {
-          return true; // Not applicable when the action is locked
-        }
-
-        const location = r.headers.Location || '';
-
-        return (
-          location === '/home/' ||
-          location.endsWith('/home/')
-        );
-      },
+      'waveform submission is accepted or explicitly locked':
+        () => isAccepted || isLocked,
     });
 
-    if (isLocked) {
-      console.warn(
-        'Waveform submission was rejected because processing is still in progress'
-      );
+    let responseBody;
 
-      // Do not run assertions that require a successful submission.
-    } else if (!isRedirect) {
+    try {
+      responseBody =
+        waveformResponse.json();
+    } catch (error) {
       fail(
-        `Unexpected waveform submission response: ${waveformResponse.status}`
+        `Waveform response was not valid JSON: ` +
+        `status=${waveformResponse.status} ` +
+        `body=${waveformResponse.body}`
       );
     }
 
+    if (isAccepted) {
+      check(responseBody, {
+        'waveform response reports success':
+          (data) =>
+            data.error === false,
+
+        'waveform response contains event UUID':
+          (data) =>
+            Boolean(data.event_uuid),
+
+        'waveform response contains message':
+          (data) =>
+            Boolean(data.message),
+      });
+
+      console.log(
+        `Waveform ${waveformValue} accepted: ` +
+        `${responseBody.event_uuid}`
+      );
+
+    } else if (isLocked) {
+      check(responseBody, {
+        'locked response reports error':
+          (data) =>
+            data.error === true,
+
+        'locked response contains message':
+          (data) =>
+            Boolean(data.message),
+      });
+
+      console.warn(
+        `Waveform submission locked: ` +
+        `${responseBody.message}`
+      );
+
+    } else {
+      fail(
+        `Unexpected waveform submission response: ` +
+        `status=${waveformResponse.status} ` +
+        `body=${waveformResponse.body}`
+      );
+    }
   });
 // ------------------------------------------------------------
   group('home-after-submit', () => {
