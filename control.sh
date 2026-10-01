@@ -200,8 +200,10 @@ loadtest)
     docker compose --profile loadtest run --rm \
         -e RUN_ID="load-${timestamp}" \
         k6 run \
-        --out experimental-prometheus-rw /scripts/load.js
-        ;; 
+        --out experimental-prometheus-rw \
+        --out "json=/results/breakpoint_${timestamp}.json" \
+        /scripts/load.js
+        ;;         # add another output to save raw results to a file for later analysis (needed if doing a breakpoint test) --out "json=/results/breakpoint_${timestamp}.json"
 
 hard-reset)
     read -p "This will DELETE your local database and containers. Continue? (y/N): " ANSWER

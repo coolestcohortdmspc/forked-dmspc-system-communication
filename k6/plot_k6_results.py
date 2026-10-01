@@ -102,7 +102,7 @@ def create_plot(results, output_file):
         ax.text(
             bar.get_x() + bar.get_width() / 2,
             bar.get_height(),
-            f"{count:.0f} requests",
+            f"{count:.0f}",
             ha="center",
             va="bottom",
             fontsize=9,
@@ -189,7 +189,7 @@ def main():
     parser.add_argument(
         "-o",
         "--output",
-        default="k6-results/k6-results-avgload.png", # change name of png file here
+        default="k6-results/k6-loadtest-results2.png", # change name of png file here
         help="Output image filename.",
     )
 

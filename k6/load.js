@@ -9,7 +9,7 @@ export const options = {
       startVUs: 1,
       stages: [
         { duration: '30s', target: 2 },
-        { duration: '4m', target: 10 },
+        { duration: '4m', target: 10 }, // change this number to increase/decrease the number of maximum concurrent users
         { duration: '30s', target: 2 },
       ],
       gracefulRampDown: '30s',
@@ -33,7 +33,7 @@ export const options = {
   },
 
   tags: {
-    test_type: 'avg_load',
+    test_type: 'load',
     service: 'ngradar_website',
   },
 };
@@ -373,7 +373,7 @@ export function browseUser() {
     }
 
   });
-  sleep(7);
+  sleep(8);
 }
 
 
