@@ -3,11 +3,26 @@ import { check, fail, group, sleep } from 'k6';
 
 export const options = {
   scenarios: {
-    smoke_test: {
-      executor: 'shared-iterations',
-      vus: 2,
-      iterations: 10,
-      maxDuration: '1m',
+    browsers: {
+      executor: 'ramping-vus',
+      exec: 'browseUser',
+      startVUs: 1,
+      stages: [
+        { duration: '10s', target: 1 },
+        { duration: '30s', target: 3 },
+        { duration: '10s', target: 0 },
+      ],
+      gracefulRampDown: '10s',
+      tags: { journey: 'browse' },
+    },
+
+    waveform_submitters: {
+      executor: 'constant-vus',
+      exec: 'waveformUser',
+      vus: 1, // Use 1 or 2 submitter VUs
+      duration: '30s',
+      gracefulStop: '10s',
+      tags: { journey: 'submit_waveform' },
     },
   },
 
@@ -23,6 +38,9 @@ export const options = {
   },
 };
 
+//=====================================================================
+// Constants and helper functions
+//=====================================================================
 const baseUrl = (
   __ENV.K6_BASE_URL || 'http://ngradar-website:8000'
 ).replace(/\/$/, '');
@@ -63,7 +81,11 @@ function checkAuthenticatedPage(response, name) {
   });
 }
 
-export default function () {
+
+//=====================================================================
+// One VU submits a waveform every minute if the button is unlocked
+//=====================================================================
+export function browseUser() {
   if (!username || !password) {
     fail(
       'K6_USERNAME and K6_PASSWORD must be provided'
@@ -91,7 +113,282 @@ export default function () {
   let homeResponse;
   let dashboardResponse;
 
+  group('login', () => {
+    const loginPage = http.get(`${baseUrl}/login/`, {
+      tags: {
+        endpoint: 'login_page',
+      },
+    });
+
+    check(loginPage, {
+      'login page returns 200': (r) => r.status === 200,
+    });
+
+    const loginCsrfToken = extractCsrfToken(loginPage.body);
+
+    if (!loginCsrfToken) {
+      fail(
+        'Could not find Django CSRF token on /login/'
+      );
+    }
+
+    const loginResponse = http.post(
+      `${baseUrl}/login/`,
+      {
+        username,
+        password,
+        csrfmiddlewaretoken: loginCsrfToken,
+        next: '/home/',
+      },
+      {
+        headers: {
+          Referer: `${baseUrl}/login/`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        redirects: 0,
+        tags: {
+          endpoint: 'login_submit',
+        },
+      }
+    );
+
+    check(loginResponse, {
+      'login returns redirect': (r) =>
+        r.status === 302 || r.status === 303,
+
+      'login sets Django session cookie': (r) =>
+        Boolean(
+          r.cookies.sessionid &&
+          r.cookies.sessionid.length > 0
+        ),
+
+      'login redirects to home': (r) => {
+        const location = r.headers.Location || '';
+
+        return (
+          location === '/home/' ||
+          location.endsWith('/home/')
+        );
+      },
+    });
+
+    if (
+      loginResponse.status !== 302 &&
+      loginResponse.status !== 303
+    ) {
+      fail(
+        `Login failed with HTTP ${loginResponse.status}`
+      );
+    }
+  });
+
 // ------------------------------------------------------------
+  group('home', () => {
+    homeResponse = http.get(`${baseUrl}/home/`, {
+      tags: {
+        endpoint: 'home',
+      },
+    });
+
+    checkAuthenticatedPage(
+      homeResponse,
+      'home page'
+    );
+  });
+
+  const csrfToken = extractCsrfToken(homeResponse.body);
+
+  if (!csrfToken) {
+    fail(
+      'Could not find Django CSRF token on /home/'
+    );
+  }
+
+// ------------------------------------------------------------
+  group('dashboard', () => {
+    dashboardResponse = http.get(`${baseUrl}/dashboard/`, {
+      tags: {
+        endpoint: 'dashboard',
+      },
+    });
+
+    checkAuthenticatedPage(
+      dashboardResponse,
+      'dashboard page'
+    );
+  });
+
+  group('open-dashboard-image', () => {
+    console.log(`Opening image path: ${imagePath}`);
+
+    /*
+     * The endpoint is expected to redirect to a signed URL such as:
+
+       http://images.localhost/ddm-images/...png?X-Amz-...
+
+     * redirects: 0 prevents k6 from trying to connect to
+     * images.localhost.
+     */
+    const imagePageResponse = http.get(
+      `${baseUrl}${imagePath}`,
+      {
+        redirects: 0,
+        tags: {
+          endpoint: 'home_image_redirect',
+        },
+      }
+    );
+
+    const location =
+      imagePageResponse.headers.Location || '';
+
+    check(imagePageResponse, {
+      'image endpoint returns redirect': (r) =>
+        r.status === 301 ||
+        r.status === 302 ||
+        r.status === 303 ||
+        r.status === 307 ||
+        r.status === 308,
+
+      'image redirect points to images.host': () =>
+        location.startsWith(
+          'http://images.localhost/'
+        ) ||
+        location.startsWith(
+          'https://images.ngradar.dedyn.io/'
+        ),
+
+      'image redirect contains signed URL': () =>
+        location.includes('X-Amz-Signature='),
+
+      'image redirect contains image path': () =>
+        location.includes('/ddm-images/'),
+    });
+
+    if (
+      imagePageResponse.status < 300 ||
+      imagePageResponse.status >= 400
+    ) {
+      fail(
+        `Expected ${imagePath} to redirect, but received HTTP ${imagePageResponse.status}`
+      );
+    }
+  });
+
+  let finalHomeResponse;
+
+// ------------------------------------------------------------
+  group('return-home', () => {
+    finalHomeResponse = http.get(`${baseUrl}/home/`, {
+      tags: {
+        endpoint: 'home_final',
+      },
+    });
+
+    check(finalHomeResponse, {
+      'final home page returns 200': (r) =>
+        r.status === 200,
+
+      'final home page is authenticated': (r) =>
+        !r.url.includes('/login/'),
+    });
+  });
+
+// ------------------------------------------------------------
+  group('logout', () => {
+    const logoutCsrfToken = extractCsrfToken(
+      finalHomeResponse.body
+    );
+
+    if (!logoutCsrfToken) {
+      fail(
+        'Could not find Django CSRF token on final /home/'
+      );
+    }
+
+    const logoutResponse = http.post(
+      `${baseUrl}/logout/`,
+      {
+        csrfmiddlewaretoken: logoutCsrfToken,
+      },
+      {
+        headers: {
+          Referer: `${baseUrl}/home/`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        redirects: 0,
+        tags: {
+          endpoint: 'logout',
+        },
+      }
+    );
+
+    const location = logoutResponse.headers.Location || '';
+
+    check(logoutResponse, {
+      'logout returns redirect': (r) =>
+        r.status === 302 || r.status === 303,
+
+      'logout redirects to /login/': () =>
+        location === '/login/' ||
+        location.endsWith('/login/'),
+    });
+
+    if (
+      logoutResponse.status !== 302 &&
+      logoutResponse.status !== 303
+    ) {
+      fail(
+        `Logout failed with HTTP ${logoutResponse.status}`
+      );
+    }
+
+    if (
+      location !== '/login/' &&
+      !location.endsWith('/login/')
+    ) {
+      fail(
+        `Logout redirected to an unexpected location: ${location}`
+      );
+    }
+
+  });
+  sleep(7);
+}
+
+
+
+//=====================================================================
+// One VU submits a waveform every minute if the button is unlocked
+//=====================================================================
+export function waveformUser() {
+  if (!username || !password) {
+    fail(
+      'K6_USERNAME and K6_PASSWORD must be provided'
+    );
+  }
+
+  if (!imageId) {
+    fail(
+      'K6_IMAGE_ID must be provided, for example: ' +
+      'K6_IMAGE_ID=3f3d44e5-553d-452f-a938-26b0b3651ccb'
+    );
+  }
+
+  // Basic validation to catch accidental full URLs or paths.
+  const validUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+  if (!validUuid.test(imageId)) {
+    fail(
+      `K6_IMAGE_ID is not a valid UUID: ${imageId}`
+    );
+  }
+
+  const imagePath = `/home/image/${imageId}/`;
+
+  let homeResponse;
+  let dashboardResponse;
+
   group('login', () => {
     const loginPage = http.get(`${baseUrl}/login/`, {
       tags: {
@@ -413,7 +710,5 @@ export default function () {
     }
 
   });
-
-
-  sleep(15);
+  sleep(60);
 }
