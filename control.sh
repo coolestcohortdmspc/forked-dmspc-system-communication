@@ -6,7 +6,7 @@ set -a
 source .env
 set +a
 
-START="traefik_http portainer ngradar_website postgres prometheus grafana postgres_exporter"
+START="traefik_http portainer ngradar_website postgres prometheus grafana postgres_exporter otel-collector"
 
 DSOC_DROPLET="root@${DSOC_DROPLET_IP}"
 VLBA_1_DROPLET="root@${VLBA_1_DROPLET_IP}"
@@ -25,7 +25,7 @@ SIM_SERVICES="etr_daemon gbt vlba-sc vlba-hn vlba-nl vlba-fd vlba-la vlba-pt vlb
 PORTAINER_SERVICE="portainer"
 AGENT_SERVICE="portainer_agent"
 
-DSOC_SERVICES="traefik ngradar_website postgres prometheus grafana postgres_exporter kafka-init kafka-ui kafka-exporter seaweedfs dsoc-volume-init dsoc etr_daemon progress_tracker db_consumer vlba-kp vlba-ov"
+DSOC_SERVICES="traefik ngradar_website postgres prometheus otel-collector grafana postgres_exporter kafka-init kafka-ui kafka-exporter seaweedfs dsoc-volume-init dsoc etr_daemon progress_tracker db_consumer vlba-kp vlba-ov"
 VLBA_1_SERVICES="vlba-sc vlba-hn"
 VLBA_2_SERVICES="vlba-nl vlba-fd"
 VLBA_3_SERVICES="vlba-la vlba-pt"
