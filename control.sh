@@ -119,10 +119,34 @@ system-down)
     docker compose rm -f $START
     ;;
 
+
 rebuild)
-    # Will rebuild ALL containers for local dev used in start/system-up commands
+    # Rebuild one or more specified containers.
+
+    shift
+
+     if [ "$#" -eq 0 ]; then
+        echo "Error: Specify at least one service to rebuild."
+        echo
+        echo "Usage:"
+        echo "  ./control.sh rebuild <service> <service> . . ."
+        exit 1
+    fi
+
+    echo "Rebuilding services: $*"
+
+    # Rebuild selected services with fresh images.
+    docker compose build --no-cache "$@"
+
+    # Recreate only the selected services so image,
+    # environment, and Compose config changes are applied.
+    docker compose up -d --force-recreate --no-deps "$@"
+    ;;
+
+
+rebuild-all)
+    # Will rebuild ALL containers for local dev used in local dev
     ./control.sh system-down
-    ./control.sh stop
 
     docker volume ls -q \
         | grep -v 'postgres_data$' \
@@ -311,7 +335,8 @@ droplets-down)
     echo "./control.sh shell"
     echo
     echo "Utility commands to rebuild local dev environment:"
-    echo "./control.sh rebuild"
+    echo "./control.sh rebuild <service> <service> ..."
+    echo "./control.sh rebuild-all"
     echo "./control.sh hard-reset"
     echo
     echo "To run test coverage on this branch, run:"
