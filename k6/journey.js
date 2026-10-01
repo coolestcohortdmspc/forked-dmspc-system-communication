@@ -34,7 +34,9 @@ const password = __ENV.K6_PASSWORD;
 const imageId = __ENV.K6_IMAGE_ID;
 
 const waveformField = __ENV.K6_WAVEFORM_FIELD || 'waveform';
-const waveformValue = __ENV.K6_WAVEFORM_VALUE || '48';
+// const waveformValue = __ENV.K6_WAVEFORM_VALUE || '48';
+const waveformValue = __ENV.K6_WAVEFORM_VALUE || 'W48';
+
 
 function extractCsrfToken(body) {
   const patterns = [
@@ -183,6 +185,50 @@ export default function () {
   }
 
 // ------------------------------------------------------------
+//   group('submit-waveform', () => {
+//     const waveformResponse = http.post(
+//       `${baseUrl}/home/submit-waveform/`,
+//       {
+//         [waveformField]: waveformValue,
+//         csrfmiddlewaretoken: csrfToken,
+//       },
+//       {
+//         headers: {
+//           Referer: `${baseUrl}/home/`,
+//           'Content-Type': 'application/x-www-form-urlencoded',
+//         },
+//         redirects: 0,
+//         tags: {
+//           endpoint: 'submit_waveform',
+//         },
+//       }
+//     );
+//
+//     check(waveformResponse, {
+//       'waveform submission redirects': (r) =>
+//         r.status === 302 || r.status === 303,
+//
+//       'waveform redirects to home': (r) => {
+//         const location = r.headers.Location || '';
+//
+//         return (
+//           location === '/home/' ||
+//           location.endsWith('/home/')
+//         );
+//       },
+//     });
+//
+//     if (
+//       waveformResponse.status !== 302 &&
+//       waveformResponse.status !== 303
+//     ) {
+//       fail(
+//         `Waveform submission failed with HTTP ${waveformResponse.status}`
+//       );
+//     }
+//   });
+
+// ------------------------------------------------------------
   group('submit-waveform', () => {
     const waveformResponse = http.post(
       `${baseUrl}/home/submit-waveform/`,
@@ -193,35 +239,85 @@ export default function () {
       {
         headers: {
           Referer: `${baseUrl}/home/`,
-          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Type':
+            'application/x-www-form-urlencoded',
         },
         redirects: 0,
         tags: {
           endpoint: 'submit_waveform',
         },
+        responseCallback: http.expectedStatuses(
+          202,
+          409
+        ),
       }
     );
 
+    const isAccepted =
+      waveformResponse.status === 202;
+
+    const isLocked =
+      waveformResponse.status === 409;
+
     check(waveformResponse, {
-      'waveform submission redirects': (r) =>
-        r.status === 302 || r.status === 303,
-
-      'waveform redirects to home': (r) => {
-        const location = r.headers.Location || '';
-
-        return (
-          location === '/home/' ||
-          location.endsWith('/home/')
-        );
-      },
+      'waveform submission is accepted or locked':
+        () => isAccepted || isLocked,
     });
 
-    if (
-      waveformResponse.status !== 302 &&
-      waveformResponse.status !== 303
-    ) {
+    let responseBody;
+
+    try {
+      responseBody =
+        waveformResponse.json();
+    } catch (error) {
       fail(
-        `Waveform submission failed with HTTP ${waveformResponse.status}`
+        `Waveform response was not valid JSON: ` +
+        `status=${waveformResponse.status} ` +
+        `body=${waveformResponse.body}`
+      );
+    }
+
+    if (isAccepted) {
+      check(responseBody, {
+        'waveform response reports success':
+          (data) =>
+            data.error === false,
+
+        'waveform response contains event UUID':
+          (data) =>
+            Boolean(data.event_uuid),
+
+        'waveform response contains message':
+          (data) =>
+            Boolean(data.message),
+      });
+
+      console.log(
+        `Waveform ${waveformValue} accepted: ` +
+        `${responseBody.event_uuid}`
+      );
+
+    } else if (isLocked) {
+      check(responseBody, {
+        'locked response reports error':
+          (data) =>
+            data.error === true,
+
+        'locked response contains message':
+          (data) =>
+            Boolean(data.message),
+      });
+
+      console.warn(
+        `Waveform submission locked: ` +
+        `${responseBody.message}`
+      );
+
+    } else {
+      fail(
+        `Waveform submission failed: ` +
+        `status=${waveformResponse.status} ` +
+        `body=${waveformResponse.body}`
       );
     }
   });
