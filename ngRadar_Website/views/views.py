@@ -415,12 +415,13 @@ def submit_waveform(request):
     user = request.user.username
 
     if not waveform:
-        messages.error(
-            request,
-            "Waveform is required.",
+        return JsonResponse(
+            {
+                "error": True,
+                "message": "Waveform is required.",
+            },
+            status=400,
         )
-
-        return redirect("home")
 
     producer_topic, producer_config = (
         bootstrap(Stations.UI)
@@ -442,19 +443,29 @@ def submit_waveform(request):
     )
 
     if event_uuid is None:
-        messages.error(
-            request,
-            "Unable to submit waveform.",
+        return JsonResponse(
+            {
+                "error": True,
+                "message": "Unable to submit waveform.",
+            },
+            status=503,
         )
-
-        return redirect("home")
 
     cache.set(
         "submit_locked",
         datetime.now(timezone.utc),
     )
 
-    return redirect("home")
+    return JsonResponse(
+        {
+            "error": False,
+            "event_uuid": str(event_uuid),
+            "message": (
+                f"Waveform {waveform} submitted."
+            ),
+        },
+        status=202,
+    )
 
 
 # ============================================================
