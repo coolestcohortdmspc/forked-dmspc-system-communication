@@ -67,6 +67,15 @@ ANSI_RE = re.compile(
     r"\x1b\[[0-9;]*[A-Za-z]"
 )
 
+EXPEDAT_PROGRESS_RE = re.compile(
+    r"^\s*P\s+"
+    r"\S+\s+\S+\s+"       # date/time
+    r"\S+\s+"             # S
+    r"\S+\s+"             # transfer ID
+    r"(?P<duration>\d+)\s+"
+    r"(?P<received>\d+)\s+"
+    r"(?P<total>\d+)"
+)
 
 # =============================================================
 # GENERAL HELPERS
@@ -795,27 +804,72 @@ def parse_etc_progress(line, *, expected_num_bytes, transfer_id):
     #     transfer_id=transfer_id,
     # )
 
+def parse_expedat_progress(line, *, transfer_id):
+    match = EXPEDAT_PROGRESS_RE.search(line)
+
+    if not match:
+        return
+
+    received_bytes = int(match.group("received"))
+    total_bytes = int(match.group("total"))
+
+    if total_bytes:
+        percent = (received_bytes / total_bytes) * 100
+    else:
+        percent = 0.0
+
+    if percent >= 100.0:
+        received_bytes = total_bytes
+        percent = 100.0
+
+    print(
+        f"Transfer progress: "
+        f"{received_bytes}/{total_bytes} bytes "
+        f"({percent:.1f}%)"
+    )
 
 # =============================================================
 # E-TRANSFER CONNECTION / COMMANDS
 # =============================================================
 
-def wait_for_etd():
+# def wait_for_etd():
+#     """
+#     Wait for the e-transfer daemon to become reachable again.
+
+#     Use only for etransfer!
+
+#     Returns:
+#         True  - daemon responded
+#         False - retry limit exhausted
+#     """
+
+#     result = subprocess.run(
+#         [
+#             "etc",
+#             "--list",
+#             os.environ["ETD_DESTINATION"],
+#             "--max-conn-retry", str(ETD_MAX_CONN_RETRY),
+#             "--retry-conn-delay", str(ETD_RETRY_CONN_DELAY),
+#         ],
+#         capture_output=True,
+#     )
+#     return result.returncode == 0
+
+def wait_for_exp():
     """
-    Wait for the e-transfer daemon to become reachable again.
+    Wait for the expedat server to become reachable again.
+
+    Use only for expedat!
 
     Returns:
-        True  - daemon responded
+        True  - server responded
         False - retry limit exhausted
     """
 
     result = subprocess.run(
         [
-            "etc",
-            "--list",
-            os.environ["ETD_DESTINATION"],
-            "--max-conn-retry", str(ETD_MAX_CONN_RETRY),
-            "--retry-conn-delay", str(ETD_RETRY_CONN_DELAY),
+            "./mtping",
+            os.environ["SVD_IP"],
         ],
         capture_output=True,
     )
@@ -823,102 +877,249 @@ def wait_for_etd():
 
 
 # etransfer command to send data from client -> daemon
-def etc_send(frame_path):
+# def etc_send(frame_path):
+#     """
+#     Send one raw-data file from VLBA to DSOC using e-transfer.
+
+#     Used only for e-transfer!
+
+#     Uses --resume so an interrupted transfer can continue
+#     using the partially received destination file.
+#     """
+
+#     expected_num_bytes = frame_path.stat().st_size
+#     transfer_id = str(uuid.uuid4())
+#     # Reset progress at the beginning of a new transfer.
+#     # write_transfer_progress(
+#     #     received_bytes=0,
+#     #     total_bytes=expected_num_bytes,
+#     #     percent=0.0,
+#     #     transfer_id=transfer_id,
+#     # )
+
+#     master_fd, receiver_fd = os.openpty()
+
+#     etd_host = os.environ["ETD_HOST"]
+#     etd_command_port = os.environ.get("ETD_COMMAND_PORT", "4004")
+
+#     etd_destination = (
+#         f"tcp://{etd_host}#{etd_command_port}:/dsoc/incoming/"
+#     )
+
+#     os.environ["ETD_DESTINATION"] = etd_destination
+
+#     process = subprocess.Popen(
+#         [
+#             "etc",
+#             str(frame_path),
+#             etd_destination,
+#             "--resume",
+#         ],
+#         stdin=receiver_fd,
+#         stdout=receiver_fd,
+#         stderr=receiver_fd,
+#         close_fds=True,
+#     )
+
+#     os.close(receiver_fd)
+
+#     buffer = ""
+
+#     try:
+#         while process.poll() is None:
+#             readable, _, _ = select.select(
+#                 [master_fd],
+#                 [],
+#                 [],
+#                 0.5,
+#             )
+
+#             if not readable:
+#                 continue
+
+#             try:
+
+#                 terminal_output = os.read(master_fd, 4096).decode(
+#                     "utf-8",
+#                     errors="replace",
+#                 )
+
+#             except OSError:
+#                 break
+
+#             # Print the actual etc output to Docker logs.
+#             print(terminal_output, end="", flush=True)
+
+#             buffer += terminal_output
+
+#             # etc redraws the same terminal line using carriage returns.
+#             parts = re.split(r"[\r\n]", buffer)
+
+#             # Save any incomplete piece for the next chunk.
+#             buffer = parts.pop()
+
+#             for line in parts:
+#                 parse_etc_progress(
+#                     line,
+#                     expected_num_bytes=expected_num_bytes,
+#                     transfer_id=transfer_id,
+#                 )
+
+#         # Process anything left in the buffer.
+#         if buffer:
+#             parse_etc_progress(
+#                 buffer,
+#                 expected_num_bytes=expected_num_bytes,
+#                 transfer_id=transfer_id,
+#             )
+
+#     finally:
+#         os.close(master_fd)
+
+#     return_code = process.wait()
+
+#     if return_code != 0:
+#         raise subprocess.CalledProcessError(
+#             return_code,
+#             process.args,
+#         )
+
+
+def expedat_send(mvd_filepath, method):
     """
-    Send one raw-data file from VLBA to DSOC using e-transfer.
+    Send one raw-data file from one directory/machine to another using expedat.
+    Supports both Transfer and Stream methods
 
-    Uses --resume so an interrupted transfer can continue
-    using the partially received destination file.
+    movedat (mvd): sender
+    servedat (svd): receiver
+
     """
 
-    expected_num_bytes = frame_path.stat().st_size
-    transfer_id = str(uuid.uuid4())
-    # Reset progress at the beginning of a new transfer.
-    # write_transfer_progress(
-    #     received_bytes=0,
-    #     total_bytes=expected_num_bytes,
-    #     percent=0.0,
-    #     transfer_id=transfer_id,
-    # )
+    svd_password = os.environ["SVD_PASSWORD"]
+    svd_ip = os.environ["SVD_IP"]
+    svd_user = os.environ["SVD_USER"]
+    recipient_directory = os.environ["RECIPIENT_DIR"]
 
-    master_fd, receiver_fd = os.openpty()
+    #location where movedat is saved on my computer:
+    mvd_location = os.environ["MVD_LOC"]
 
-    etd_host = os.environ["ETD_HOST"]
-    etd_command_port = os.environ.get("ETD_COMMAND_PORT", "4004")
+    if method == "transfer":
 
-    etd_destination = (
-        f"tcp://{etd_host}#{etd_command_port}:/dsoc/incoming/"
-    )
+        master_fd, receiver_fd = os.openpty()
 
-    os.environ["ETD_DESTINATION"] = etd_destination
+        # transfer method requires a filepath to retrieve the completed file
+        terminal_command = [
+                "./movedat",
+                mvd_filepath,
+                f"{svd_user}:{svd_password}@{svd_ip}:{recipient_directory}",
+            ]
+        
+        process = subprocess.Popen(
+            terminal_command,
+            stdin=receiver_fd,
+            stdout=receiver_fd,
+            stderr=receiver_fd,
+            close_fds=True,
+            cwd=mvd_location
+        )
 
-    process = subprocess.Popen(
-        [
-            "etc",
-            str(frame_path),
-            etd_destination,
-            "--resume",
-        ],
-        stdin=receiver_fd,
-        stdout=receiver_fd,
-        stderr=receiver_fd,
-        close_fds=True,
-    )
+        os.close(receiver_fd)
 
-    os.close(receiver_fd)
+        try:
+            while process.poll() is None:
+                readable, _, _ = select.select(
+                    [master_fd],
+                    [],
+                    [],
+                    0.5,
+                )
+    
+                if not readable:
+                    continue
+    
+                try:
+    
+                    terminal_output = os.read(master_fd, 4096).decode(
+                        "utf-8",
+                        errors="replace",
+                    )
+    
+                except OSError:
+                    break
+    
+                # Print the actual output to Docker logs.
+                print(terminal_output, end="", flush=True)
+    
+        finally:
+            os.close(master_fd)
 
-    buffer = ""
+    elif method == "stream":
 
-    try:
-        while process.poll() is None:
-            readable, _, _ = select.select(
-                [master_fd],
-                [],
-                [],
-                0.5,
-            )
+        # stream method uses "-" in place of filepath, because the file does not exist anywhere yet
+        # flag -s displays progress of transfer
+        terminal_command = [
+                    "./movedat",
+                    "-s",
+                    "-",
+                    f"{svd_user}:{svd_password}@{svd_ip}:{recipient_directory}/generated_file.txt",
+                ]
 
-            if not readable:
-                continue
+        # Standard Input IN (stdin) and Standard Input OUT (stdout):
+        # creates a pipe connecting the Python process to the movedat process
+        # allows the Python file generation to inform movedat, and vice versa
+        process = subprocess.Popen(
+            terminal_command,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            cwd=mvd_location,
+        )
+        try:
+            file_size_bytes = 1000 * 1024 * 1024
+            num_buffers = 1000
 
-            try:
+            # X amount of buffers divides the file into X pieces to be
+            # sent to movedat as each piece is written
+            buffer_size = file_size_bytes // num_buffers
+            remainder = file_size_bytes % num_buffers
 
-                terminal_output = os.read(master_fd, 4096).decode(
-                    "utf-8",
-                    errors="replace",
+            for index in range(num_buffers):
+                size = buffer_size + (
+                    1 if index < remainder else 0
                 )
 
-            except OSError:
-                break
+                # the randomly generated data:
+                buffer = random.randbytes(size)
 
-            # Print the actual etc output to Docker logs.
-            print(terminal_output, end="", flush=True)
+                process.stdin.write(buffer)
+                process.stdin.flush()
 
-            buffer += terminal_output
+            # No more data is coming.
+            process.stdin.close()
 
-            # etc redraws the same terminal line using carriage returns.
-            parts = re.split(r"[\r\n]", buffer)
-
-            # Save any incomplete piece for the next chunk.
-            buffer = parts.pop()
-
-            for line in parts:
-                parse_etc_progress(
-                    line,
-                    expected_num_bytes=expected_num_bytes,
-                    transfer_id=transfer_id,
+            # Read movedat output after sending the data.
+            for output in process.stdout:
+                print(
+                    output.decode(
+                        "utf-8",
+                        errors="replace",
+                    ),
+                    end="",
+                    flush=True,
                 )
 
-        # Process anything left in the buffer.
-        if buffer:
-            parse_etc_progress(
-                buffer,
-                expected_num_bytes=expected_num_bytes,
-                transfer_id=transfer_id,
-            )
+        finally:
+            if process.stdin and not process.stdin.closed:
+                process.stdin.close()
 
-    finally:
-        os.close(master_fd)
+            if process.stdout:
+                process.stdout.close()
+
+    else:
+        raise ValueError(
+            "Invalid method: expected "
+            "'transfer' or 'stream'."
+        )
 
     return_code = process.wait()
 
@@ -928,75 +1129,78 @@ def etc_send(frame_path):
             process.args,
         )
 
-
 # =============================================================
 # FILE / STORAGE HELPERS
 # =============================================================
 
-def create_file(
-    file_path,
-    file_mb=20,
-):
-    """
-    Create a random binary file for simulated VLBA data.
-    """
+# def create_file(
+#     file_path,
+#     file_mb=20,
+# ):
+#     """
+#     Create a random binary file for simulated VLBA data.
 
-    file_size_bytes = (
-        file_mb
-        * 1024
-        * 1024
-    )
+#     Used only for e-transfer and expedat transfer mode (?)
+#     """
 
-    num_buffers = 100
+#     file_size_bytes = (
+#         file_mb
+#         * 1024
+#         * 1024
+#     )
 
-    buffer_size = (file_size_bytes // num_buffers)
+#     num_buffers = 100
 
-    remainder = (file_size_bytes % num_buffers)
+#     buffer_size = (file_size_bytes // num_buffers)
 
-    with open(file_path, "wb") as file:
-        for index in range(num_buffers):
-            size = (buffer_size + (1 if index < remainder else 0))
+#     remainder = (file_size_bytes % num_buffers)
 
-            buffer = (random.randbytes(size))
+#     with open(file_path, "wb") as file:
+#         for index in range(num_buffers):
+#             size = (buffer_size + (1 if index < remainder else 0))
 
-            file.write(
-                buffer
-            )
+#             buffer = (random.randbytes(size))
 
-    print(
-        "Successfully created a "
-        f"{file_mb}MB random binary "
-        f"file at {file_path}"
-    )
+#             file.write(
+#                 buffer
+#             )
+
+#     print(
+#         "Successfully created a "
+#         f"{file_mb}MB random binary "
+#         f"file at {file_path}"
+#     )
 
 
-def watch_for_file(
-    file_path,
-):
-    """
-    Wait until no process has the file open.
-    """
+# def watch_for_file(
+#     file_path,
+# ):
+#     """
+#     Wait until no process has the file open.
 
-    while True:
-        result = subprocess.run(
-            [
-                "lsof",
-                file_path,
-            ],
-            capture_output=True,
-            text=True,
-        )
+#     Should only be used for e-transfer, and for expedat transfer mode (?)
+#     """
 
-        output = (
-            result.stdout
-        )
+#     while True:
+#         result = subprocess.run(
+#             [
+#                 "lsof",
+#                 file_path,
+#             ],
+#             capture_output=True,
+#             text=True,
+#         )
 
-        if output.strip():
-            print("Output:\n", output)
-        else:
-            break
+#         output = (
+#             result.stdout
+#         )
 
-        time.sleep(1)
+#         if output.strip():
+#             print("Output:\n", output)
+#         else:
+#             break
+
+#         time.sleep(1)
 
 
 def delete_observation_data(

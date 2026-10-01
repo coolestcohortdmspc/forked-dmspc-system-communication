@@ -17,14 +17,16 @@ from ngRadar_Website.enums import (
 from ngRadar_Website.utils import (
     bootstrap,
     consume,
-    create_file,
-    watch_for_file,
     send_kafka_message,
     etc_send,
-    wait_for_etd,
     delete_observation_data,
     ETD_MAX_CONN_RETRY,
     ETD_RETRY_CONN_DELAY,
+    wait_for_exp,
+    # E-transfer imports:
+    # create_file,
+    # watch_for_file,
+    # wait_for_etd,
 )
 
 
@@ -377,7 +379,7 @@ def process_msg(
                         "come back..."
                     )
 
-                    if not wait_for_etd():
+                    if not wait_for_exp():
                         print(
                             "E-transfer daemon "
                             "never came back. "

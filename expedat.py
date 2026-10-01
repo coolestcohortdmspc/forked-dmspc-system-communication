@@ -69,7 +69,7 @@ def expedat_send(mvd_filepath, method):
                 except OSError:
                     break
     
-                # Print the actual etc output to Docker logs.
+                # Print the actual output to Docker logs.
                 print(terminal_output, end="", flush=True)
     
         finally:
@@ -80,6 +80,7 @@ def expedat_send(mvd_filepath, method):
         # stream method uses "-" in place of filepath, because the file does not exist anywhere yet
         terminal_command = [
                     "./movedat",
+                    "-s",
                     "-",
                     f"{svd_user}:{svd_password}@{svd_ip}:{recipient_directory}/generated_file.txt",
                 ]
@@ -95,8 +96,8 @@ def expedat_send(mvd_filepath, method):
             cwd=mvd_location,
         )
         try:
-            file_size_bytes = 10 * 1024 * 1024
-            num_buffers = 100
+            file_size_bytes = 1000 * 1024 * 1024
+            num_buffers = 1000
 
             # X amount of buffers divides the file into X pieces to be
             # sent to movedat as each piece is written
