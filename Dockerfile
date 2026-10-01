@@ -79,6 +79,24 @@ FROM base AS etc
 COPY --from=etransfer-builder /build/etransfer/*-native-opt/etc /usr/local/bin/
 
 
+#===============
+# expedat server
+#===============
+FROM base AS expedat-server
+
+COPY /expedat/servedat /usr/local/bin/
+
+
+#===============
+# expedat client
+#===============
+FROM base AS expedat-client
+
+COPY /expedat/movedat /usr/local/bin/
+
+COPY /expedat/mtping /usr/local/bin/
+
+
 #================
 # load-staging-data
 #================
