@@ -33,7 +33,7 @@ with patch("pathlib.Path.read_text", return_value=mock_env_data):
         create_s3_client,
         ensure_bucket_exists,
         # etc_send,
-        watch_for_file,
+        # watch_for_file,
         produce,
         send_kafka_message,
         get_folder_size,

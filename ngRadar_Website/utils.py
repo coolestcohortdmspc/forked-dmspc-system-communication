@@ -985,7 +985,7 @@ def wait_for_exp():
 #         )
 
 
-def expedat_send(mvd_filepath, method):
+def expedat_send(mvd_filepath, method="stream"):
     """
     Send one raw-data file from one directory/machine to another using expedat.
     Supports both Transfer and Stream methods
@@ -1009,10 +1009,10 @@ def expedat_send(mvd_filepath, method):
 
         # transfer method requires a filepath to retrieve the completed file
         terminal_command = [
-                "./movedat",
-                mvd_filepath,
-                f"{svd_user}:{svd_password}@{svd_ip}:{recipient_directory}",
-            ]
+            "./movedat",
+            mvd_filepath,
+            f"{svd_user}:{svd_password}@{svd_ip}:{recipient_directory}",
+        ]
         
         process = subprocess.Popen(
             terminal_command,
@@ -1058,11 +1058,11 @@ def expedat_send(mvd_filepath, method):
         # stream method uses "-" in place of filepath, because the file does not exist anywhere yet
         # flag -s displays progress of transfer
         terminal_command = [
-                    "./movedat",
-                    "-s",
-                    "-",
-                    f"{svd_user}:{svd_password}@{svd_ip}:{recipient_directory}/generated_file.txt",
-                ]
+            "./movedat",
+            "-s",
+            "-",
+            f"{svd_user}:{svd_password}@{svd_ip}:{mvd_filepath}",  # TODO test that this file gets created correctly
+        ]
 
         # Standard Input IN (stdin) and Standard Input OUT (stdout):
         # creates a pipe connecting the Python process to the movedat process
