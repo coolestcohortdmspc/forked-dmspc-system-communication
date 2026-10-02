@@ -29,7 +29,7 @@ from ngRadar_Website.utils import (
     latency_calc,
     send_kafka_message,
     upload_seaweedfs,
-    write_transfer_progress,
+    delete_observation_data,
 )
 
 
@@ -800,6 +800,8 @@ def process_msg(
                 "delete its raw data."
             ),
         )
+
+        delete_observation_data(filename, directory="/dsoc/incoming") # NOTE delete later!! Had to add this to help clear storage during load tests.
 
         print(
             "DSOC processing COMPLETE."

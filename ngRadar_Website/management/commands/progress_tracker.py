@@ -79,10 +79,10 @@ def process_msg(
     producer_topic,
     producer_config,
 ):
-    incoming_key = int(msg.key().decode("utf-8"))
+    incoming_key = msg.key().decode("utf-8")
     payload = json.loads(msg.value().decode("utf-8"))
 
-    if incoming_key != Message.VLBA_TRANSFERRING.value:
+    if incoming_key != str(Message.VLBA_TRANSFERRING.value):
         return True
     else:
         payload["last_progress_at"] = time.monotonic()

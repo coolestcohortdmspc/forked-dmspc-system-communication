@@ -102,43 +102,88 @@ def test_serve_image_error(mock_presigned, mock_get_obj, caplog):
 # ===============================================================================
 # 3. Submit waveform test
 # ===============================================================================
-
 @patch("ngRadar_Website.views.views.datetime")
 @patch("ngRadar_Website.views.views.cache")
-@patch("ngRadar_Website.views.views.write_transfer_progress")
 @patch("ngRadar_Website.views.views.bootstrap")
 @patch("ngRadar_Website.views.views.send_kafka_message")
-def test_submit_waveform(mock_kafka, mock_bootstrap, Mock_ProgressBar, Mock_Cache, mock_datetime):
-    #create simulated data
-    mock_uuid = uuid.UUID('12345678-1234-5678-1234-567812345678')
-    test_timestamp = datetime(2026, 8, 17, 12, 30, 45, tzinfo=timezone.utc)
-    test_waveform = '45'
+def test_submit_waveform(
+    mock_kafka,
+    mock_bootstrap,
+    mock_cache,
+    mock_datetime,
+):
+    """Test successful waveform submission."""
 
-    #create fixed return value for date time
-    mock_datetime.now.return_value=test_timestamp
+    mock_uuid = uuid.UUID(
+        "12345678-1234-5678-1234-567812345678"
+    )
 
-    #generate a mock post request
-    factory = RequestFactory()
-    myRequest = factory.post('home/submit-waveform/', data={'waveform':test_waveform})
-    myRequest.user = User(username="testuser")
+    test_timestamp = datetime(
+        2026,
+        8,
+        17,
+        12,
+        30,
+        45,
+        tzinfo=timezone.utc,
+    )
 
-    #mock a UI Event
-    Mock_EVENT = MagicMock()
-    Mock_EVENT.uuid = mock_uuid
-    Mock_EVENT.selected_waveform = test_waveform
-    Mock_EVENT.event_time = test_timestamp
+    test_waveform = "W45"
+
+    # No existing waveform submission lock.
+    mock_cache.get.return_value = None
+
+    # Fixed timestamp for the new lock.
+    mock_datetime.now.return_value = (
+        test_timestamp
+    )
+
+    # Kafka successfully returns the event UUID.
+    mock_kafka.return_value = mock_uuid
 
     mock_bootstrap.return_value = (
         "test_topic",
         "test_config",
     )
 
-    data = submit_waveform(myRequest)
-    
-    # Assert cache was set
-    Mock_Cache.set.assert_called_once()
-    #assert call to reset progress bar was made
-    Mock_ProgressBar.assert_called_once()
+    factory = RequestFactory()
+
+    request = factory.post(
+        "/home/submit-waveform/",
+        data={
+            "waveform": test_waveform,
+        },
+    )
+
+    request.user = User(
+        username="testuser"
+    )
+
+    response = submit_waveform(request)
+
+    assert response.status_code == 202
+
+    response_data = json.loads(
+        response.content
+    )
+
+    assert response_data == {
+        "error": False,
+        "event_uuid": str(mock_uuid),
+        "message": (
+            f"Waveform {test_waveform} submitted."
+        ),
+    }
+
+    mock_cache.get.assert_called_once_with(
+        "submit_locked"
+    )
+
+    mock_cache.set.assert_called_once_with(
+        "submit_locked",
+        test_timestamp,
+    )
+
     mock_kafka.assert_called_once_with(
         message_type=Message.UI_EVENT,
         producer_topic="test_topic",
@@ -147,9 +192,15 @@ def test_submit_waveform(mock_kafka, mock_bootstrap, Mock_ProgressBar, Mock_Cach
         station=Stations.UI,
         tx_waveform=test_waveform,
         rec_waveform=test_waveform,
-        message=f"testuser submitted waveform {test_waveform}.",
+        message=(
+            f"testuser submitted waveform "
+            f"{test_waveform}."
+        ),
     )
-    mock_bootstrap.assert_called_once_with(Stations.UI)
+
+    mock_bootstrap.assert_called_once_with(
+        Stations.UI
+    )
 
 # ==============================================================================
 # 4. login_view Test

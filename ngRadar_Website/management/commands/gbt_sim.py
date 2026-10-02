@@ -3,6 +3,8 @@ import time
 import uuid
 from datetime import datetime, timezone
 from django.core.management.base import BaseCommand
+from django.db.backends.utils import logger
+
 from ngRadar_Website.enums import (
     Stations,
     Status,
@@ -55,11 +57,11 @@ def process_msg(
     producer_topic,
     producer_config,
 ):
-    incoming_key = int(msg.key().decode("utf-8"))
+    incoming_key = msg.key().decode("utf-8")
 
     # GBT only reacts to waveform requests
     # submitted by the UI.
-    if (incoming_key!= Message.UI_EVENT.value):
+    if (incoming_key!= str(Message.UI_EVENT.value)):
         return True
 
     messages_processed.add(1)
@@ -119,7 +121,7 @@ def process_msg(
     # 2. Remain OFF for five seconds
     # -------------------------------------------------
 
-    time.sleep(5)
+    #time.sleep(5)
 
     # -------------------------------------------------
     # 3. Turn transmitter ON with new waveform
@@ -187,4 +189,5 @@ class Command(BaseCommand):
             process_msg,
             producer_topic=producer_topic,
             producer_config=producer_config,
+            manual_commit=True,
         )
