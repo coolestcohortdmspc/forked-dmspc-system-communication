@@ -1,22 +1,4 @@
 #==========================
-# etransfer builder stage
-#==========================
-FROM debian:bookworm-slim AS etransfer-builder 
-
-RUN apt-get update && apt-get install -y gcc g++ make git 
-
-WORKDIR /build 
-
-RUN git clone --branch v2.0 https://github.com/jive-vlbi/etransfer.git
-
-RUN sed -i 's/MACHINE),arm64)/MACHINE),aarch64)/' /build/etransfer/libudt5ab/Makefile
-
-RUN sed -i 's/MACHINE),arm64)/MACHINE),aarch64)/' /build/etransfer/libsrt5ab/Makefile
-
-RUN cd etransfer && make
-
-
-#==========================
 # main application image
 #==========================
 FROM python:3.11-slim AS base
@@ -63,20 +45,22 @@ RUN python manage.py collectstatic --noinput
 CMD ["uvicorn", "asgi:application", "--host", "0.0.0.0", "--port", "8000"]
 
 
-#================
-# etransfer etd
-#================
-FROM base AS etd
+#===============
+# expedat server
+#===============
+FROM base AS expedat-server
 
-COPY --from=etransfer-builder /build/etransfer/*-native-opt/etd /usr/local/bin/
+COPY /expedat/servedat /usr/local/bin/
 
 
-#================
-# etransfer etc
-#================
-FROM base AS etc
+#===============
+# expedat client
+#===============
+FROM base AS expedat-client
 
-COPY --from=etransfer-builder /build/etransfer/*-native-opt/etc /usr/local/bin/
+COPY /expedat/movedat /usr/local/bin/
+
+COPY /expedat/mtping /usr/local/bin/
 
 
 #================

@@ -18,14 +18,17 @@ from ngRadar_Website.enums import (
 from ngRadar_Website.utils import (
     bootstrap,
     consume,
-    create_file,
-    watch_for_file,
     send_kafka_message,
-    etc_send,
-    wait_for_etd,
+    # etc_send,
+    expedat_send,
     delete_observation_data,
     ETD_MAX_CONN_RETRY,
     ETD_RETRY_CONN_DELAY,
+    wait_for_exp,
+    # E-transfer imports:
+    # create_file,
+    # watch_for_file,
+    # wait_for_etd,
 )
 
 
@@ -108,18 +111,20 @@ def process_msg(
         rec_waveform = payload.get("rec_waveform")
 
         # One transfer UUID identifies this entire
-        # VLBA -> DSOC e-transfer lifecycle.
+        # VLBA -> DSOC expedat transfer lifecycle.
         transfer_uuid = uuid.uuid4()
 
         frame_path = (raw_data_path / f"{transfer_uuid}.bin")
 
-        Thread(
-            target=create_file,
-            args=(frame_path,),
-            daemon=True,
-        ).start()
+        expedat_mode = os.environ["EXPEDAT_MODE"]
 
-        watch_for_file(frame_path)
+        # Thread(
+        #     target=create_file,
+        #     args=(frame_path,),
+        #     daemon=True,
+        # ).start()
+
+        # watch_for_file(frame_path)
 
         # -----------------------------------------------------
         # Raw data file successfully created
@@ -127,6 +132,38 @@ def process_msg(
         if frame_path.is_file():
             num_bytes = (frame_path.stat().st_size)
 
+            send_kafka_message(
+                producer_topic=producer_topic,
+                producer_config=producer_config,
+                waveform_requester=waveform_requester,
+                message_type=(Message.VLBA_REQUEST_STORAGE),
+                transfer_uuid=transfer_uuid,
+                gbt_uuid=gbt_uuid,
+                gbt_event_time=gbt_event_time,
+                station=STATION,
+                status=Status.QUEUED,
+                object_id=object_id,
+                target=target,
+                tx_waveform=tx_waveform,
+                rec_waveform=rec_waveform,
+                num_bytes=num_bytes,
+                filename=frame_path.name,
+                xmit_station=Stations.GBT,
+                rcvr_station=STATION,
+                message=(
+                    "VLBA requested a storage "
+                    "check at DSOC."
+                )
+            )
+
+            print(
+                "VLBA requesting DSOC "
+                "check storage..."
+            )
+
+        elif expedat_mode == "stream":
+            num_bytes = int(os.environ["EXPEDAT_STREAM_MB"]) * 1024 * 1024
+            
             send_kafka_message(
                 producer_topic=producer_topic,
                 producer_config=producer_config,
@@ -279,10 +316,10 @@ def process_msg(
                         xmit_station=Stations.GBT,
                         rcvr_station=STATION,
                         message=(
-                            "Hancock VLBA has "
+                            f"VLBA-{STATION} has "
                             "started sending the "
                             "data file to DSOC "
-                            "via e-transfer."
+                            "via movedat."
                         ),
                     )
 
@@ -292,29 +329,29 @@ def process_msg(
                         "DSOC responded "
                         "affirmative to storage "
                         "check. Initiating "
-                        "e-transfer..."
+                        "expedat transfer..."
                     )
 
-                    etc_send(frame_path)
+                    expedat_send(frame_path)
 
                     # -----------------------------------------
-                    # etc_send returned successfully.
+                    # expedat_send returned successfully.
                     #
                     # VLBA now knows that its side of the
                     # transfer completed successfully.
                     # -----------------------------------------
-                    print("E-Transfer completed successfully.")
+                    print("movedat completed successfully.")
 
                     break
 
                 # =============================================
-                # Known ETC/e-transfer process failure
+                # Known expedat process failure
                 # =============================================
                 except subprocess.CalledProcessError as exc:
                     failure_reason = (
                         FAILURE_REASONS.get(
                             exc.returncode,
-                            "The e-transfer failed",
+                            "The expedat transfer failed",
                         )
                     )
 
@@ -327,7 +364,7 @@ def process_msg(
                     )
 
                     print(
-                        "E-transfer failed with "
+                        "Expedat transfer failed with "
                         "return code: "
                         f"{exc.returncode}"
                     )
@@ -357,7 +394,7 @@ def process_msg(
 
                     if (attempts >= MAX_RESUME_ATTEMPTS):
                         print(
-                            "E-transfer failed "
+                            "Expedat transfer failed "
                             f"{attempts} times. "
                             "Giving up."
                         )
@@ -366,13 +403,13 @@ def process_msg(
 
                     print(
                         "Waiting for the "
-                        "e-transfer daemon to "
+                        "expedat server to "
                         "come back..."
                     )
 
-                    if not wait_for_etd():
+                    if not wait_for_exp():
                         print(
-                            "E-transfer daemon "
+                            "Expedat server "
                             "never came back. "
                             "Giving up."
                         )
@@ -380,7 +417,7 @@ def process_msg(
                         return False
 
                     print(
-                        "E-transfer daemon is "
+                        "Expedat server is "
                         "back. Resuming the "
                         "transfer..."
                     )
@@ -390,7 +427,7 @@ def process_msg(
                 # =============================================
                 except Exception as exc:
                     print(
-                        "Unexpected e-transfer "
+                        "Unexpected expedat transfer "
                         f"failure: {exc}"
                     )
 
@@ -413,7 +450,7 @@ def process_msg(
                         xmit_station=Stations.GBT,
                         rcvr_station=STATION,
                         message=(
-                            "The e-transfer "
+                            "The expedat transfer "
                             "failed unexpectedly "
                             "mid-transfer. "
                             "Transfer interrupted. "

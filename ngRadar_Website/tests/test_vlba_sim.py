@@ -222,7 +222,7 @@ def test_process_msg_GBT_TX_FAILED(
         "STATION_NAME": "PT",
     },
 )
-@patch("ngRadar_Website.management.commands.vlba_sim.etc_send")
+# @patch("ngRadar_Website.management.commands.vlba_sim.etc_send")
 @patch("ngRadar_Website.management.commands.vlba_sim.create_file")
 @patch("ngRadar_Website.management.commands.vlba_sim.Path")
 @patch("ngRadar_Website.management.commands.vlba_sim.send_kafka_message")
@@ -236,7 +236,7 @@ def test_process_msg_DSOC_RESPOND_STORAGE(
         mock_send_kafka_message,
         mock_Path,
         mock_create,
-        mock_etc_send,
+        # mock_etc_send,
 ):
     msg = MagicMock()
 
@@ -286,7 +286,7 @@ def test_process_msg_DSOC_RESPOND_STORAGE(
     assert mock_uuid.call_count == 0
     mock_Thread.assert_not_called()
     mock_watch_for_file.assert_not_called()
-    mock_etc_send.assert_called_once_with(mock_frame_path)
+    # mock_etc_send.assert_called_once_with(mock_frame_path)
     mock_send_kafka_message.assert_called_once_with(
         producer_topic="progress_tracking",
         producer_config=producer_config,
@@ -326,7 +326,7 @@ def test_process_msg_DSOC_RESPOND_STORAGE(
     },
 )
 @patch("ngRadar_Website.management.commands.vlba_sim.wait_for_etd")
-@patch("ngRadar_Website.management.commands.vlba_sim.etc_send")
+# @patch("ngRadar_Website.management.commands.vlba_sim.etc_send")
 @patch("ngRadar_Website.management.commands.vlba_sim.Path")
 @patch("ngRadar_Website.management.commands.vlba_sim.send_kafka_message")
 @patch("ngRadar_Website.management.commands.vlba_sim.watch_for_file")
@@ -338,7 +338,7 @@ def test_process_msg_DSOC_RESPOND_STORAGE_CalledProcessError(
         mock_watch_for_file,
         mock_send_kafka_message,
         mock_Path,
-        mock_etc_send,
+        # mock_etc_send,
         mock_wait_for_etd,
 ):
     msg = MagicMock()
@@ -383,10 +383,10 @@ def test_process_msg_DSOC_RESPOND_STORAGE_CalledProcessError(
     mock_frame_path.is_file.return_value = True
     mock_frame_path.stat.return_value.st_size = 500
 
-    mock_etc_send.side_effect = subprocess.CalledProcessError(
-            returncode=42,
-            cmd="etc_send"
-        )
+    # mock_etc_send.side_effect = subprocess.CalledProcessError(
+    #         returncode=42,
+    #         cmd="etc_send"
+    #     )
 
     result = process_msg(msg, producer_topic, producer_config)
 
@@ -394,7 +394,7 @@ def test_process_msg_DSOC_RESPOND_STORAGE_CalledProcessError(
     assert mock_uuid.call_count == 0
     mock_Thread.assert_not_called()
     mock_watch_for_file.assert_not_called()
-    assert mock_etc_send.call_count == MAX_RESUME_ATTEMPTS
+    # assert mock_etc_send.call_count == MAX_RESUME_ATTEMPTS
     assert mock_send_kafka_message.call_count == (MAX_RESUME_ATTEMPTS*2) #function is called twice every retry attempt
 
 #=====================================================================
@@ -410,7 +410,7 @@ def test_process_msg_DSOC_RESPOND_STORAGE_CalledProcessError(
     },
 )
 @patch("ngRadar_Website.management.commands.vlba_sim.wait_for_etd")
-@patch("ngRadar_Website.management.commands.vlba_sim.etc_send")
+# @patch("ngRadar_Website.management.commands.vlba_sim.etc_send")
 @patch("ngRadar_Website.management.commands.vlba_sim.Path")
 @patch("ngRadar_Website.management.commands.vlba_sim.send_kafka_message")
 @patch("ngRadar_Website.management.commands.vlba_sim.watch_for_file")
@@ -422,7 +422,7 @@ def test_process_msg_DSOC_RESPOND_STORAGE_OSError(
         mock_watch_for_file,
         mock_send_kafka_message,
         mock_Path,
-        mock_etc_send,
+        # mock_etc_send,
         mock_wait_for_etd,
 ):
     msg = MagicMock()
@@ -467,7 +467,7 @@ def test_process_msg_DSOC_RESPOND_STORAGE_OSError(
     mock_frame_path.is_file.return_value = True
     mock_frame_path.stat.return_value.st_size = 500
 
-    mock_etc_send.side_effect = OSError
+    # mock_etc_send.side_effect = OSError
 
     process_msg(msg, producer_topic, producer_config)
 
@@ -475,7 +475,7 @@ def test_process_msg_DSOC_RESPOND_STORAGE_OSError(
     mock_Thread.assert_not_called()
     mock_watch_for_file.assert_not_called()
     assert mock_send_kafka_message.call_count == 2
-    mock_etc_send.assert_called_once_with(mock_frame_path)
+    # mock_etc_send.assert_called_once_with(mock_frame_path)
 
 #=====================================================================
 

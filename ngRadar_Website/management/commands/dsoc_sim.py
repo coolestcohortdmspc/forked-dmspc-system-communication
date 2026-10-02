@@ -592,7 +592,7 @@ def process_msg(
                 "DSOC has enough storage "
                 "to accept the incoming "
                 "data. Awaiting "
-                "e-transfer..."
+                "streaming..."
             )
 
     # =========================================================
@@ -793,7 +793,7 @@ def process_msg(
             rcvr_station=(vlba_station),
             message=(
                 f"DSOC verified {vlba_station.label}'s "
-                "e-transfer, generated "
+                "streaming, generated "
                 "the DDM image, stored "
                 "the image, and completed "
                 f"processing. {vlba_station.label} may "
