@@ -318,7 +318,7 @@ def process_msg(
                     break
 
                 # =============================================
-                # Known ETC/e-transfer process failure
+                # Known expedat process failure
                 # =============================================
                 except subprocess.CalledProcessError as exc:
                     failure_reason = (

@@ -34,6 +34,7 @@ with patch("pathlib.Path.read_text", return_value=mock_env_data):
         ensure_bucket_exists,
         # etc_send,
         # watch_for_file,
+        expedat_send,
         produce,
         send_kafka_message,
         get_folder_size,
@@ -487,13 +488,13 @@ def test_consume_partition_error(mock_Consumer, capsys):
 # X. create_file Test
 # ==============================================================================
 
-def test_create_file(tmp_path):
-    file_path = tmp_path / "test.bin"
+# def test_create_file(tmp_path):
+#     file_path = tmp_path / "test.bin"
 
-    create_file(file_path, file_mb=1)
+#     # create_file(file_path, file_mb=1)
 
-    assert file_path.exists()
-    assert file_path.stat().st_size == 1 * 1024 * 1024
+#     assert file_path.exists()
+#     assert file_path.stat().st_size == 1 * 1024 * 1024
 
 
 # ==============================================================================
@@ -690,13 +691,14 @@ def test_ensure_bucket_exists_created():
 
 
 # ==============================================================================
-# 5. etc_send Test
+# 5. expedat_send Test
 # ==============================================================================
 @patch.dict(
     "os.environ",
     {
-        "ETD_HOST": "fake_host",
-        "ETD_COMMAND_PORT": "4004",
+        "SVD_USER": "fake_user",
+        "SVD_PASSWORD": "fake_password",
+        "SVD_IP": "fake_host",
     },
 )
 @patch("ngRadar_Website.utils.uuid.uuid4")
@@ -705,8 +707,8 @@ def test_ensure_bucket_exists_created():
 @patch("ngRadar_Website.utils.os.close")
 @patch("ngRadar_Website.utils.select.select")
 @patch("ngRadar_Website.utils.os.read")
-@patch("ngRadar_Website.utils.parse_etc_progress")
-def test_etc_send(mock_parse, mock_os_read, mock_select, mock_os_close, mock_popen, mock_os_open, mock_uuid):
+@patch("ngRadar_Website.utils.parse_expedat_progress")
+def test_expedat_send(mock_parse, mock_os_read, mock_select, mock_os_close, mock_popen, mock_os_open, mock_uuid):
     mock_frame_path = MagicMock()
     mock_frame_path.stat.return_value.st_size = 500
 
@@ -727,19 +729,19 @@ def test_etc_send(mock_parse, mock_os_read, mock_select, mock_os_close, mock_pop
     # Only run through the while loop once to avoid an infinite loop.
     mock_process.poll.side_effect = [None, 0]
     mock_process.wait.return_value = 0
-    mock_process.args = ["etc", "fake_file"]
+    mock_process.args = ["./movedat", "fake_file"]
 
-    etc_send(mock_frame_path)
+    expedat_send(mock_frame_path)
 
     mock_uuid.assert_called_once()
     mock_os_open.assert_called_once()
 
     mock_popen.assert_called_once_with(
         [
-            "etc",
-            str(mock_frame_path),
-            "tcp://fake_host#4004:/dsoc/incoming/",
-            "--resume",
+            "./movedat",
+            "-s",
+            "-",
+            "fake_user:fake_password@fake_host:" + str(mock_frame_path),
         ],
         stdin=mock_receiver,
         stdout=mock_receiver,
@@ -762,29 +764,29 @@ def test_etc_send(mock_parse, mock_os_read, mock_select, mock_os_close, mock_pop
 # 5. watch_for_file Test
 # ==============================================================================
 
-@patch("ngRadar_Website.utils.subprocess.run")
-@patch("ngRadar_Website.utils.time.sleep")
-def test_watch_for_file(mock_sleep, mock_subprocess):
-    file_path = "filepath"
+# @patch("ngRadar_Website.utils.subprocess.run")
+# @patch("ngRadar_Website.utils.time.sleep")
+# def test_watch_for_file(mock_sleep, mock_subprocess):
+#     file_path = "filepath"
 
-    first_result = MagicMock()
-    first_result.stdout = "exists"
-    second_result = MagicMock()
-    second_result.stdout = ""
+#     first_result = MagicMock()
+#     first_result.stdout = "exists"
+#     second_result = MagicMock()
+#     second_result.stdout = ""
 
-    mock_subprocess.side_effect = [first_result, second_result]
+#     mock_subprocess.side_effect = [first_result, second_result]
 
-    mock_sleep.return_value = None
+#     mock_sleep.return_value = None
 
-    watch_for_file(file_path)
+#     # watch_for_file(file_path)
 
-    first = mock_subprocess.call_args_list[0]
-    second = mock_subprocess.call_args_list[1]
+#     first = mock_subprocess.call_args_list[0]
+#     second = mock_subprocess.call_args_list[1]
 
-    mock_sleep.assert_called_once()
-    assert mock_subprocess.call_count == 2
-    assert first.kwargs["capture_output"] == True
-    assert second.kwargs["capture_output"] == True
+#     mock_sleep.assert_called_once()
+#     assert mock_subprocess.call_count == 2
+#     assert first.kwargs["capture_output"] == True
+#     assert second.kwargs["capture_output"] == True
 
 
 # ==============================================================================

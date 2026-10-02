@@ -767,29 +767,29 @@ def write_transfer_progress(
 
 
 # Intercepts etc CLI and parses output:
-def parse_etc_progress(line, *, expected_num_bytes, transfer_id):
-    # Remove terminal escape sequences such as ESC[K.
-    clean_line = ANSI_RE.sub("", line)
+# def parse_etc_progress(line, *, expected_num_bytes, transfer_id):
+#     # Remove terminal escape sequences such as ESC[K.
+#     clean_line = ANSI_RE.sub("", line)
 
-    match = PROGRESS_RE.search(clean_line)
+#     match = PROGRESS_RE.search(clean_line)
 
-    if not match:
-        return
+#     if not match:
+#         return
 
-    percent = float(match.group("percent"))
+#     percent = float(match.group("percent"))
 
-    received_bytes = round(
-        expected_num_bytes * (percent / 100.0)
-    )
+#     received_bytes = round(
+#         expected_num_bytes * (percent / 100.0)
+#     )
 
-    if percent >= 100.0:
-        received_bytes = expected_num_bytes
+#     if percent >= 100.0:
+#         received_bytes = expected_num_bytes
 
-    print(
-        f"Transfer progress: "
-        f"{received_bytes}/{expected_num_bytes} bytes "
-        f"({percent:.1f}%)"
-    )
+#     print(
+#         f"Transfer progress: "
+#         f"{received_bytes}/{expected_num_bytes} bytes "
+#         f"({percent:.1f}%)"
+#     )
 
     # Progress currently also gets measured from
     # the receiving DSOC side.
