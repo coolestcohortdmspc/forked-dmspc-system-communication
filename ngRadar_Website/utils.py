@@ -828,6 +828,7 @@ def write_transfer_progress(
     #     transfer_id=transfer_id,
     # )
 
+# TODO see if we actually need this
 def parse_expedat_progress(line, *, transfer_id):
     match = EXPEDAT_PROGRESS_RE.search(line)
 
@@ -1101,7 +1102,7 @@ def expedat_send(mvd_filepath):
             cwd=mvd_location,
         )
         try:
-            num_mb = os.environ["EXPEDAT_STREAM_MB"]
+            num_mb = int(os.environ["EXPEDAT_STREAM_MB"])
             file_size_bytes = num_mb * 1024 * 1024
             num_buffers = num_mb
 
