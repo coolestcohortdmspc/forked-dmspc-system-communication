@@ -653,7 +653,6 @@ services:
   vlba:
     container_name: vlba
     # this for local development on Mac since we use linux build x86 
-    platform: linux/amd64
     build:
       context: .
       target: expedat-client
@@ -901,7 +900,6 @@ services:
 
   expedat_server:
     container_name: expedat_server
-    platform: linux/amd64
     build:
       context: .
       target: expedat-server
