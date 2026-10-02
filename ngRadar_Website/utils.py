@@ -767,29 +767,29 @@ def write_transfer_progress(
 
 
 # Intercepts etc CLI and parses output:
-def parse_etc_progress(line, *, expected_num_bytes, transfer_id):
-    # Remove terminal escape sequences such as ESC[K.
-    clean_line = ANSI_RE.sub("", line)
+# def parse_etc_progress(line, *, expected_num_bytes, transfer_id):
+#     # Remove terminal escape sequences such as ESC[K.
+#     clean_line = ANSI_RE.sub("", line)
 
-    match = PROGRESS_RE.search(clean_line)
+#     match = PROGRESS_RE.search(clean_line)
 
-    if not match:
-        return
+#     if not match:
+#         return
 
-    percent = float(match.group("percent"))
+#     percent = float(match.group("percent"))
 
-    received_bytes = round(
-        expected_num_bytes * (percent / 100.0)
-    )
+#     received_bytes = round(
+#         expected_num_bytes * (percent / 100.0)
+#     )
 
-    if percent >= 100.0:
-        received_bytes = expected_num_bytes
+#     if percent >= 100.0:
+#         received_bytes = expected_num_bytes
 
-    print(
-        f"Transfer progress: "
-        f"{received_bytes}/{expected_num_bytes} bytes "
-        f"({percent:.1f}%)"
-    )
+#     print(
+#         f"Transfer progress: "
+#         f"{received_bytes}/{expected_num_bytes} bytes "
+#         f"({percent:.1f}%)"
+#     )
 
     # Progress currently also gets measured from
     # the receiving DSOC side.
@@ -985,7 +985,7 @@ def wait_for_exp():
 #         )
 
 
-def expedat_send(mvd_filepath, method):
+def expedat_send(mvd_filepath, method="stream"):
     """
     Send one raw-data file from one directory/machine to another using expedat.
     Supports both Transfer and Stream methods
@@ -1009,10 +1009,10 @@ def expedat_send(mvd_filepath, method):
 
         # transfer method requires a filepath to retrieve the completed file
         terminal_command = [
-                "./movedat",
-                mvd_filepath,
-                f"{svd_user}:{svd_password}@{svd_ip}:{recipient_directory}",
-            ]
+            "./movedat",
+            mvd_filepath,
+            f"{svd_user}:{svd_password}@{svd_ip}:{recipient_directory}",
+        ]
         
         process = subprocess.Popen(
             terminal_command,
@@ -1058,11 +1058,11 @@ def expedat_send(mvd_filepath, method):
         # stream method uses "-" in place of filepath, because the file does not exist anywhere yet
         # flag -s displays progress of transfer
         terminal_command = [
-                    "./movedat",
-                    "-s",
-                    "-",
-                    f"{svd_user}:{svd_password}@{svd_ip}:{recipient_directory}/generated_file.txt",
-                ]
+            "./movedat",
+            "-s",
+            "-",
+            f"{svd_user}:{svd_password}@{svd_ip}:{mvd_filepath}",  # TODO test that this file gets created correctly
+        ]
 
         # Standard Input IN (stdin) and Standard Input OUT (stdout):
         # creates a pipe connecting the Python process to the movedat process
