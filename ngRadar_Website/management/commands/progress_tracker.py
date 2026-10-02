@@ -203,7 +203,7 @@ def get_transfer_progress(
     # File has not appeared at DSOC yet.
     # -----------------------------------------------------
 
-    temp_file = tracked_file + "-sv.tmp"
+    temp_file = tracked_file.with_name(tracked_file.name + "-sv.tmp")
 
     if not tracked_file.exists():
         if not temp_file.exists():
@@ -271,7 +271,7 @@ def get_transfer_progress(
             filename=payload["filename"],
             xmit_station=payload["xmit_station"],
             rcvr_station=payload["rcvr_station"],
-            message=(f"VLBA-{Stations(payload['station']).name} completed sending the data file to DSOC via e-transfer."),
+            message=(f"VLBA-{Stations(payload['station']).name} completed sending the data file to DSOC via ExpeDat."),
 
         )
 

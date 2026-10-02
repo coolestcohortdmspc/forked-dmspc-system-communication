@@ -652,6 +652,8 @@ services:
 
   vlba:
     container_name: vlba
+    # this for local development on Mac since we use linux build x86 
+    platform: linux/amd64
     build:
       context: .
       target: expedat-client
@@ -666,6 +668,11 @@ services:
     restart: unless-stopped
     environment:
       BOOTSTRAP_SERVER: ${KAFKA_BOOTSTRAP_SERVERS} # needs all 3 brokers bootstrap server
+      SVD_IP: expedat_server
+      RECIPIENT_DIR: /dsoc/incoming
+      MVD_LOC: /usr/local/bin/
+      EXPEDAT_MODE: ${EXPEDAT_MODE}
+      EXPEDAT_STREAM_MB: ${EXPEDAT_STREAM_MB}
     entrypoint:
       - python
       - manage.py
@@ -891,6 +898,30 @@ services:
       - tcp://:4004
       - --data
       - srt://:8008
+
+  expedat_server:
+    container_name: expedat_server
+    platform: linux/amd64
+    build:
+      context: .
+      target: expedat-server
+    profiles: ["kafka"]
+    user: "33:33"   # non root user: www-data
+    depends_on:
+      dsoc-volume-init:
+        condition: service_completed_successfully
+    networks:
+      - ngradar_website_network
+      - proxy
+    volumes:
+      - dsoc_transfer:/dsoc/incoming
+    environment:
+      SVD_USER: ${SVD_USER} 
+      SVD_PASSWORD: ${SVD_PASSWORD}
+    command:
+      - sh 
+      - -c 
+      - echo "$$SVD_USER:$$SVD_PASSWORD:/dsoc/incoming" > /tmp/svpassword && exec servedat -A /tmp/svpassword
 
 
 #===============================
