@@ -123,6 +123,8 @@ def process_msg(
 
         frame_path = (raw_data_path / f"{transfer_uuid}.bin")
 
+        expedat_mode = os.environ["EXPEDAT_MODE"]
+
         # Thread(
         #     target=create_file,
         #     args=(frame_path,),
@@ -137,6 +139,38 @@ def process_msg(
         if frame_path.is_file():
             num_bytes = (frame_path.stat().st_size)
 
+            send_kafka_message(
+                producer_topic=producer_topic,
+                producer_config=producer_config,
+                waveform_requester=waveform_requester,
+                message_type=(Message.VLBA_REQUEST_STORAGE),
+                transfer_uuid=transfer_uuid,
+                gbt_uuid=gbt_uuid,
+                gbt_event_time=gbt_event_time,
+                station=STATION,
+                status=Status.QUEUED,
+                object_id=object_id,
+                target=target,
+                tx_waveform=tx_waveform,
+                rec_waveform=rec_waveform,
+                num_bytes=num_bytes,
+                filename=frame_path.name,
+                xmit_station=Stations.GBT,
+                rcvr_station=STATION,
+                message=(
+                    "VLBA requested a storage "
+                    "check at DSOC."
+                )
+            )
+
+            print(
+                "VLBA requesting DSOC "
+                "check storage..."
+            )
+
+        elif expedat_mode == "stream":
+            num_bytes = os.environ["EXPEDAT_STREAM_MB"] * 1024 * 1024
+            
             send_kafka_message(
                 producer_topic=producer_topic,
                 producer_config=producer_config,

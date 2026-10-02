@@ -728,7 +728,7 @@ services:
     container_name: vlba
     build:
       context: .
-      target: etc
+      target: expedat-client
     env_file:
       - .env
     volumes:
@@ -740,8 +740,6 @@ services:
     restart: unless-stopped
     environment:
       BOOTSTRAP_SERVER: ${KAFKA_BOOTSTRAP_SERVERS} # needs all 3 brokers bootstrap server
-      ETD_HOST: ${ETD_HOST}
-      ETD_COMMAND_PORT: ${ETD_COMMAND_PORT:-4004}
     entrypoint:
       - python
       - manage.py

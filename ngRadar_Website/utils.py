@@ -985,7 +985,7 @@ def wait_for_exp():
 #         )
 
 
-def expedat_send(mvd_filepath, method="stream"):
+def expedat_send(mvd_filepath):
     """
     Send one raw-data file from one directory/machine to another using expedat.
     Supports both Transfer and Stream methods
@@ -1003,7 +1003,9 @@ def expedat_send(mvd_filepath, method="stream"):
     #location where movedat is saved on my computer:
     mvd_location = os.environ["MVD_LOC"]
 
-    if method == "transfer":
+    expedat_mode = os.environ["EXPEDAT_MODE"]
+
+    if expedat_mode == "transfer":
 
         master_fd, receiver_fd = os.openpty()
 
@@ -1053,7 +1055,7 @@ def expedat_send(mvd_filepath, method="stream"):
         finally:
             os.close(master_fd)
 
-    elif method == "stream":
+    elif expedat_mode == "stream":
 
         # stream method uses "-" in place of filepath, because the file does not exist anywhere yet
         # flag -s displays progress of transfer
@@ -1075,8 +1077,9 @@ def expedat_send(mvd_filepath, method="stream"):
             cwd=mvd_location,
         )
         try:
-            file_size_bytes = 1000 * 1024 * 1024
-            num_buffers = 1000
+            num_mb = os.environ["EXPEDAT_STREAM_MB"]
+            file_size_bytes = num_mb * 1024 * 1024
+            num_buffers = num_mb
 
             # X amount of buffers divides the file into X pieces to be
             # sent to movedat as each piece is written
