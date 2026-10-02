@@ -325,6 +325,46 @@ droplets-down)
     ssh "$DSOC_DROPLET" \
         "cd $REMOTE_DIR && git checkout dev && ./control.sh dsoc-down"
     ;;
+
+
+droplets-checkout)
+    # Checkout a specified branch on all droplets.
+
+    shift
+
+     if [ "$#" -ne 1 ]; then
+        echo "Error: Specify exactly one branch to checkout and pull."
+        echo
+        echo "Usage:"
+        echo "  ./control.sh droplets-checkout <branch_name>"
+        exit 1
+    fi
+
+    branch="$1"
+
+    echo "Checking out: $branch"
+
+    echo "DSOC Droplet"
+    ssh "$DSOC_DROPLET" \
+        "cd $REMOTE_DIR && git checkout $branch && git pull"
+
+    echo "VLBA 1 Droplet"
+    ssh "$VLBA_1_DROPLET" \
+        "cd $REMOTE_DIR && git checkout $branch && git pull"
+
+    echo "VLBA 2 Droplet"
+    ssh "$VLBA_2_DROPLET" \
+        "cd $REMOTE_DIR && git checkout $branch && git pull"
+
+    echo "VLBA 3 Droplet"
+    ssh "$VLBA_3_DROPLET" \
+        "cd $REMOTE_DIR && git checkout $branch && git pull"
+
+    echo "GBT Droplet"
+    ssh "$GBT_DROPLET" \
+        "cd $REMOTE_DIR && git checkout $branch && git pull"
+    ;;
+
 *)
     echo
     echo "HELP with ./control.sh usage:"
