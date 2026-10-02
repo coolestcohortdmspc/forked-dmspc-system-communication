@@ -16,12 +16,10 @@ exporters:
     endpoint: tempo:4317
     tls:
       insecure: true
-    debug:
-      verbosity: basic
 
 service:
   pipelines:
     metrics:
       receivers: [otlp]
       processors: [batch]
-      exporters: [prometheus, otlp/tempo, debug]
+      exporters: [prometheus, otlp/tempo]
