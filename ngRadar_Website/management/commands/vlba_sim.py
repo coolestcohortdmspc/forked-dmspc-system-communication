@@ -169,7 +169,7 @@ def process_msg(
             )
 
         elif expedat_mode == "stream":
-            num_bytes = os.environ["EXPEDAT_STREAM_MB"] * 1024 * 1024
+            num_bytes = int(os.environ["EXPEDAT_STREAM_MB"]) * 1024 * 1024
             
             send_kafka_message(
                 producer_topic=producer_topic,

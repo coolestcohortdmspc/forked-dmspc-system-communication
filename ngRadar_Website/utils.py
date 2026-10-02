@@ -871,7 +871,7 @@ def wait_for_exp():
             "./mtping",
             os.environ["SVD_IP"],
         ],
-        capture_output=True,
+        capture_output=True,cwd=os.environ["MVD_LOC"],
     )
     return result.returncode == 0
 
@@ -1063,7 +1063,7 @@ def expedat_send(mvd_filepath):
             "./movedat",
             "-s",
             "-",
-            f"{svd_user}:{svd_password}@{svd_ip}:{mvd_filepath}",  # TODO test that this file gets created correctly
+            f"{svd_user}:{svd_password}@{svd_ip}:{recipient_directory}/{Path(mvd_filepath).name}",  # TODO test that this file gets created correctly
         ]
 
         # Standard Input IN (stdin) and Standard Input OUT (stdout):
@@ -1077,7 +1077,7 @@ def expedat_send(mvd_filepath):
             cwd=mvd_location,
         )
         try:
-            num_mb = os.environ["EXPEDAT_STREAM_MB"]
+            num_mb = int(os.environ["EXPEDAT_STREAM_MB"])
             file_size_bytes = num_mb * 1024 * 1024
             num_buffers = num_mb
 

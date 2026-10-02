@@ -742,6 +742,11 @@ services:
     restart: unless-stopped
     environment:
       BOOTSTRAP_SERVER: ${KAFKA_BOOTSTRAP_SERVERS} # needs all 3 brokers bootstrap server
+      SVD_IP: expedat_server
+      RECIPIENT_DIR: /dsoc/incoming
+      MVD_LOC: /usr/local/bin/
+      EXPEDAT_MODE: ${EXPEDAT_MODE}
+      EXPEDAT_STREAM_MB: ${EXPEDAT_STREAM_MB}
     entrypoint:
       - python
       - manage.py
