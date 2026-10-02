@@ -203,7 +203,7 @@ def get_transfer_progress(
     # File has not appeared at DSOC yet.
     # -----------------------------------------------------
 
-    temp_file = tracked_file + "-sv.tmp"
+    temp_file = tracked_file.with_name(tracked_file.name + "-sv.tmp")
 
     if not tracked_file.exists():
         if not temp_file.exists():
