@@ -36,6 +36,30 @@ from ngRadar_Website.enums import (
 
 from ngRadar_Website.models.models import ObservatoryEvent
 
+# =============================================================
+# FUNCTIONS IN THIS FILE
+# =============================================================
+"""
+latency_calc
+config_func
+bootstrap
+produce
+consume
+send_kafka_message
+consumer_group_has_members
+create_s3_client
+ensure_bucket_exists
+create_presigned_url
+upload_seaweedfs
+write_transfer_progress
+parse_etc_progress
+wait_for_etd
+etc_send
+create_file
+watch_for_file
+delete_observation_data
+get_folder_size
+"""
 
 # =============================================================
 # CONSTANTS
@@ -239,15 +263,14 @@ def config_func(
             f"{sim.name.lower()}"
             "-consumer-group"
         ),
-        # "auto.offset.reset": (
-        #     "earliest"
-        # ),
+
         # Consumer failover/recovery
         "session.timeout.ms": 45000,
         "heartbeat.interval.ms": 15000,
         "socket.timeout.ms": 30000,
         "reconnect.backoff.ms": 100,
         "reconnect.backoff.max.ms": 10000,
+        "auto.offset.reset": "earliest",
 
         # Usually useful for clients that must discover changed leaders
         "topic.metadata.refresh.interval.ms": 300000,
@@ -467,6 +490,7 @@ def send_kafka_message(
             else None
         ),
         "retry_count": (int(retry_count)),
+        
         "object_id": (
             object_id
             if object_id is not None

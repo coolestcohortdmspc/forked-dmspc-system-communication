@@ -490,6 +490,7 @@ function unlockSubmitButton() {
         "Submit";
 }
 
+
 async function initializeSubmitLock() {
     const button =
         document.getElementById(
@@ -533,6 +534,83 @@ async function initializeSubmitLock() {
     }
 }
 
+
+// =========================================================
+// Waveform submission
+// =========================================================
+
+async function submitWaveform(event) {
+    event.preventDefault();
+
+    const waveformForm = event.currentTarget;
+
+    try {
+        const response = await fetch(
+            waveformForm.action,
+            {
+                method: "POST",
+                body: new FormData(
+                    waveformForm
+                ),
+                credentials: "same-origin",
+            }
+        );
+
+        const data =
+            await response.json();
+
+        if (response.status === 409) {
+            lockSubmitButton();
+
+            console.log(
+                "[Home] "
+                + data.message
+            );
+
+            return;
+        }
+
+        if (!response.ok) {
+            console.error(
+                "[Home] "
+                + (
+                    data.message
+                    || "Waveform submission failed."
+                )
+            );
+
+            return;
+        }
+
+        // Django server accepted the waveform and
+        // created the submission lock.
+        lockSubmitButton();
+
+        console.log(
+            "[Home] "
+            + data.message
+        );
+
+    } catch (error) {
+        console.error(
+            "[Home] Could not submit waveform:",
+            error
+        );
+    }
+}
+
+
+const waveformForm =
+    document.getElementById(
+        "waveform-form"
+    );
+
+if (waveformForm) {
+    waveformForm.addEventListener(
+        "submit",
+        submitWaveform
+    );
+}
 
 initializeSubmitLock();
 

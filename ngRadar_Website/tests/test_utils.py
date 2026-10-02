@@ -128,24 +128,25 @@ def test_config_func_GBT():
                 }
     assert consumer_topic == ["GBT_notif"]
     assert consumer_config == {
-                    "bootstrap.servers": (bootstrap),
-                    "client.id": (
-                        f"{sim.name.lower()}"
-                        "-consumer"
-                    ),
-                    "group.id": (
-                        f"{sim.name.lower()}"
-                        "-consumer-group"
-                    ),
-                    "session.timeout.ms": 45000,
-                    "heartbeat.interval.ms": 15000,
-                    "socket.timeout.ms": 30000,
-                    "reconnect.backoff.ms": 100,
-                    "reconnect.backoff.max.ms": 10000,
-                    "topic.metadata.refresh.interval.ms": 300000,
-                    "metadata.max.age.ms": 300000,
-                    "enable.auto.commit": False,
-                }
+        "bootstrap.servers": bootstrap,
+        "client.id": (
+            f"{sim.name.lower()}"
+            "-consumer"
+        ),
+        "group.id": (
+            f"{sim.name.lower()}"
+            "-consumer-group"
+        ),
+        "session.timeout.ms": 45000,
+        "heartbeat.interval.ms": 15000,
+        "socket.timeout.ms": 30000,
+        "reconnect.backoff.ms": 100,
+        "reconnect.backoff.max.ms": 10000,
+        "auto.offset.reset": "earliest",
+        "topic.metadata.refresh.interval.ms": 300000,
+        "metadata.max.age.ms": 300000,
+        "enable.auto.commit": False,
+    }
 
 
 @pytest.mark.parametrize("sim", [
@@ -174,24 +175,25 @@ def test_config_func_VLBA(sim):
                     "DSOC_notif",
                 ]
     assert consumer_config == {
-                    "bootstrap.servers": (bootstrap),
-                    "client.id": (
-                        f"{sim.name.lower()}"
-                        "-consumer"
-                    ),
-                    "group.id": (
-                        f"{sim.name.lower()}"
-                        "-consumer-group"
-                    ),
-                    "session.timeout.ms": 45000,
-                    "heartbeat.interval.ms": 15000,
-                    "socket.timeout.ms": 30000,
-                    "reconnect.backoff.ms": 100,
-                    "reconnect.backoff.max.ms": 10000,
-                    "topic.metadata.refresh.interval.ms": 300000,
-                    "metadata.max.age.ms": 300000,
-                    "enable.auto.commit": False,
-                }
+        "bootstrap.servers": bootstrap,
+        "client.id": (
+            f"{sim.name.lower()}"
+            "-consumer"
+        ),
+        "group.id": (
+            f"{sim.name.lower()}"
+            "-consumer-group"
+        ),
+        "session.timeout.ms": 45000,
+        "heartbeat.interval.ms": 15000,
+        "socket.timeout.ms": 30000,
+        "reconnect.backoff.ms": 100,
+        "reconnect.backoff.max.ms": 10000,
+        "auto.offset.reset": "earliest",
+        "topic.metadata.refresh.interval.ms": 300000,
+        "metadata.max.age.ms": 300000,
+        "enable.auto.commit": False,
+    }
 
 
 def test_config_func_DSOC():
@@ -216,24 +218,25 @@ def test_config_func_DSOC():
                 "VLBA_notif",
             ]
     assert consumer_config == {
-                    "bootstrap.servers": (bootstrap),
-                    "client.id": (
-                        f"{sim.name.lower()}"
-                        "-consumer"
-                    ),
-                    "group.id": (
-                        f"{sim.name.lower()}"
-                        "-consumer-group"
-                    ),
-                    "session.timeout.ms": 45000,
-                    "heartbeat.interval.ms": 15000,
-                    "socket.timeout.ms": 30000,
-                    "reconnect.backoff.ms": 100,
-                    "reconnect.backoff.max.ms": 10000,
-                    "topic.metadata.refresh.interval.ms": 300000,
-                    "metadata.max.age.ms": 300000,
-                    "enable.auto.commit": False,
-                }
+        "bootstrap.servers": bootstrap,
+        "client.id": (
+            f"{sim.name.lower()}"
+            "-consumer"
+        ),
+        "group.id": (
+            f"{sim.name.lower()}"
+            "-consumer-group"
+        ),
+        "session.timeout.ms": 45000,
+        "heartbeat.interval.ms": 15000,
+        "socket.timeout.ms": 30000,
+        "reconnect.backoff.ms": 100,
+        "reconnect.backoff.max.ms": 10000,
+        "auto.offset.reset": "earliest",
+        "topic.metadata.refresh.interval.ms": 300000,
+        "metadata.max.age.ms": 300000,
+        "enable.auto.commit": False,
+    }
 
     
 def test_config_func_UI():
@@ -282,24 +285,25 @@ def test_config_func_PTW():
                 "progress_tracking",
             ]
     assert consumer_config == {
-                    "bootstrap.servers": (bootstrap),
-                    "client.id": (
-                        f"{sim.name.lower()}"
-                        "-consumer"
-                    ),
-                    "group.id": (
-                        f"{sim.name.lower()}"
-                        "-consumer-group"
-                    ),
-                    "session.timeout.ms": 45000,
-                    "heartbeat.interval.ms": 15000,
-                    "socket.timeout.ms": 30000,
-                    "reconnect.backoff.ms": 100,
-                    "reconnect.backoff.max.ms": 10000,
-                    "topic.metadata.refresh.interval.ms": 300000,
-                    "metadata.max.age.ms": 300000,
-                    "enable.auto.commit": False,
-                }
+        "bootstrap.servers": bootstrap,
+        "client.id": (
+            f"{sim.name.lower()}"
+            "-consumer"
+        ),
+        "group.id": (
+            f"{sim.name.lower()}"
+            "-consumer-group"
+        ),
+        "session.timeout.ms": 45000,
+        "heartbeat.interval.ms": 15000,
+        "socket.timeout.ms": 30000,
+        "reconnect.backoff.ms": 100,
+        "reconnect.backoff.max.ms": 10000,
+        "auto.offset.reset": "earliest",
+        "topic.metadata.refresh.interval.ms": 300000,
+        "metadata.max.age.ms": 300000,
+        "enable.auto.commit": False,
+    }
 
 # ==============================================================================
 # 3. bootstrap Test
