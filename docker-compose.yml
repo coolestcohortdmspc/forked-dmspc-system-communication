@@ -759,6 +759,7 @@ services:
 # The UI consumer is part of the ngradar_website service, while this db_consumer is a separate service
 # that runs in the background and writes to the database.
   db_consumer:
+    container_name: db_consumer
     build:
       context: .
       target: app
@@ -918,6 +919,30 @@ services:
       - "--storage.tsdb.retention.time=15d"
       - "--web.enable-remote-write-receiver"
 
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:nightly
+    container_name: otel-collector
+    restart: unless-stopped
+    volumes:
+      - ./otel-collector/otelcol-config.yml:/etc/otelcol-contrib/config.yaml:ro
+    # ports:
+      # - "4317:4317"   # OTLP gRPC
+      # - "4318:4318"   # OTLP HTTP
+    networks:
+      - ngradar_website_network
+    depends_on:
+      - tempo
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+
+  tempo:
+    image: grafana/tempo:main-ff11875-2195-1
+    container_name: tempo
+    volumes:
+      - ./otel-collector/tempo.yml:/etc/tempo.yaml:ro
+      - tempo_data:/var/tempo
+    networks:
+      - ngradar_website_network
+    command: ["-config.file=/etc/tempo.yaml"]
 
   grafana:
     image: grafana/grafana:latest
@@ -931,6 +956,7 @@ services:
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
     networks:
       - proxy
+      - ngradar_website_network
     environment:
       - GF_SECURITY_ADMIN_USER=${GRAFANA_USER}
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
@@ -1004,7 +1030,7 @@ volumes:
   portainer_data:
   prometheus_data:
   grafana_data:
-  volumes:
+  tempo_data:
 
 networks:
   ngradar_website_network:
