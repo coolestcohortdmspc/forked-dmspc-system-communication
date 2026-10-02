@@ -48,7 +48,7 @@ METRIC_SERVICES="portainer prometheus grafana otel-collector postgres_exporter k
 PORTAINER_SERVICE="portainer"
 AGENT_SERVICE="portainer_agent"
 
-DSOC_SERVICES="traefik ngradar_website postgres prometheus otel-collector grafana postgres_exporter kafka-init kafka-ui kafka-exporter seaweedfs dsoc-volume-init dsoc etr_daemon progress_tracker db_consumer vlba-kp vlba-ov"
+DSOC_SERVICES="traefik ngradar_website postgres prometheus tempo otel-collector grafana postgres_exporter kafka-init kafka-ui kafka-exporter seaweedfs dsoc-volume-init dsoc etr_daemon progress_tracker db_consumer vlba-kp vlba-ov"
 VLBA_1_SERVICES="vlba-sc vlba-hn"
 VLBA_2_SERVICES="vlba-nl vlba-fd"
 VLBA_3_SERVICES="vlba-la vlba-pt"
