@@ -328,12 +328,12 @@ def test_process_msg_DSOC_RESPOND_STORAGE(
     "os.environ",
     {
         "STATION_NAME": "PT",
-        "SVD_PASSWORD": "fake_password",
-        "SVD_IP": "fake_IP",
-        "SVD_USER": "fake_username",
-        "RECIPIENT_DIR": "/fake/directory/",
-        "MVD_LOC": "/fake/movedat/directory/",
-        "MVD_FILEPATH": "/fake/file.png",
+        # "SVD_PASSWORD": "fake_password",
+        # "SVD_IP": "fake_IP",
+        # "SVD_USER": "fake_username",
+        # "RECIPIENT_DIR": "/fake/directory/",
+        # "MVD_LOC": str(mvd_loc),
+        # "MVD_FILEPATH": "/fake/file.png",
     },
 )
 #@patch("ngRadar_Website.management.commands.vlba_sim.wait_for_etd")
@@ -344,7 +344,9 @@ def test_process_msg_DSOC_RESPOND_STORAGE(
 #@patch("ngRadar_Website.management.commands.vlba_sim.Thread")
 @patch("ngRadar_Website.management.commands.vlba_sim.uuid.uuid4")
 @patch("ngRadar_Website.management.commands.vlba_sim.expedat_send")
+@patch("ngRadar_Website.management.commands.vlba_sim.wait_for_exp")
 def test_process_msg_DSOC_RESPOND_STORAGE_CalledProcessError(
+        mock_wait_for_exp,
         mock_exp_send,
         mock_uuid,
         #mock_Thread,
@@ -353,7 +355,7 @@ def test_process_msg_DSOC_RESPOND_STORAGE_CalledProcessError(
         mock_Path,
         # mock_etc_send,
         #mock_wait_for_etd,
-):
+):  
     msg = MagicMock()
 
     payload = {
@@ -405,6 +407,8 @@ def test_process_msg_DSOC_RESPOND_STORAGE_CalledProcessError(
             returncode=42,
             cmd="expedat_send"
         )
+
+    mock_wait_for_exp.return_value = True
 
     result = process_msg(msg, producer_topic, producer_config)
 
