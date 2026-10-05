@@ -556,7 +556,7 @@ def test_process_msg_Message_PROGRESS_COMPLETE_value_success(
             rcvr_station=(Stations.PT),
             message=(
                 f"DSOC verified {Stations.PT.label}'s "
-                "e-transfer, generated "
+                "streaming, generated "
                 "the DDM image, stored "
                 "the image, and completed "
                 f"processing. {Stations.PT.label} may "

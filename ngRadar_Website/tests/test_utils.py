@@ -762,16 +762,17 @@ def test_expedat_send_transfer(mock_os_read, mock_select, mock_os_close, mock_po
         "SVD_USER": "fake_username",
         "RECIPIENT_DIR": "/fake/directory/",
         "MVD_LOC": "/fake/movedat/directory/",
-        "MVD_FILEPATH": "/fake/file.png",
         "EXPEDAT_MODE": "stream",
         "EXPEDAT_STREAM_MB": "10",
     },
 )
 @patch("ngRadar_Website.utils.subprocess.Popen")
-def test_expedat_send_stream(mock_popen):
+@patch("ngRadar_Website.utils.subprocess.PIPE")
+@patch("ngRadar_Website.utils.subprocess.STDOUT")
+def test_expedat_send_stream(mock_stdout, mock_pipe, mock_popen):
 
-    mock_master = "fake_master_fd"
-    mock_receiver = "fake_receiver_fd"
+    mvd_filepath = MagicMock()
+    mvd_filepath.name.return_value.st_size = "fake_file.png"
 
     mock_process = MagicMock()
     mock_popen.return_value = mock_process
@@ -781,19 +782,19 @@ def test_expedat_send_stream(mock_popen):
     mock_process.wait.return_value = 0
     mock_process.args = ["./movedat", "fake_file"]
 
-    expedat_send("/fake/file.png")
+    expedat_send(mvd_filepath)
 
     mock_popen.assert_called_once_with(
         [
             "./movedat",
             "-s",
             "-",
-            "fake_user:fake_password@fake_host:/fake/directory/"+ str("/fake/file.png").name
+            f"fake_username:fake_password@fake_host:/fake/directory//{Path(mvd_filepath).name}",
         ],
-        stdin=mock_receiver,
-        stdout=mock_receiver,
-        stderr=mock_receiver,
-        close_fds=True,
+        stdin=mock_pipe,
+        stdout=mock_pipe,
+        stderr=mock_stdout,
+        cwd="/fake/movedat/directory/",
     )
 
 
