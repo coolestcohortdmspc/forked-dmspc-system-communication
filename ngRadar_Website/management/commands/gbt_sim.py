@@ -17,6 +17,7 @@ from opentelemetry import trace, propagate
 from opentelemetry.trace import SpanKind, StatusCode
 from opentelemetry.trace.status import Status as TraceStatus
 from opentelemetry.context import attach, detach
+from opentelemetry.sdk.resources import Resource
 
 from ngRadar_Website.utils import (
     bootstrap,
@@ -88,6 +89,8 @@ def process_msg(
         if (incoming_key!= str(Message.UI_EVENT.value)):
             return True
 
+        span.set_attribute("ngradar.message.name", "UI_EVENT")
+
         payload = json.loads(msg.value().decode("utf-8"))
 
         waveform = payload["tx_waveform"]
@@ -108,36 +111,42 @@ def process_msg(
         # events with the same observation.
         gbt_uuid = uuid.uuid4()
 
+        span.set_attribute("ngradar.gbt_uuid", str(gbt_uuid))
+
         # -------------------------------------------------
         # 1. Turn transmitter OFF
         # -------------------------------------------------
-        print(
-            "GBT transmitter OFF"
-        )
-
-        send_kafka_message(
-            message_type=(Message.STATUS_UPDATE),
-            producer_topic=producer_topic,
-            producer_config=producer_config,
-            waveform_requester=waveform_requester,
-            station=Stations.GBT,
-            gbt_uuid=gbt_uuid,
-            object_id="30104",
-            target="Moretus",
-            tx_waveform="TX_OFF",
-            rec_waveform="TX_OFF",
-            status=None,
-            xmit_station=Stations.GBT,
-            rcvr_station=None,
-            latency_ms=latency_calc(
-                ui_event_time,
-                Stations.GBT,
-            ),
-            message=(
-                "GBT transmitter turned OFF "
-                "for waveform change."
-            ),
-        )
+        with tracer.start_as_current_span(
+                "GBT transmitter OFF",
+                attributes={
+                    "ngradar.gbt_uuid": str(gbt_uuid),
+                    "ngradar.transmitter.state": "OFF",
+                },
+        ):
+            print("GBT transmitter OFF")
+            send_kafka_message(
+                message_type=(Message.STATUS_UPDATE),
+                producer_topic=producer_topic,
+                producer_config=producer_config,
+                waveform_requester=waveform_requester,
+                station=Stations.GBT,
+                gbt_uuid=gbt_uuid,
+                object_id="30104",
+                target="Moretus",
+                tx_waveform="TX_OFF",
+                rec_waveform="TX_OFF",
+                status=None,
+                xmit_station=Stations.GBT,
+                rcvr_station=None,
+                latency_ms=latency_calc(
+                    ui_event_time,
+                    Stations.GBT,
+                ),
+                message=(
+                    "GBT transmitter turned OFF "
+                    "for waveform change."
+                ),
+            )
 
         # -------------------------------------------------
         # 2. Remain OFF for five seconds
@@ -148,37 +157,40 @@ def process_msg(
         # -------------------------------------------------
         # 3. Turn transmitter ON with new waveform
         # -------------------------------------------------
-        gbt_event_time = datetime.now(timezone.utc)
-
-        print(
-            "GBT transmitter ON with "
-            f"waveform {waveform}"
-        )
-
-        event_uuid = send_kafka_message(
-            message_type=(Message.GBT_TX),
-            producer_topic=producer_topic,
-            producer_config=producer_config,
-            waveform_requester=waveform_requester,
-            station=Stations.GBT,
-            gbt_uuid=gbt_uuid,
-            gbt_event_time=(gbt_event_time.isoformat()),
-            object_id="30104",
-            target="Moretus",
-            tx_waveform=waveform,
-            rec_waveform=waveform,
-            status=None,
-            xmit_station=Stations.GBT,
-            rcvr_station=None,
-            latency_ms=latency_calc(
-                ui_event_time,
-                Stations.GBT,
-            ),
-            message=(
-                "GBT transmitting waveform "
-                f"{waveform}."
-            ),
-        )
+        with tracer.start_as_current_span(
+                "GBT transmitter ON",
+                attributes={
+                    "ngradar.gbt_uuid": str(gbt_uuid),
+                    "ngradar.transmitter.state": "ON",
+                    "ngradar.waveform": str(waveform),
+                },
+        ):
+            gbt_event_time = datetime.now(timezone.utc)
+            print(f"GBT transmitter ON with waveform {waveform}")
+            event_uuid = send_kafka_message(
+                message_type=(Message.GBT_TX),
+                producer_topic=producer_topic,
+                producer_config=producer_config,
+                waveform_requester=waveform_requester,
+                station=Stations.GBT,
+                gbt_uuid=gbt_uuid,
+                gbt_event_time=(gbt_event_time.isoformat()),
+                object_id="30104",
+                target="Moretus",
+                tx_waveform=waveform,
+                rec_waveform=waveform,
+                status=None,
+                xmit_station=Stations.GBT,
+                rcvr_station=None,
+                latency_ms=latency_calc(
+                    ui_event_time,
+                    Stations.GBT,
+                ),
+                message=(
+                    "GBT transmitting waveform "
+                    f"{waveform}."
+                ),
+            )
 
         print(
             "GBT published TX event "
@@ -191,11 +203,12 @@ def process_msg(
     except Exception as exc:
         span.record_exception(exc)
         span.set_status(TraceStatus(StatusCode.ERROR, str(exc)))
-        span.end() # Safely closing the span in case it wasn't already closed in the business logic above
+        # span.end() # Safely closing the span in case it wasn't already closed in the business logic above
         raise
 
     finally:
         detach(token) # Detach the context to avoid leaking it to other spans
+        span.end()
 
 
 class Command(BaseCommand):
@@ -208,7 +221,11 @@ class Command(BaseCommand):
     ):
         print("Starting GBT simulator")
 
-        provider = TracerProvider(sampler=ALWAYS_ON)
+        # provider = TracerProvider(sampler=ALWAYS_ON)
+        provider = TracerProvider(
+            sampler=ALWAYS_ON,
+            resource=Resource.create({"service.name": "gbt"}),
+        )
         processor = BatchSpanProcessor(OTLPSpanExporter(endpoint="http://otel-collector:4317")) # endpoint will not work on droplets - configuring that later
         provider.add_span_processor(processor)
         trace.set_tracer_provider(provider)

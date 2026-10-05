@@ -581,7 +581,7 @@ services:
     profiles: ["kafka"]
     environment:
       BOOTSTRAP_SERVER: ${KAFKA_BOOTSTRAP_SERVERS} # needs all 3 brokers
-      OTEL_SERVICE_NAME: "gbt.kafka.operations"
+      OTEL_SERVICE_NAME: "gbt"
     entrypoint:
         - python
         - manage.py
