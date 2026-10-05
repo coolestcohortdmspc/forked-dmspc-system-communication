@@ -251,7 +251,7 @@ def process_msg(
         },
     )
 
-    # 2. Make this span the active parent in Python's execution context
+    # Make this span the active parent in Python's execution context
     ctx = trace.set_span_in_context(span)
     token = attach(ctx)
 

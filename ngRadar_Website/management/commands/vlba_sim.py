@@ -10,9 +10,14 @@ from django.core.management.base import BaseCommand
 
 from ngRadar_Website.enums import Stations, Status, Message, UIEvent
 
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter # or HTTP
+from opentelemetry.sdk.trace.sampling import ALWAYS_ON
 from opentelemetry import trace, propagate
 from opentelemetry.trace import SpanKind, StatusCode
 from opentelemetry.trace.status import Status as TraceStatus
+from opentelemetry.context import attach, detach
 
 from ngRadar_Website.utils import (
     bootstrap,
@@ -55,7 +60,7 @@ FAILURE_REASONS = {
 MAX_RESUME_ATTEMPTS = 5
 
 STATION = Stations[os.environ.get("STATION_NAME")]
-tracer = trace.get_tracer(f"{Stations(STATION).name}.kafka")
+tracer = trace.get_tracer(f"{Stations(STATION).name}.kafka.consumer")
 
 
 def process_msg(
@@ -71,7 +76,7 @@ def process_msg(
 
     parent_context = propagate.extract(carrier)
 
-    with tracer.start_as_current_span(
+    span = tracer.start_span(
         f"process {msg.topic()}",
         context=parent_context,
         kind=SpanKind.CONSUMER,
@@ -83,449 +88,458 @@ def process_msg(
             "messaging.kafka.offset": msg.offset(),
             "messaging.consumer.group.name": f"{STATION.name.lower()}-consumer-group",
         },
-    ) as span:
-        # Performing our business logic within the span
-        try:
+    )
+
+    # Make this span the active parent in Python's execution context
+    ctx = trace.set_span_in_context(span)
+    token = attach(ctx)
+    
+    # Performing our business logic within the span
+    try:
 
 
-            incoming_key = msg.key().decode("utf-8")
+        incoming_key = msg.key().decode("utf-8")
 
-            raw_data_path = Path("/raw_data")
+        raw_data_path = Path("/raw_data")
 
-            # ------------------------------------------------------------------
-            # DB_COMMITTED + IMAGE_CHANGED + STATUS_UPDATE kafka messages
-            # are acknowledgements intended for the website/UI consumers only.
-            # VLBAs should ignore these.
-            # ------------------------------------------------------------------
-            if incoming_key == str(Message.DB_COMMITTED.value) or incoming_key == UIEvent.IMAGE_CHANGED or incoming_key == str(Message.STATUS_UPDATE.value):
+        # ------------------------------------------------------------------
+        # DB_COMMITTED + IMAGE_CHANGED + STATUS_UPDATE kafka messages
+        # are acknowledgements intended for the website/UI consumers only.
+        # VLBAs should ignore these.
+        # ------------------------------------------------------------------
+        if incoming_key == str(Message.DB_COMMITTED.value) or incoming_key == UIEvent.IMAGE_CHANGED or incoming_key == str(Message.STATUS_UPDATE.value):
+            return True
+
+        # =========================================================
+        # GBT -> VLBA
+        # =========================================================
+        if incoming_key == str(Message.GBT_TX.value):
+            print(
+                "Received Kafka message from GBT."
+            )
+
+            payload = json.loads(msg.value().decode("utf-8"))
+
+            # An observation-wide correlation ID.
+            gbt_uuid = payload["gbt_uuid"]
+            station = payload["station"]
+
+            # Preserve the original GBT timestamp for
+            # end-to-end latency calculation at DSOC.
+            gbt_event_time = payload.get(
+                "gbt_event_time",
+                payload["event_time"],
+            )
+
+            # Observation context inherited from GBT.
+            object_id = payload.get("object_id")
+
+            target = payload.get("target")
+
+            waveform_requester = payload.get("waveform_requester")
+
+            tx_waveform = payload.get("tx_waveform")
+
+            rec_waveform = payload.get("rec_waveform")
+
+            # One transfer UUID identifies this entire
+            # VLBA -> DSOC e-transfer lifecycle.
+            transfer_uuid = uuid.uuid4()
+
+            frame_path = (raw_data_path / f"{transfer_uuid}.bin")
+
+            Thread(
+                target=create_file,
+                args=(frame_path,),
+                daemon=True,
+            ).start()
+
+            watch_for_file(frame_path)
+
+            # -----------------------------------------------------
+            # Raw data file successfully created
+            # -----------------------------------------------------
+            if frame_path.is_file():
+                num_bytes = (frame_path.stat().st_size)
+
+                send_kafka_message(
+                    producer_topic=producer_topic,
+                    producer_config=producer_config,
+                    waveform_requester=waveform_requester,
+                    message_type=(Message.VLBA_REQUEST_STORAGE),
+                    transfer_uuid=transfer_uuid,
+                    gbt_uuid=gbt_uuid,
+                    gbt_event_time=gbt_event_time,
+                    station=STATION,
+                    status=Status.QUEUED,
+                    object_id=object_id,
+                    target=target,
+                    tx_waveform=tx_waveform,
+                    rec_waveform=rec_waveform,
+                    num_bytes=num_bytes,
+                    filename=frame_path.name,
+                    xmit_station=Stations.GBT,
+                    rcvr_station=STATION,
+                    message=(
+                        "VLBA requested a storage "
+                        "check at DSOC."
+                    )
+                )
+
+                print(
+                    "VLBA requesting DSOC "
+                    "check storage..."
+                )
+
+            # -----------------------------------------------------
+            # Raw data file creation failed
+            # -----------------------------------------------------
+            else:
+                send_kafka_message(
+                    producer_topic=producer_topic,
+                    producer_config=producer_config,
+                    waveform_requester=waveform_requester,
+                    message_type=(Message.VLBA_FAILED),
+                    transfer_uuid=transfer_uuid,
+                    gbt_uuid=gbt_uuid,
+                    gbt_event_time=gbt_event_time,
+                    status=Status.FAILED,
+                    object_id=object_id,
+                    target=target,
+                    tx_waveform=tx_waveform,
+                    rec_waveform=rec_waveform,
+                    num_bytes=0,
+                    filename=frame_path.name,
+                    station=STATION,
+                    xmit_station=Stations.GBT,
+                    rcvr_station=STATION,
+                    message=(
+                        "VLBA source file "
+                        "does not exist."
+                    ),
+                )
+
+                print(
+                    "Source file does not exist."
+                )
+
                 return True
 
-            # =========================================================
-            # GBT -> VLBA
-            # =========================================================
-            if incoming_key == str(Message.GBT_TX.value):
+        # =========================================================
+        # DSOC -> VLBA
+        #
+        # DSOC responded to our storage request.
+        # =========================================================
+        elif (incoming_key == str(Message.DSOC_RESPOND_STORAGE.value)):
+
+            payload = json.loads(msg.value().decode("utf-8"))
+
+            station = payload["rcvr_station"]
+
+            # Check if the Kafka message is for this station
+            if Stations(station) != STATION:
+                return
+
+            print(
+                "Received DSOC's storage "
+                "check response!"
+            )
+
+            transfer_uuid = payload["transfer_uuid"]
+            gbt_uuid = payload["gbt_uuid"]
+            gbt_event_time = payload.get("gbt_event_time")
+            object_id = payload.get("object_id")
+            target = payload.get("target")
+            waveform_requester = payload.get("waveform_requester")
+            tx_waveform = payload.get("tx_waveform")
+            rec_waveform = payload.get("rec_waveform")
+            num_bytes = int(payload.get(
+                    "num_bytes",
+                    0,
+                )
+            )
+            filename = payload.get("filename")
+            retry_count = int(payload.get(
+                    "retry_count",
+                    0,
+                )
+            )
+            response_status = int(payload["status"])
+
+            # =====================================================
+            # DSOC storage check permanently failed
+            # =====================================================
+            if (response_status == Status.FAILED.value):
                 print(
-                    "Received Kafka message from GBT."
+                    "DSOC storage request "
+                    f"failed: {payload['message']}"
                 )
 
-                payload = json.loads(msg.value().decode("utf-8"))
+                return True
 
-                # An observation-wide correlation ID.
-                gbt_uuid = payload["gbt_uuid"]
-                station = payload["station"]
+            # =====================================================
+            # DSOC HAS STORAGE
+            # =====================================================
+            elif (response_status == Status.READY.value):
 
-                # Preserve the original GBT timestamp for
-                # end-to-end latency calculation at DSOC.
-                gbt_event_time = payload.get(
-                    "gbt_event_time",
-                    payload["event_time"],
-                )
+                attempts = 0
 
-                # Observation context inherited from GBT.
-                object_id = payload.get("object_id")
-
-                target = payload.get("target")
-
-                waveform_requester = payload.get("waveform_requester")
-
-                tx_waveform = payload.get("tx_waveform")
-
-                rec_waveform = payload.get("rec_waveform")
-
-                # One transfer UUID identifies this entire
-                # VLBA -> DSOC e-transfer lifecycle.
-                transfer_uuid = uuid.uuid4()
-
-                frame_path = (raw_data_path / f"{transfer_uuid}.bin")
-
-                Thread(
-                    target=create_file,
-                    args=(frame_path,),
-                    daemon=True,
-                ).start()
-
-                watch_for_file(frame_path)
-
-                # -----------------------------------------------------
-                # Raw data file successfully created
-                # -----------------------------------------------------
-                if frame_path.is_file():
-                    num_bytes = (frame_path.stat().st_size)
-
-                    send_kafka_message(
-                        producer_topic=producer_topic,
-                        producer_config=producer_config,
-                        waveform_requester=waveform_requester,
-                        message_type=(Message.VLBA_REQUEST_STORAGE),
-                        transfer_uuid=transfer_uuid,
-                        gbt_uuid=gbt_uuid,
-                        gbt_event_time=gbt_event_time,
-                        station=STATION,
-                        status=Status.QUEUED,
-                        object_id=object_id,
-                        target=target,
-                        tx_waveform=tx_waveform,
-                        rec_waveform=rec_waveform,
-                        num_bytes=num_bytes,
-                        filename=frame_path.name,
-                        xmit_station=Stations.GBT,
-                        rcvr_station=STATION,
-                        message=(
-                            "VLBA requested a storage "
-                            "check at DSOC."
+                while True:
+                    try:
+                        # -----------------------------------------
+                        # VLBA is beginning the actual transfer.
+                        #
+                        # This Kafka message:
+                        #
+                        # - tells the progress tracking worker that transmission started
+                        # - records VLBA TRANSFERRING through
+                        #   db_consumer
+                        # -----------------------------------------
+                        send_kafka_message(
+                            producer_topic=("progress_tracking"),
+                            producer_config=(producer_config),
+                            waveform_requester=waveform_requester,
+                            message_type=(Message.VLBA_TRANSFERRING),
+                            transfer_uuid=(transfer_uuid),
+                            gbt_uuid=gbt_uuid,
+                            gbt_event_time=(gbt_event_time),
+                            station=STATION,
+                            status=(Status.TRANSFERRING),
+                            object_id=object_id,
+                            target=target,
+                            tx_waveform=tx_waveform,
+                            rec_waveform=(rec_waveform),
+                            num_bytes=num_bytes,
+                            filename=filename,
+                            xmit_station=Stations.GBT,
+                            rcvr_station=STATION,
+                            message=(
+                                "Hancock VLBA has "
+                                "started sending the "
+                                "data file to DSOC "
+                                "via e-transfer."
+                            ),
                         )
-                    )
 
-                    print(
-                        "VLBA requesting DSOC "
-                        "check storage..."
-                    )
+                        frame_path = (raw_data_path / f"{transfer_uuid}.bin")
 
-                # -----------------------------------------------------
-                # Raw data file creation failed
-                # -----------------------------------------------------
-                else:
-                    send_kafka_message(
-                        producer_topic=producer_topic,
-                        producer_config=producer_config,
-                        waveform_requester=waveform_requester,
-                        message_type=(Message.VLBA_FAILED),
-                        transfer_uuid=transfer_uuid,
-                        gbt_uuid=gbt_uuid,
-                        gbt_event_time=gbt_event_time,
-                        status=Status.FAILED,
-                        object_id=object_id,
-                        target=target,
-                        tx_waveform=tx_waveform,
-                        rec_waveform=rec_waveform,
-                        num_bytes=0,
-                        filename=frame_path.name,
-                        station=STATION,
-                        xmit_station=Stations.GBT,
-                        rcvr_station=STATION,
-                        message=(
-                            "VLBA source file "
-                            "does not exist."
-                        ),
-                    )
+                        print(
+                            "DSOC responded "
+                            "affirmative to storage "
+                            "check. Initiating "
+                            "e-transfer..."
+                        )
 
-                    print(
-                        "Source file does not exist."
-                    )
+                        etc_send(frame_path)
 
-                    return True
+                        # -----------------------------------------
+                        # etc_send returned successfully.
+                        #
+                        # VLBA now knows that its side of the
+                        # transfer completed successfully.
+                        # -----------------------------------------
+                        print("E-Transfer completed successfully.")
 
-            # =========================================================
-            # DSOC -> VLBA
-            #
-            # DSOC responded to our storage request.
-            # =========================================================
-            elif (incoming_key == str(Message.DSOC_RESPOND_STORAGE.value)):
+                        break
 
-                payload = json.loads(msg.value().decode("utf-8"))
-
-                station = payload["rcvr_station"]
-
-                # Check if the Kafka message is for this station
-                if Stations(station) != STATION:
-                    return
-
-                print(
-                    "Received DSOC's storage "
-                    "check response!"
-                )
-
-                transfer_uuid = payload["transfer_uuid"]
-                gbt_uuid = payload["gbt_uuid"]
-                gbt_event_time = payload.get("gbt_event_time")
-                object_id = payload.get("object_id")
-                target = payload.get("target")
-                waveform_requester = payload.get("waveform_requester")
-                tx_waveform = payload.get("tx_waveform")
-                rec_waveform = payload.get("rec_waveform")
-                num_bytes = int(payload.get(
-                        "num_bytes",
-                        0,
-                    )
-                )
-                filename = payload.get("filename")
-                retry_count = int(payload.get(
-                        "retry_count",
-                        0,
-                    )
-                )
-                response_status = int(payload["status"])
-
-                # =====================================================
-                # DSOC storage check permanently failed
-                # =====================================================
-                if (response_status == Status.FAILED.value):
-                    print(
-                        "DSOC storage request "
-                        f"failed: {payload['message']}"
-                    )
-
-                    return True
-
-                # =====================================================
-                # DSOC HAS STORAGE
-                # =====================================================
-                elif (response_status == Status.READY.value):
-
-                    attempts = 0
-
-                    while True:
-                        try:
-                            # -----------------------------------------
-                            # VLBA is beginning the actual transfer.
-                            #
-                            # This Kafka message:
-                            #
-                            # - tells the progress tracking worker that transmission started
-                            # - records VLBA TRANSFERRING through
-                            #   db_consumer
-                            # -----------------------------------------
-                            send_kafka_message(
-                                producer_topic=("progress_tracking"),
-                                producer_config=(producer_config),
-                                waveform_requester=waveform_requester,
-                                message_type=(Message.VLBA_TRANSFERRING),
-                                transfer_uuid=(transfer_uuid),
-                                gbt_uuid=gbt_uuid,
-                                gbt_event_time=(gbt_event_time),
-                                station=STATION,
-                                status=(Status.TRANSFERRING),
-                                object_id=object_id,
-                                target=target,
-                                tx_waveform=tx_waveform,
-                                rec_waveform=(rec_waveform),
-                                num_bytes=num_bytes,
-                                filename=filename,
-                                xmit_station=Stations.GBT,
-                                rcvr_station=STATION,
-                                message=(
-                                    "Hancock VLBA has "
-                                    "started sending the "
-                                    "data file to DSOC "
-                                    "via e-transfer."
-                                ),
+                    # =============================================
+                    # Known ETC/e-transfer process failure
+                    # =============================================
+                    except subprocess.CalledProcessError as exc:
+                        failure_reason = (
+                            FAILURE_REASONS.get(
+                                exc.returncode,
+                                "The e-transfer failed",
                             )
+                        )
 
-                            frame_path = (raw_data_path / f"{transfer_uuid}.bin")
+                        failure_message = (
+                            f"{failure_reason} "
+                            "mid-transfer. "
+                            "Transfer interrupted. "
+                            f"(return code: "
+                            f"{exc.returncode})"
+                        )
 
+                        print(
+                            "E-transfer failed with "
+                            "return code: "
+                            f"{exc.returncode}"
+                        )
+
+                        send_kafka_message(
+                            producer_topic=(producer_topic),
+                            producer_config=(producer_config),
+                            waveform_requester=waveform_requester,
+                            message_type=(Message.VLBA_FAILED),
+                            transfer_uuid=(transfer_uuid),
+                            gbt_uuid=gbt_uuid,
+                            gbt_event_time=(gbt_event_time),
+                            station=STATION,
+                            status=Status.FAILED,
+                            object_id=object_id,
+                            target=target,
+                            tx_waveform=tx_waveform,
+                            rec_waveform=(rec_waveform),
+                            num_bytes=num_bytes,
+                            filename=filename,
+                            xmit_station=Stations.GBT,
+                            rcvr_station=STATION,
+                            message=(failure_message),
+                        )
+
+                        attempts += 1
+
+                        if (attempts >= MAX_RESUME_ATTEMPTS):
                             print(
-                                "DSOC responded "
-                                "affirmative to storage "
-                                "check. Initiating "
-                                "e-transfer..."
-                            )
-
-                            etc_send(frame_path)
-
-                            # -----------------------------------------
-                            # etc_send returned successfully.
-                            #
-                            # VLBA now knows that its side of the
-                            # transfer completed successfully.
-                            # -----------------------------------------
-                            print("E-Transfer completed successfully.")
-
-                            break
-
-                        # =============================================
-                        # Known ETC/e-transfer process failure
-                        # =============================================
-                        except subprocess.CalledProcessError as exc:
-                            failure_reason = (
-                                FAILURE_REASONS.get(
-                                    exc.returncode,
-                                    "The e-transfer failed",
-                                )
-                            )
-
-                            failure_message = (
-                                f"{failure_reason} "
-                                "mid-transfer. "
-                                "Transfer interrupted. "
-                                f"(return code: "
-                                f"{exc.returncode})"
-                            )
-
-                            print(
-                                "E-transfer failed with "
-                                "return code: "
-                                f"{exc.returncode}"
-                            )
-
-                            send_kafka_message(
-                                producer_topic=(producer_topic),
-                                producer_config=(producer_config),
-                                waveform_requester=waveform_requester,
-                                message_type=(Message.VLBA_FAILED),
-                                transfer_uuid=(transfer_uuid),
-                                gbt_uuid=gbt_uuid,
-                                gbt_event_time=(gbt_event_time),
-                                station=STATION,
-                                status=Status.FAILED,
-                                object_id=object_id,
-                                target=target,
-                                tx_waveform=tx_waveform,
-                                rec_waveform=(rec_waveform),
-                                num_bytes=num_bytes,
-                                filename=filename,
-                                xmit_station=Stations.GBT,
-                                rcvr_station=STATION,
-                                message=(failure_message),
-                            )
-
-                            attempts += 1
-
-                            if (attempts >= MAX_RESUME_ATTEMPTS):
-                                print(
-                                    "E-transfer failed "
-                                    f"{attempts} times. "
-                                    "Giving up."
-                                )
-
-                                return False
-
-                            print(
-                                "Waiting for the "
-                                "e-transfer daemon to "
-                                "come back..."
-                            )
-
-                            if not wait_for_etd():
-                                print(
-                                    "E-transfer daemon "
-                                    "never came back. "
-                                    "Giving up."
-                                )
-
-                                return False
-
-                            print(
-                                "E-transfer daemon is "
-                                "back. Resuming the "
-                                "transfer..."
-                            )
-
-                        # =============================================
-                        # Unexpected transfer failure
-                        # =============================================
-                        except Exception as exc:
-                            print(
-                                "Unexpected e-transfer "
-                                f"failure: {exc}"
-                            )
-
-                            send_kafka_message(
-                                producer_topic=(producer_topic),
-                                producer_config=(producer_config),
-                                waveform_requester=waveform_requester,
-                                message_type=(Message.VLBA_FAILED),
-                                transfer_uuid=(transfer_uuid),
-                                gbt_uuid=gbt_uuid,
-                                gbt_event_time=(gbt_event_time),
-                                station=STATION,
-                                status=Status.FAILED,
-                                object_id=object_id,
-                                target=target,
-                                tx_waveform=tx_waveform,
-                                rec_waveform=(rec_waveform),
-                                num_bytes=num_bytes,
-                                filename=filename,
-                                xmit_station=Stations.GBT,
-                                rcvr_station=STATION,
-                                message=(
-                                    "The e-transfer "
-                                    "failed unexpectedly "
-                                    "mid-transfer. "
-                                    "Transfer interrupted. "
-                                    f"({exc})"
-                                ),
+                                "E-transfer failed "
+                                f"{attempts} times. "
+                                "Giving up."
                             )
 
                             return False
 
-                # =====================================================
-                # DSOC DOES NOT HAVE STORAGE
-                # =====================================================
-                else:
-                    print(
-                        "DSOC responded negative to "
-                        "storage check. Will ask "
-                        "again in 5 seconds..."
-                    )
+                        print(
+                            "Waiting for the "
+                            "e-transfer daemon to "
+                            "come back..."
+                        )
 
-                    time.sleep(5)
+                        if not wait_for_etd():
+                            print(
+                                "E-transfer daemon "
+                                "never came back. "
+                                "Giving up."
+                            )
 
-                    # VLBA remains BLOCKED but performs the
-                    # same workflow action again:
-                    #
-                    # VLBA_REQUEST_STORAGE
-                    #
-                    # Message type = action
-                    # Status       = current state
-                    send_kafka_message(
-                        producer_topic=producer_topic,
-                        producer_config=producer_config,
-                        waveform_requester=waveform_requester,
-                        message_type=(Message.VLBA_REQUEST_STORAGE),
-                        retry_count=retry_count,
-                        transfer_uuid=transfer_uuid,
-                        gbt_uuid=gbt_uuid,
-                        gbt_event_time=gbt_event_time,
-                        station=STATION,
-                        status=Status.BLOCKED,
-                        object_id=object_id,
-                        target=target,
-                        tx_waveform=tx_waveform,
-                        rec_waveform=rec_waveform,
-                        num_bytes=num_bytes,
-                        filename=filename,
-                        xmit_station=Stations.GBT,
-                        rcvr_station=STATION,
-                        message=(
-                            "Waiting for DSOC "
-                            "storage availability."
-                        ),
-                    )
+                            return False
 
-            # =========================================================
-            # DSOC -> VLBA
-            #
-            # DSOC says the VLBA raw file can be deleted.
-            # =========================================================
-            elif (incoming_key == str(Message.VLBA_DELETE.value)):
-                payload = json.loads(msg.value().decode("utf-8"))
-                station = payload["rcvr_station"]
+                        print(
+                            "E-transfer daemon is "
+                            "back. Resuming the "
+                            "transfer..."
+                        )
 
-                # Check if the Kafka message is for this station
-                if Stations(station) != STATION:
-                    return
+                    # =============================================
+                    # Unexpected transfer failure
+                    # =============================================
+                    except Exception as exc:
+                        print(
+                            "Unexpected e-transfer "
+                            f"failure: {exc}"
+                        )
 
-                file_name = payload["filename"]
+                        send_kafka_message(
+                            producer_topic=(producer_topic),
+                            producer_config=(producer_config),
+                            waveform_requester=waveform_requester,
+                            message_type=(Message.VLBA_FAILED),
+                            transfer_uuid=(transfer_uuid),
+                            gbt_uuid=gbt_uuid,
+                            gbt_event_time=(gbt_event_time),
+                            station=STATION,
+                            status=Status.FAILED,
+                            object_id=object_id,
+                            target=target,
+                            tx_waveform=tx_waveform,
+                            rec_waveform=(rec_waveform),
+                            num_bytes=num_bytes,
+                            filename=filename,
+                            xmit_station=Stations.GBT,
+                            rcvr_station=STATION,
+                            message=(
+                                "The e-transfer "
+                                "failed unexpectedly "
+                                "mid-transfer. "
+                                "Transfer interrupted. "
+                                f"({exc})"
+                            ),
+                        )
 
-                delete_observation_data(file_name)
+                        return False
 
-            # =========================================================
-            # Encountered a message for a different VLBA station
-            # than whichever VLBA station is currently processing
-            # =========================================================
+            # =====================================================
+            # DSOC DOES NOT HAVE STORAGE
+            # =====================================================
             else:
                 print(
-                    "NOT A VALID KAFKA "
-                    "MESSAGE VALUE!"
+                    "DSOC responded negative to "
+                    "storage check. Will ask "
+                    "again in 5 seconds..."
                 )
 
-            return True
+                time.sleep(5)
 
-        # Catch any unexpected exceptions and record them in the span
-        except Exception as exc:
-            span.record_exception(exc)
-            span.set_status(TraceStatus(StatusCode.ERROR, str(exc)))
-            raise
+                # VLBA remains BLOCKED but performs the
+                # same workflow action again:
+                #
+                # VLBA_REQUEST_STORAGE
+                #
+                # Message type = action
+                # Status       = current state
+                send_kafka_message(
+                    producer_topic=producer_topic,
+                    producer_config=producer_config,
+                    waveform_requester=waveform_requester,
+                    message_type=(Message.VLBA_REQUEST_STORAGE),
+                    retry_count=retry_count,
+                    transfer_uuid=transfer_uuid,
+                    gbt_uuid=gbt_uuid,
+                    gbt_event_time=gbt_event_time,
+                    station=STATION,
+                    status=Status.BLOCKED,
+                    object_id=object_id,
+                    target=target,
+                    tx_waveform=tx_waveform,
+                    rec_waveform=rec_waveform,
+                    num_bytes=num_bytes,
+                    filename=filename,
+                    xmit_station=Stations.GBT,
+                    rcvr_station=STATION,
+                    message=(
+                        "Waiting for DSOC "
+                        "storage availability."
+                    ),
+                )
+
+        # =========================================================
+        # DSOC -> VLBA
+        #
+        # DSOC says the VLBA raw file can be deleted.
+        # =========================================================
+        elif (incoming_key == str(Message.VLBA_DELETE.value)):
+            payload = json.loads(msg.value().decode("utf-8"))
+            station = payload["rcvr_station"]
+
+            # Check if the Kafka message is for this station
+            if Stations(station) != STATION:
+                return
+
+            file_name = payload["filename"]
+
+            delete_observation_data(file_name)
+
+        # =========================================================
+        # Encountered a message for a different VLBA station
+        # than whichever VLBA station is currently processing
+        # =========================================================
+        else:
+            print(
+                "NOT A VALID KAFKA "
+                "MESSAGE VALUE!"
+            )
+
+        return True
+
+    # Catch any unexpected exceptions and record them in the span
+    except Exception as exc:
+        span.record_exception(exc)
+        span.set_status(TraceStatus(StatusCode.ERROR, str(exc)))
+        span.end() # Safely closing the span in case it wasn't already closed in the business logic above
+        raise
+
+    finally:
+        detach(token) # Detach the context to avoid leaking it to other spans
 
 
 class Command(BaseCommand):
@@ -536,11 +550,15 @@ class Command(BaseCommand):
         *args,
         **options,
     ):
-        print(
-            "Starting VLBA simulator"
-        )
+        print("Starting VLBA simulator")
 
         STATION = Stations[os.environ.get("STATION_NAME")]
+
+        provider = TracerProvider(sampler=ALWAYS_ON)
+        processor = BatchSpanProcessor(OTLPSpanExporter(endpoint="http://otel-collector:4317")) # endpoint will not work on droplets - configuring that later
+        provider.add_span_processor(processor)
+        trace.set_tracer_provider(provider)
+        
         (
             producer_topic,
             producer_config,
