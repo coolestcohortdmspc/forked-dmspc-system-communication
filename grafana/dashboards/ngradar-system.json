@@ -29,7 +29,7 @@
     "cursorSync": "Crosshair",
     "editable": true,
     "elements": {
-      "panel-2": {
+      "panel-12": {
         "kind": "Panel",
         "spec": {
           "data": {
@@ -48,9 +48,9 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(rate(traefik_router_requests_total{router=~\"ngradar_website.*\"}[1m]))",
+                        "expr": "kafka_topic_partitions{topic=~\"GBT_notif|VLBA_notif|DSOC_notif|progress_tracking\"}",
                         "instant": false,
-                        "legendFormat": "requests/s",
+                        "legendFormat": "{{topic}}",
                         "range": true
                       },
                       "version": "v0"
@@ -63,33 +63,37 @@
               "transformations": []
             }
           },
-          "description": "Requests per second through the ngRadar Traefik router.",
-          "id": 2,
+          "description": "Configured partitions for ngRadar application topics. Expected: 3 per topic.",
+          "id": 12,
           "links": [],
-          "title": "Website requests",
+          "title": "Partitions per topic",
           "vizConfig": {
             "group": "stat",
             "kind": "VizConfig",
             "spec": {
               "fieldConfig": {
                 "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
                       {
-                        "color": "green",
+                        "color": "red",
                         "value": 0
                       },
                       {
-                        "color": "red",
-                        "value": 10
+                        "color": "#EAB839",
+                        "value": 2
+                      },
+                      {
+                        "color": "green",
+                        "value": 3
                       }
                     ]
                   },
-                  "unit": "reqps",
-                  "color": {
-                    "mode": "thresholds"
-                  }
+                  "unit": "short"
                 },
                 "overrides": []
               },
@@ -111,7 +115,7 @@
                 "wideLayout": true
               }
             },
-            "version": "13.2.1"
+            "version": "13.2.3"
           }
         }
       },
@@ -159,6 +163,11 @@
             "spec": {
               "fieldConfig": {
                 "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "max": 500,
+                  "min": 0,
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
@@ -176,16 +185,21 @@
                       }
                     ]
                   },
-                  "unit": "MB",
-                  "color": {
-                    "mode": "thresholds"
-                  },
-                  "min": 0,
-                  "max": 500
+                  "unit": "MB"
                 },
                 "overrides": []
               },
               "options": {
+                "barShape": "flat",
+                "barWidthFactor": 0.5,
+                "effects": {
+                  "barGlow": false,
+                  "centerGlow": false,
+                  "gradient": true
+                },
+                "endpointMarker": "point",
+                "minVizHeight": 75,
+                "minVizWidth": 75,
                 "orientation": "auto",
                 "reduceOptions": {
                   "calcs": [
@@ -194,355 +208,17 @@
                   "fields": "",
                   "values": false
                 },
+                "segmentCount": 1,
+                "segmentSpacing": 0.3,
+                "shape": "gauge",
                 "showThresholdLabels": false,
                 "showThresholdMarkers": true,
-                "sizing": "auto"
+                "sizing": "auto",
+                "sparkline": true,
+                "textMode": "auto"
               }
             },
-            "version": "13.2.1"
-          }
-        }
-      },
-      "panel-4": {
-        "kind": "Panel",
-        "spec": {
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "hidden": false,
-                    "query": {
-                      "datasource": {
-                        "name": "prometheus"
-                      },
-                      "group": "prometheus",
-                      "kind": "DataQuery",
-                      "spec": {
-                        "editorMode": "code",
-                        "expr": "kafka_brokers",
-                        "instant": false,
-                        "legendFormat": "brokers",
-                        "range": true
-                      },
-                      "version": "v0"
-                    },
-                    "refId": "A"
-                  }
-                }
-              ],
-              "queryOptions": {},
-              "transformations": []
-            }
-          },
-          "description": "Kafka brokers discovered by kafka-exporter. Expected cluster size: 3.",
-          "id": 4,
-          "links": [],
-          "title": "Kafka brokers online",
-          "vizConfig": {
-            "group": "stat",
-            "kind": "VizConfig",
-            "spec": {
-              "fieldConfig": {
-                "defaults": {
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "red",
-                        "value": 0
-                      },
-                      {
-                        "color": "#EAB839",
-                        "value": 2
-                      },
-                      {
-                        "color": "green",
-                        "value": 3
-                      }
-                    ]
-                  },
-                  "unit": "short",
-                  "color": {
-                    "mode": "thresholds"
-                  }
-                },
-                "overrides": []
-              },
-              "options": {
-                "colorMode": "value",
-                "graphMode": "area",
-                "justifyMode": "auto",
-                "orientation": "auto",
-                "percentChangeColorMode": "standard",
-                "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ],
-                  "fields": "",
-                  "values": false
-                },
-                "showPercentChange": false,
-                "textMode": "auto",
-                "wideLayout": true
-              }
-            },
-            "version": "13.2.1"
-          }
-        }
-      },
-      "panel-12": {
-        "kind": "Panel",
-        "spec": {
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "hidden": false,
-                    "query": {
-                      "datasource": {
-                        "name": "prometheus"
-                      },
-                      "group": "prometheus",
-                      "kind": "DataQuery",
-                      "spec": {
-                        "editorMode": "code",
-                        "expr": "kafka_topic_partitions{topic=~\"GBT_notif|VLBA_notif|DSOC_notif|progress_tracking\"}",
-                        "instant": false,
-                        "legendFormat": "{{topic}}",
-                        "range": true
-                      },
-                      "version": "v0"
-                    },
-                    "refId": "A"
-                  }
-                }
-              ],
-              "queryOptions": {},
-              "transformations": []
-            }
-          },
-          "description": "Configured partitions for ngRadar application topics. Expected: 3 per topic.",
-          "id": 12,
-          "links": [],
-          "title": "Partitions per topic",
-          "vizConfig": {
-            "group": "stat",
-            "kind": "VizConfig",
-            "spec": {
-              "fieldConfig": {
-                "defaults": {
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "red",
-                        "value": 0
-                      },
-                      {
-                        "color": "#EAB839",
-                        "value": 2
-                      },
-                      {
-                        "color": "green",
-                        "value": 3
-                      }
-                    ]
-                  },
-                  "unit": "short",
-                  "color": {
-                    "mode": "thresholds"
-                  }
-                },
-                "overrides": []
-              },
-              "options": {
-                "colorMode": "value",
-                "graphMode": "area",
-                "justifyMode": "auto",
-                "orientation": "auto",
-                "percentChangeColorMode": "standard",
-                "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ],
-                  "fields": "",
-                  "values": false
-                },
-                "showPercentChange": false,
-                "textMode": "auto",
-                "wideLayout": true
-              }
-            },
-            "version": "13.2.1"
-          }
-        }
-      },
-      "panel-8": {
-        "kind": "Panel",
-        "spec": {
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "hidden": false,
-                    "query": {
-                      "datasource": {
-                        "name": "prometheus"
-                      },
-                      "group": "prometheus",
-                      "kind": "DataQuery",
-                      "spec": {
-                        "editorMode": "code",
-                        "expr": "histogram_quantile(0.50, sum by(le) (rate(traefik_router_request_duration_seconds_bucket{router=~\"ngradar_website.*\"}[5m])))",
-                        "instant": false,
-                        "legendFormat": "p50",
-                        "range": true
-                      },
-                      "version": "v0"
-                    },
-                    "refId": "A"
-                  }
-                },
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "hidden": false,
-                    "query": {
-                      "datasource": {
-                        "name": "prometheus"
-                      },
-                      "group": "prometheus",
-                      "kind": "DataQuery",
-                      "spec": {
-                        "editorMode": "code",
-                        "expr": "histogram_quantile(0.95, sum by(le) (rate(traefik_router_request_duration_seconds_bucket{router=~\"ngradar_website.*\"}[5m])))",
-                        "instant": false,
-                        "legendFormat": "p95",
-                        "range": true
-                      },
-                      "version": "v0"
-                    },
-                    "refId": "B"
-                  }
-                },
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "hidden": false,
-                    "query": {
-                      "datasource": {
-                        "name": "prometheus"
-                      },
-                      "group": "prometheus",
-                      "kind": "DataQuery",
-                      "spec": {
-                        "editorMode": "code",
-                        "expr": "histogram_quantile(0.99, sum by(le) (rate(traefik_router_request_duration_seconds_bucket{router=~\"ngradar_website.*\"}[5m])))",
-                        "instant": false,
-                        "legendFormat": "p99",
-                        "range": true
-                      },
-                      "version": "v0"
-                    },
-                    "refId": "C"
-                  }
-                }
-              ],
-              "queryOptions": {},
-              "transformations": []
-            }
-          },
-          "description": "Traefik request latency percentiles over a 5-minute window.",
-          "id": 8,
-          "links": [],
-          "title": "Website request latency",
-          "vizConfig": {
-            "group": "timeseries",
-            "kind": "VizConfig",
-            "spec": {
-              "fieldConfig": {
-                "defaults": {
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "green",
-                        "value": 0
-                      }
-                    ]
-                  },
-                  "unit": "s",
-                  "color": {
-                    "mode": "palette-classic",
-                    "seriesBy": "max"
-                  },
-                  "custom": {
-                    "axisBorderShow": false,
-                    "axisCenteredZero": false,
-                    "axisColorMode": "text",
-                    "axisLabel": "",
-                    "axisPlacement": "auto",
-                    "barAlignment": 0,
-                    "barWidthFactor": 0.9,
-                    "drawStyle": "line",
-                    "fillOpacity": 30,
-                    "gradientMode": "opacity",
-                    "hideFrom": {
-                      "legend": false,
-                      "tooltip": false,
-                      "viz": false
-                    },
-                    "insertNulls": false,
-                    "lineInterpolation": "linear",
-                    "lineStyle": {
-                      "fill": "solid"
-                    },
-                    "lineWidth": 2,
-                    "pointSize": 2,
-                    "scaleDistribution": {
-                      "type": "linear"
-                    },
-                    "showPoints": "auto",
-                    "showValues": false,
-                    "spanNulls": false,
-                    "stacking": {
-                      "group": "A",
-                      "mode": "none"
-                    },
-                    "thresholdsStyle": {
-                      "mode": "off"
-                    }
-                  }
-                },
-                "overrides": []
-              },
-              "options": {
-                "legend": {
-                  "calcs": [
-                    "lastNotNull",
-                    "max"
-                  ],
-                  "displayMode": "table",
-                  "placement": "bottom",
-                  "showLegend": true
-                },
-                "tooltip": {
-                  "hideZeros": false,
-                  "mode": "multi",
-                  "sort": "desc"
-                }
-              }
-            },
-            "version": "13.2.1"
+            "version": "13.2.3"
           }
         }
       },
@@ -590,16 +266,6 @@
             "spec": {
               "fieldConfig": {
                 "defaults": {
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "green",
-                        "value": 0
-                      }
-                    ]
-                  },
-                  "unit": "ops",
                   "color": {
                     "mode": "palette-classic",
                     "seriesBy": "max"
@@ -640,7 +306,17 @@
                     "thresholdsStyle": {
                       "mode": "off"
                     }
-                  }
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      }
+                    ]
+                  },
+                  "unit": "ops"
                 },
                 "overrides": []
               },
@@ -661,7 +337,93 @@
                 }
               }
             },
-            "version": "13.2.1"
+            "version": "13.2.3"
+          }
+        }
+      },
+      "panel-2": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "group": "prometheus",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum(rate(traefik_router_requests_total{router=~\"ngradar_website.*\"}[1m]))",
+                        "instant": false,
+                        "legendFormat": "requests/s",
+                        "range": true
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Requests per second through the ngRadar Traefik router.",
+          "id": 2,
+          "links": [],
+          "title": "Website requests",
+          "vizConfig": {
+            "group": "stat",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "red",
+                        "value": 10
+                      }
+                    ]
+                  },
+                  "unit": "reqps"
+                },
+                "overrides": []
+              },
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "percentChangeColorMode": "standard",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "showPercentChange": false,
+                "textMode": "auto",
+                "wideLayout": true
+              }
+            },
+            "version": "13.2.3"
           }
         }
       },
@@ -709,16 +471,6 @@
             "spec": {
               "fieldConfig": {
                 "defaults": {
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "green",
-                        "value": 0
-                      }
-                    ]
-                  },
-                  "unit": "short",
                   "color": {
                     "mode": "palette-classic",
                     "seriesBy": "max"
@@ -759,7 +511,17 @@
                     "thresholdsStyle": {
                       "mode": "off"
                     }
-                  }
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      }
+                    ]
+                  },
+                  "unit": "short"
                 },
                 "overrides": []
               },
@@ -780,7 +542,7 @@
                 }
               }
             },
-            "version": "13.2.1"
+            "version": "13.2.3"
           }
         }
       },
@@ -828,6 +590,9 @@
             "spec": {
               "fieldConfig": {
                 "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
@@ -841,10 +606,7 @@
                       }
                     ]
                   },
-                  "unit": "short",
-                  "color": {
-                    "mode": "thresholds"
-                  }
+                  "unit": "short"
                 },
                 "overrides": []
               },
@@ -866,7 +628,7 @@
                 "wideLayout": true
               }
             },
-            "version": "13.2.1"
+            "version": "13.2.3"
           }
         }
       },
@@ -914,6 +676,9 @@
             "spec": {
               "fieldConfig": {
                 "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
@@ -927,10 +692,7 @@
                       }
                     ]
                   },
-                  "unit": "short",
-                  "color": {
-                    "mode": "thresholds"
-                  }
+                  "unit": "short"
                 },
                 "overrides": []
               },
@@ -952,7 +714,7 @@
                 "wideLayout": true
               }
             },
-            "version": "13.2.1"
+            "version": "13.2.3"
           }
         }
       },
@@ -1000,6 +762,9 @@
             "spec": {
               "fieldConfig": {
                 "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
@@ -1017,10 +782,7 @@
                       }
                     ]
                   },
-                  "unit": "short",
-                  "color": {
-                    "mode": "thresholds"
-                  }
+                  "unit": "short"
                 },
                 "overrides": []
               },
@@ -1042,7 +804,97 @@
                 "wideLayout": true
               }
             },
-            "version": "13.2.1"
+            "version": "13.2.3"
+          }
+        }
+      },
+      "panel-24": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "group": "prometheus",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "kafka_brokers",
+                        "instant": false,
+                        "legendFormat": "brokers",
+                        "range": true
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Kafka brokers discovered by kafka-exporter. Expected cluster size: 3.",
+          "id": 24,
+          "links": [],
+          "title": "Kafka brokers online",
+          "vizConfig": {
+            "group": "stat",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "red",
+                        "value": 0
+                      },
+                      {
+                        "color": "#EAB839",
+                        "value": 2
+                      },
+                      {
+                        "color": "green",
+                        "value": 3
+                      }
+                    ]
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "percentChangeColorMode": "standard",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "showPercentChange": false,
+                "textMode": "auto",
+                "wideLayout": true
+              }
+            },
+            "version": "13.2.3"
           }
         }
       },
@@ -1112,16 +964,6 @@
             "spec": {
               "fieldConfig": {
                 "defaults": {
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "green",
-                        "value": 0
-                      }
-                    ]
-                  },
-                  "unit": "Bps",
                   "color": {
                     "mode": "palette-classic",
                     "seriesBy": "max"
@@ -1162,7 +1004,17 @@
                     "thresholdsStyle": {
                       "mode": "off"
                     }
-                  }
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      }
+                    ]
+                  },
+                  "unit": "Bps"
                 },
                 "overrides": []
               },
@@ -1183,7 +1035,7 @@
                 }
               }
             },
-            "version": "13.2.1"
+            "version": "13.2.3"
           }
         }
       },
@@ -1231,16 +1083,6 @@
             "spec": {
               "fieldConfig": {
                 "defaults": {
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "green",
-                        "value": 0
-                      }
-                    ]
-                  },
-                  "unit": "Bps",
                   "color": {
                     "mode": "palette-classic",
                     "seriesBy": "max"
@@ -1281,7 +1123,17 @@
                     "thresholdsStyle": {
                       "mode": "off"
                     }
-                  }
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      }
+                    ]
+                  },
+                  "unit": "Bps"
                 },
                 "overrides": []
               },
@@ -1302,7 +1154,7 @@
                 }
               }
             },
-            "version": "13.2.1"
+            "version": "13.2.3"
           }
         }
       },
@@ -1350,16 +1202,6 @@
             "spec": {
               "fieldConfig": {
                 "defaults": {
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "green",
-                        "value": 0
-                      }
-                    ]
-                  },
-                  "unit": "Bps",
                   "color": {
                     "mode": "palette-classic",
                     "seriesBy": "max"
@@ -1400,7 +1242,17 @@
                     "thresholdsStyle": {
                       "mode": "off"
                     }
-                  }
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      }
+                    ]
+                  },
+                  "unit": "Bps"
                 },
                 "overrides": []
               },
@@ -1421,7 +1273,7 @@
                 }
               }
             },
-            "version": "13.2.1"
+            "version": "13.2.3"
           }
         }
       },
@@ -1513,16 +1365,6 @@
             "spec": {
               "fieldConfig": {
                 "defaults": {
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "green",
-                        "value": 0
-                      }
-                    ]
-                  },
-                  "unit": "Bps",
                   "color": {
                     "mode": "palette-classic",
                     "seriesBy": "max"
@@ -1563,7 +1405,17 @@
                     "thresholdsStyle": {
                       "mode": "off"
                     }
-                  }
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      }
+                    ]
+                  },
+                  "unit": "Bps"
                 },
                 "overrides": []
               },
@@ -1676,16 +1528,6 @@
             "spec": {
               "fieldConfig": {
                 "defaults": {
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "green",
-                        "value": 0
-                      }
-                    ]
-                  },
-                  "unit": "Bps",
                   "color": {
                     "mode": "palette-classic",
                     "seriesBy": "max"
@@ -1726,7 +1568,17 @@
                     "thresholdsStyle": {
                       "mode": "off"
                     }
-                  }
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      }
+                    ]
+                  },
+                  "unit": "Bps"
                 },
                 "overrides": []
               },
@@ -1751,7 +1603,121 @@
           }
         }
       },
-      "panel-24": {
+      "panel-32": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "group": "prometheus",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "builder",
+                        "expr": "gbt_messages_processed_total",
+                        "legendFormat": "__auto",
+                        "range": true
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "",
+          "id": 32,
+          "links": [],
+          "title": "Total Messages Processed",
+          "vizConfig": {
+            "group": "timeseries",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "custom": {
+                    "axisBorderShow": false,
+                    "axisCenteredZero": false,
+                    "axisColorMode": "text",
+                    "axisLabel": "",
+                    "axisPlacement": "auto",
+                    "barAlignment": 0,
+                    "barWidthFactor": 0.6,
+                    "drawStyle": "line",
+                    "fillOpacity": 25,
+                    "gradientMode": "none",
+                    "hideFrom": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": false
+                    },
+                    "insertNulls": false,
+                    "lineInterpolation": "linear",
+                    "lineWidth": 1,
+                    "pointSize": 5,
+                    "scaleDistribution": {
+                      "type": "linear"
+                    },
+                    "showPoints": "auto",
+                    "showValues": false,
+                    "spanNulls": false,
+                    "stacking": {
+                      "group": "A",
+                      "mode": "none"
+                    },
+                    "thresholdsStyle": {
+                      "mode": "off"
+                    }
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "red",
+                        "value": 80
+                      }
+                    ]
+                  }
+                },
+                "overrides": []
+              },
+              "options": {
+                "legend": {
+                  "calcs": [],
+                  "displayMode": "list",
+                  "placement": "bottom",
+                  "showLegend": true
+                },
+                "tooltip": {
+                  "hideZeros": false,
+                  "mode": "single",
+                  "sort": "none"
+                }
+              }
+            },
+            "version": "13.2.3"
+          }
+        }
+      },
+      "panel-4": {
         "kind": "Panel",
         "spec": {
           "data": {
@@ -1786,7 +1752,7 @@
             }
           },
           "description": "Kafka brokers discovered by kafka-exporter. Expected cluster size: 3.",
-          "id": 24,
+          "id": 4,
           "links": [],
           "title": "Kafka brokers online",
           "vizConfig": {
@@ -1795,6 +1761,9 @@
             "spec": {
               "fieldConfig": {
                 "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
@@ -1812,10 +1781,7 @@
                       }
                     ]
                   },
-                  "unit": "short",
-                  "color": {
-                    "mode": "thresholds"
-                  }
+                  "unit": "short"
                 },
                 "overrides": []
               },
@@ -1837,7 +1803,170 @@
                 "wideLayout": true
               }
             },
-            "version": "13.2.1"
+            "version": "13.2.3"
+          }
+        }
+      },
+      "panel-8": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "group": "prometheus",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "histogram_quantile(0.50, sum by(le) (rate(traefik_router_request_duration_seconds_bucket{router=~\"ngradar_website.*\"}[5m])))",
+                        "instant": false,
+                        "legendFormat": "p50",
+                        "range": true
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "group": "prometheus",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "histogram_quantile(0.95, sum by(le) (rate(traefik_router_request_duration_seconds_bucket{router=~\"ngradar_website.*\"}[5m])))",
+                        "instant": false,
+                        "legendFormat": "p95",
+                        "range": true
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "B"
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "group": "prometheus",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "histogram_quantile(0.99, sum by(le) (rate(traefik_router_request_duration_seconds_bucket{router=~\"ngradar_website.*\"}[5m])))",
+                        "instant": false,
+                        "legendFormat": "p99",
+                        "range": true
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "C"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Traefik request latency percentiles over a 5-minute window.",
+          "id": 8,
+          "links": [],
+          "title": "Website request latency",
+          "vizConfig": {
+            "group": "timeseries",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic",
+                    "seriesBy": "max"
+                  },
+                  "custom": {
+                    "axisBorderShow": false,
+                    "axisCenteredZero": false,
+                    "axisColorMode": "text",
+                    "axisLabel": "",
+                    "axisPlacement": "auto",
+                    "barAlignment": 0,
+                    "barWidthFactor": 0.9,
+                    "drawStyle": "line",
+                    "fillOpacity": 30,
+                    "gradientMode": "opacity",
+                    "hideFrom": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": false
+                    },
+                    "insertNulls": false,
+                    "lineInterpolation": "linear",
+                    "lineStyle": {
+                      "fill": "solid"
+                    },
+                    "lineWidth": 2,
+                    "pointSize": 2,
+                    "scaleDistribution": {
+                      "type": "linear"
+                    },
+                    "showPoints": "auto",
+                    "showValues": false,
+                    "spanNulls": false,
+                    "stacking": {
+                      "group": "A",
+                      "mode": "none"
+                    },
+                    "thresholdsStyle": {
+                      "mode": "off"
+                    }
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      }
+                    ]
+                  },
+                  "unit": "s"
+                },
+                "overrides": []
+              },
+              "options": {
+                "legend": {
+                  "calcs": [
+                    "lastNotNull",
+                    "max"
+                  ],
+                  "displayMode": "table",
+                  "placement": "bottom",
+                  "showLegend": true
+                },
+                "tooltip": {
+                  "hideZeros": false,
+                  "mode": "multi",
+                  "sort": "desc"
+                }
+              }
+            },
+            "version": "13.2.3"
           }
         }
       }
@@ -2072,6 +2201,19 @@
                         "width": 8,
                         "x": 16,
                         "y": 10
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-32"
+                        },
+                        "height": 8,
+                        "width": 12,
+                        "x": 0,
+                        "y": 18
                       }
                     }
                   ]
