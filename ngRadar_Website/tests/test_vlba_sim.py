@@ -328,6 +328,12 @@ def test_process_msg_DSOC_RESPOND_STORAGE(
     "os.environ",
     {
         "STATION_NAME": "PT",
+        "SVD_PASSWORD": "fake_password",
+        "SVD_IP": "fake_IP",
+        "SVD_USER": "fake_username",
+        "RECIPIENT_DIR": "/fake/directory/",
+        "MVD_LOC": "/fake/movedat/directory/",
+        "MVD_FILEPATH": "/fake/file.png",
     },
 )
 #@patch("ngRadar_Website.management.commands.vlba_sim.wait_for_etd")
@@ -394,6 +400,11 @@ def test_process_msg_DSOC_RESPOND_STORAGE_CalledProcessError(
     #         returncode=42,
     #         cmd="etc_send"
     #     )
+
+    mock_exp_send.side_effect = subprocess.CalledProcessError(
+            returncode=42,
+            cmd="expedat_send"
+        )
 
     result = process_msg(msg, producer_topic, producer_config)
 
