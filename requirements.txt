@@ -28,3 +28,4 @@ opentelemetry-api
 opentelemetry-sdk
 opentelemetry-exporter-otlp
 pandas
+opentelemetry-instrumentation-openai

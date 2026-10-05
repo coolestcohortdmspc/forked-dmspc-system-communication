@@ -75,79 +75,66 @@ tracer = trace.get_tracer(f"{Stations(station).name.lower()}.kafka.consumer")
 # =============================================================
 
 def create_img(station, tx_waveform, waveform_requester):
-    """
-    Generate a simulated DSOC DDM product.
-    """
+    """Generate a simulated DSOC DDM product."""
+    with tracer.start_as_current_span("generate DDM") as image_span:
+        matplotlib.use("Agg")
 
-    matplotlib.use("Agg")
+        x_data = np.random.uniform(-30, 30, 40)
+        y_data = np.random.uniform(-300, 300, 40)
+        plt.scatter(x_data, y_data, color="red")
+        plt.axhline(0, color="black", linewidth=0.5)
+        plt.axvline(0, color="black", linewidth=0.5)
+        plt.suptitle(
+            f"[Station {Stations(station).name}] DDM for {tx_waveform}",
+            size=20,
+        )
+        plt.title(f"Requested by {waveform_requester}")
+        plt.xlabel("Doppler Freq (Hz)")
+        plt.ylabel("Range (km)")
+        plt.grid(True)
 
-    x_data = np.random.uniform(-30,30,40)
-    y_data = np.random.uniform(-300,300,40)
-    plt.scatter(x_data,y_data,color="red")
-    plt.axhline(0,color="black",linewidth=0.5)
-    plt.axvline(0,color="black",linewidth=0.5)
-    plt.suptitle(f"[Station {Stations(station).name}] DDM for {tx_waveform}",size=20)
-    plt.title(f"Requested by {waveform_requester}")
-    plt.xlabel("Doppler Freq (Hz)")
-    plt.ylabel("Range (km)")
-    plt.grid(True)
+        byte_buffer = io.BytesIO()
+        try:
+            plt.savefig(byte_buffer, format="png")
+            image_file = byte_buffer.getvalue()
+        finally:
+            plt.close()
+            byte_buffer.close()
 
-    byte_buffer = io.BytesIO()
-
-    plt.savefig(byte_buffer,format="png")
-
-    byte_buffer.seek(0)
-
-    image_file = (byte_buffer.getvalue())
-
-    plt.close()
-
-    num_bytes = len(image_file)
-
-    return (image_file,num_bytes)
+        image_span.set_attribute("ngradar.image.bytes", len(image_file))
+        return image_file, len(image_file)
 
 # =============================================================
 # SEAWEEDFS
 # =============================================================
 
-def save_image_to_seaweedfs(
-    target,
-    image_file,
-    product_uuid,
-):
-    """
-    Save the generated DDM image to SeaweedFS.
+def save_image_to_seaweedfs(target, image_file, product_uuid):
+    """Save the generated DDM image to SeaweedFS."""
+    image_key = f"ddm/{target}/{product_uuid}.png"
 
-    Any error is raised back to process_msg(), which will send
-    a FAILED Kafka event. This function does not write to the DB.
-    """
+    with tracer.start_as_current_span(
+        "upload DDM to SeaweedFS",
+        attributes={
+            "ngradar.image.bytes": len(image_file),
+            "ngradar.target": str(target),
+        },
+    ) as upload_span:
+        try:
+            s3 = create_s3_client(station=Stations.DSOC)
+            image_key = upload_seaweedfs(s3, image_key, image_file)
+            upload_span.set_attribute("ngradar.image.key", image_key)
 
-    image_key = (
-        f"ddm/{target}/"
-        f"{product_uuid}.png"
-    )
+            print(f"Success: Image saved to SeaweedFS at {image_key}")
+            return image_key
 
-    try:
-        s3 = create_s3_client(station=Stations.DSOC)
-
-        image_key = upload_seaweedfs(
-            s3,
-            image_key,
-            image_file,
-        )
-
-        print(
-            "Success: Image saved to "
-            f"SeaweedFS at {image_key}"
-        )
-
-        return image_key
-
-    except Exception as exc:
-        raise RuntimeError(
-            "Failed to save DDM image "
-            "to SeaweedFS."
-        ) from exc
+        except Exception as exc:
+            upload_span.record_exception(exc)
+            upload_span.set_status(
+                TraceStatus(StatusCode.ERROR, str(exc))
+            )
+            raise RuntimeError(
+                "Failed to save DDM image to SeaweedFS."
+            ) from exc
 
 
 # =============================================================
@@ -178,47 +165,58 @@ def verify_incoming_transfer(
     expected byte count supplied by VLBA, and sends a
     kafka message if successful.
     """
-
     expected_num_bytes = int(expected_num_bytes)
 
-    for _ in range(attempts):
-        if incoming_file.is_file():
-            actual_num_bytes = (incoming_file.stat().st_size)
+    with tracer.start_as_current_span(
+        "verify incoming transfer",
+        attributes={
+            "ngradar.transfer_uuid": str(transfer_uuid),
+            "ngradar.expected_bytes": expected_num_bytes,
+            "ngradar.max_attempts": attempts,
+        },
+    ) as verify_span:
+        for attempt in range(1, attempts + 1):
+            verify_span.set_attribute("ngradar.attempts", attempt)
 
-            if (actual_num_bytes == expected_num_bytes):
-                send_kafka_message(
-                    producer_topic=(producer_topic),
-                    producer_config=(producer_config),
-                    waveform_requester=waveform_requester,
-                    message_type=(Message.STATUS_UPDATE),
-                    transfer_uuid=(transfer_uuid),
-                    gbt_uuid=gbt_uuid,
-                    gbt_event_time=(gbt_event_time),
-                    station=Stations.DSOC,
-                    status=Status.VERIFIED,
-                    object_id=object_id,
-                    target=target,
-                    tx_waveform=tx_waveform,
-                    rec_waveform=(rec_waveform),
-                    num_bytes=expected_num_bytes,
-                    filename=filename,
-                    xmit_station=(Stations.GBT),
-                    rcvr_station=vlba_station,
-                    message=(
-                        f"Verified incoming transfer of "
-                        f"{filename} with "
-                        f"{actual_num_bytes} bytes."
-                    ),
+            if incoming_file.is_file():
+                actual_num_bytes = incoming_file.stat().st_size
+                verify_span.set_attribute(
+                    "ngradar.actual_bytes", actual_num_bytes
                 )
-                return actual_num_bytes
 
-            time.sleep(delay_seconds)
+                if actual_num_bytes == expected_num_bytes:
+                    send_kafka_message(
+                        producer_topic=(producer_topic),
+                        producer_config=(producer_config),
+                        waveform_requester=waveform_requester,
+                        message_type=(Message.STATUS_UPDATE),
+                        transfer_uuid=(transfer_uuid),
+                        gbt_uuid=gbt_uuid,
+                        gbt_event_time=(gbt_event_time),
+                        station=Stations.DSOC,
+                        status=Status.VERIFIED,
+                        object_id=object_id,
+                        target=target,
+                        tx_waveform=tx_waveform,
+                        rec_waveform=(rec_waveform),
+                        num_bytes=expected_num_bytes,
+                        filename=filename,
+                        xmit_station=(Stations.GBT),
+                        rcvr_station=vlba_station,
+                        message=(
+                            f"Verified incoming transfer of "
+                            f"{filename} with "
+                            f"{actual_num_bytes} bytes."
+                        ),
+                    )
+                    return actual_num_bytes
 
-    raise RuntimeError(
-        "Transfer verification failed for "
-        f"{incoming_file}. Expected "
-        f"{expected_num_bytes} bytes."
-    )
+                time.sleep(delay_seconds)
+
+        raise RuntimeError(
+            f"Transfer verification failed for {incoming_file}. "
+            f"Expected {expected_num_bytes} bytes."
+        )
 
 # =============================================================
 # KAFKA PROCESSING
@@ -274,6 +272,12 @@ def process_msg(
         payload = json.loads(
             msg.value().decode("utf-8")
         )
+
+        span.set_attributes({
+            "ngradar.station": "DSOC",
+            "ngradar.message.type": incoming_key,
+            "ngradar.message.name": Message(incoming_key).name,
+        })
     
         volume_folder = Path("/dsoc/incoming")
     
@@ -282,12 +286,22 @@ def process_msg(
         # ---------------------------------------------------------
     
         transfer_uuid = payload.get("transfer_uuid")
+        if transfer_uuid:
+            span.set_attribute(
+                "ngradar.transfer_uuid",
+                str(transfer_uuid),
+            )
     
         gbt_uuid = payload.get("gbt_uuid")
     
         object_id = payload.get("object_id")
     
         target = payload.get("target")
+        if target:
+            span.set_attribute(
+                "ngradar.target",
+                target,
+            )
     
         waveform_requester = payload.get("waveform_requester")
     
@@ -325,29 +339,22 @@ def process_msg(
     
         if (incoming_key == Message.VLBA_REQUEST_STORAGE.value):
             expected_num_bytes = (num_bytes)
-    
-            storage_limit = (
-                int(
-                    os.environ[
-                        "DSOC_VOLUME_SIZE"
-                    ]
-                )
-                * 1_000_000_000
-            )
-    
-            print(
-                "DSOC has "
-                f"{storage_limit / 1_000_000_000:0.2f}"
-                "GB of storage total."
-            )
-    
-            storage_used = int(
-                get_folder_size(
-                    volume_folder
-                )
-            )
-    
-            space_remaining = (storage_limit - storage_used)
+
+            with tracer.start_as_current_span(
+                    "check DSOC storage"
+            ) as storage_span:
+                storage_limit = (int(os.environ["DSOC_VOLUME_SIZE"]) * 1_000_000_000)
+                storage_used = int(get_folder_size(volume_folder))
+                space_remaining = storage_limit - storage_used
+                has_space = (storage_used + expected_num_bytes < storage_limit)
+
+                storage_span.set_attributes({
+                    "ngradar.storage.limit_bytes": storage_limit,
+                    "ngradar.storage.used_bytes": storage_used,
+                    "ngradar.storage.remaining_bytes": space_remaining,
+                    "ngradar.storage.requested_bytes": expected_num_bytes,
+                    "ngradar.storage.has_space": has_space,
+                })
     
             print(
                 "DSOC has "
@@ -566,6 +573,11 @@ def process_msg(
                     rcvr_station=(vlba_station),
                     message=str(exc),
                 )
+
+                span.record_exception(exc)
+                span.set_status(
+                    TraceStatus(StatusCode.ERROR, str(exc))
+                )
     
                 return True
     
@@ -639,6 +651,11 @@ def process_msg(
                         f"failed: {exc}"
                     ),
                 )
+
+                span.record_exception(exc)
+                span.set_status(
+                    TraceStatus(StatusCode.ERROR, str(exc))
+                )
     
                 return True
     
@@ -686,8 +703,12 @@ def process_msg(
                 ),
             )
     
-            delete_observation_data(filename, directory="/dsoc/incoming") # NOTE delete later!! Had to add this to help clear storage during load tests.
-    
+            with tracer.start_as_current_span("delete incoming file"):
+                delete_observation_data(
+                    filename,
+                    directory="/dsoc/incoming",
+                )
+
             print(
                 "DSOC processing COMPLETE."
             )
@@ -703,11 +724,12 @@ def process_msg(
     except Exception as exc:
         span.record_exception(exc)
         span.set_status(TraceStatus(StatusCode.ERROR, str(exc)))
-        span.end() # Safely closing the span in case it wasn't already closed in the business logic above
+        # span.end() # Safely closing the span in case it wasn't already closed in the business logic above
         raise
 
     finally:
         detach(token) # Detach the context to avoid leaking it to other spans
+        span.end()
 
 
 class Command(BaseCommand):

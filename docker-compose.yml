@@ -615,7 +615,7 @@ services:
     environment:
       BOOTSTRAP_SERVER: ${KAFKA_BOOTSTRAP_SERVERS} #needs all 3 brokers
       DSOC_VOLUME_SIZE: ${DSOC_VOLUME_SIZE}
-      OTEL_SERVICE_NAME: "dsoc.kafka.operations"
+      OTEL_SERVICE_NAME: "dsoc"
     entrypoint:
         - python
         - manage.py

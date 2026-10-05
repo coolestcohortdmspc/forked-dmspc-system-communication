@@ -406,7 +406,7 @@ def produce(topic, config, key, value, station):
             if time.time() - start_time > 2.0: # 2-second safety timeout
                 raise RuntimeError("Delivery callback timed out.")
 
-        span.end() # ending span after delivery callback is complete to ensure accurate timing
+        # span.end() # ending span after delivery callback is complete to ensure accurate timing
         print(f"Produced message to topic {topic} with key {key}.")
         
         return delivery_status["success"] # returns True
@@ -416,9 +416,13 @@ def produce(topic, config, key, value, station):
         print(f"Failed to send Kafka message to {topic}: {exc}")
         span.record_exception(exc)
         span.set_status(TraceStatus(StatusCode.ERROR, str(exc)))
+        # span.end()
+        return False
+
+
+    finally:
         span.end()
 
-        return False
 
 
 def consume(
