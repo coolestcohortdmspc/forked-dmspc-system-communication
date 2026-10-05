@@ -11,6 +11,14 @@ from ngRadar_Website.enums import (
     Status,
     Message,
 )
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter # or HTTP
+from opentelemetry.sdk.trace.sampling import ALWAYS_ON
+from opentelemetry import trace, propagate
+from opentelemetry.trace import SpanKind, StatusCode
+from opentelemetry.trace.status import Status as TraceStatus
+from opentelemetry.context import attach, detach
 
 from ngRadar_Website.utils import (
     bootstrap,
@@ -46,6 +54,7 @@ STALL_TIMEOUT_SECONDS = 15
 volume_folder = Path("/dsoc/incoming")
 
 station = Stations.PTW
+tracer = trace.get_tracer(f"{Stations(station).name.lower()}.kafka.consumer")
 
 # Helper kafka produce function to UI consumer
 def publish_progress(
@@ -83,17 +92,56 @@ def process_msg(
     producer_topic,
     producer_config,
 ):
-    incoming_key = msg.key().decode("utf-8")
-    payload = json.loads(msg.value().decode("utf-8"))
+    carrier = {}
+        
+    for name, value in (msg.headers() or []):
+        if value is not None:
+            carrier[name] = value.decode("utf-8")
 
-    if incoming_key != str(Message.VLBA_TRANSFERRING.value):
+    parent_context = propagate.extract(carrier)
+
+    span = tracer.start_span(
+        f"process message from {msg.topic()}",
+        context=parent_context,
+        kind=SpanKind.CONSUMER,
+        attributes={
+            "messaging.system": "kafka",
+            "messaging.destination.name": msg.topic(),
+            "messaging.operation.name": "process",
+            "messaging.kafka.partition": msg.partition(),
+            "messaging.kafka.offset": msg.offset(),
+            "messaging.consumer.group.name": f"{Stations(station).name.lower()}-consumer-group",
+        },
+    )
+
+    # Make this span the active parent in Python's execution context
+    ctx = trace.set_span_in_context(span)
+    token = attach(ctx)
+
+    # Performing our business logic within the span
+    try:
+    
+        incoming_key = msg.key().decode("utf-8")
+        payload = json.loads(msg.value().decode("utf-8"))
+
+        if incoming_key != str(Message.VLBA_TRANSFERRING.value):
+            return True
+        else:
+            payload["last_progress_at"] = time.monotonic()
+            payload["last_received_bytes"] = 0
+            active_transfers.append(payload)
+
         return True
-    else:
-        payload["last_progress_at"] = time.monotonic()
-        payload["last_received_bytes"] = 0
-        active_transfers.append(payload)
 
-    return True
+    # Catch any unexpected exceptions and record them in the span
+    except Exception as exc:
+        span.record_exception(exc)
+        span.set_status(TraceStatus(StatusCode.ERROR, str(exc)))
+        span.end() # Safely closing the span in case it wasn't already closed in the business logic above
+        raise
+
+    finally:
+        detach(token) # Detach the context to avoid leaking it to other spans
 
 
 
@@ -325,14 +373,17 @@ class Command(BaseCommand):
     ):
         print("Starting e-transfer progress tracking simulator")
 
+        provider = TracerProvider(sampler=ALWAYS_ON)
+        processor = BatchSpanProcessor(OTLPSpanExporter(endpoint="http://otel-collector:4317")) 
+        provider.add_span_processor(processor)
+        trace.set_tracer_provider(provider)
+
         (
             producer_topic,
             producer_config,
             consumer_topic,
             consumer_config,
-        ) = bootstrap(
-            Stations.PTW
-        )
+        ) = bootstrap(Stations.PTW)
 
         progress_consume(
             consumer_topic, 

@@ -1,6 +1,16 @@
 import json, os
 from ngRadar_Website.enums import Message, UIEvent
 from ngRadar_Website.models.models import ObservatoryEvent
+
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter # or HTTP
+from opentelemetry.sdk.trace.sampling import ALWAYS_ON
+from opentelemetry import trace, propagate
+from opentelemetry.trace import SpanKind, StatusCode
+from opentelemetry.trace.status import Status as TraceStatus
+from opentelemetry.context import attach, detach
+
 from ngRadar_Website.utils import (
     MAX_BYTES,
     consume,
@@ -9,12 +19,53 @@ from ngRadar_Website.utils import (
 from django.db import transaction
 from django.core.management.base import BaseCommand
 
+"""
+DB Consumner
+
+This simulator:
+
+- Consumes every Kafka message in the cluster.
+- Saves the message to the database as an ObservatoryEvent.
+
+The db_consumer is solely responsible for persisting
+Kafka events to ObservatoryEvent.
+"""
+station = "DB_CONSUMER"
+tracer = trace.get_tracer(f"db_consumer.kafka")
+
 
 def process_msg(
     msg,
     producer_topic,
     producer_config,
 ):
+    carrier = {}
+        
+    for name, value in (msg.headers() or []):
+        if value is not None:
+            carrier[name] = value.decode("utf-8")
+
+    parent_context = propagate.extract(carrier)
+
+    span = tracer.start_span(
+        f"process message from {msg.topic()}",
+        context=parent_context,
+        kind=SpanKind.CONSUMER,
+        attributes={
+            "messaging.system": "kafka",
+            "messaging.destination.name": msg.topic(),
+            "messaging.operation.name": "process",
+            "messaging.kafka.partition": msg.partition(),
+            "messaging.kafka.offset": msg.offset(),
+            "messaging.consumer.group.name": "ngradar-db",
+        },
+    )
+
+    # Make this span the active parent in Python's execution context
+    ctx = trace.set_span_in_context(span)
+    token = attach(ctx)
+
+    # Performing our business logic within the span
     try:
         incoming_key = msg.key().decode("utf-8")
 
@@ -88,13 +139,16 @@ def process_msg(
         )
         return False
 
-    except Exception as error:
-        print(
-            "DB consumer failed to "
-            "process message: "
-            f"{error}"
-        )
-        return False
+    except Exception as exc:
+        print(f"DB consumer failed to process message: {exc}")
+
+        span.record_exception(exc)
+        span.set_status(TraceStatus(StatusCode.ERROR, str(exc)))
+        span.end() # Safely closing the span in case it wasn't already closed in the business logic above
+        raise
+
+    finally:
+        detach(token) # Detach the context to avoid leaking it to other spans
 
 
 def record_obs_event(payload):
@@ -145,6 +199,7 @@ def publish_db_committed(
             Message.DB_COMMITTED.value
         ),
         json.dumps(notification),
+        station=station,
     )
 
 
@@ -178,6 +233,13 @@ class Command(BaseCommand):
     help = "Consume Kafka domain events and persist them to ObservatoryEvent."
 
     def handle(self, *args, **options):
+        print("Starting DB consumer")
+
+        provider = TracerProvider(sampler=ALWAYS_ON)
+        processor = BatchSpanProcessor(OTLPSpanExporter(endpoint="http://otel-collector:4317")) 
+        provider.add_span_processor(processor)
+        trace.set_tracer_provider(provider)
+        
         bootstrap_servers = os.environ["KAFKA_BOOTSTRAP_SERVERS"]
 
         topics = [
