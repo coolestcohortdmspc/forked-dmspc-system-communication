@@ -8,18 +8,27 @@ receivers:
 
 processors:
   batch:
+    send_batch_size: 8192
+    timeout: 5s
+    send_batch_max_size: 10240
 
 exporters:
   prometheus:
-    endpoint: "0.0.0.0:8889"
+    endpoint: "otel-collector:8889"
   otlp/tempo:
-    endpoint: tempo:4317
+    endpoint: "tempo:4317"
     tls:
       insecure: true
+  debug:
+    verbosity: detailed
 
 service:
-  pipelines:
+   pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug, otlp/tempo]
     metrics:
       receivers: [otlp]
       processors: [batch]
-      exporters: [prometheus, otlp/tempo]
+      exporters: [prometheus]

@@ -615,6 +615,7 @@ services:
     environment:
       BOOTSTRAP_SERVER: ${KAFKA_BOOTSTRAP_SERVERS} #needs all 3 brokers
       DSOC_VOLUME_SIZE: ${DSOC_VOLUME_SIZE}
+      OTEL_SERVICE_NAME: "dsoc.kafka.operations"
     entrypoint:
         - python
         - manage.py
@@ -925,9 +926,6 @@ services:
     restart: unless-stopped
     volumes:
       - ./otel-collector/otelcol-config.yml:/etc/otelcol-contrib/config.yaml:ro
-    # ports:
-      # - "4317:4317"   # OTLP gRPC
-      # - "4318:4318"   # OTLP HTTP
     networks:
       - ngradar_website_network
     depends_on:

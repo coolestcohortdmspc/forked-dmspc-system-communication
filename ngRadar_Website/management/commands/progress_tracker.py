@@ -11,6 +11,7 @@ from ngRadar_Website.enums import (
     Status,
     Message,
 )
+
 from ngRadar_Website.utils import (
     bootstrap,
     consumer_group_has_members,
@@ -44,6 +45,8 @@ STALL_TIMEOUT_SECONDS = 15
 
 volume_folder = Path("/dsoc/incoming")
 
+station = Stations.PTW
+
 # Helper kafka produce function to UI consumer
 def publish_progress(
     *,
@@ -60,6 +63,7 @@ def publish_progress(
         producer_config,
         str(Message.PROGRESS_UPDATE.value),
         json.dumps(payload),
+        station=station,
     )
 
     print(
@@ -330,4 +334,9 @@ class Command(BaseCommand):
             Stations.PTW
         )
 
-        progress_consume(consumer_topic, consumer_config, producer_topic=producer_topic, producer_config=producer_config)
+        progress_consume(
+            consumer_topic, 
+            consumer_config, 
+            producer_topic=producer_topic, producer_config=producer_config,
+            manual_commit=True,
+        )
