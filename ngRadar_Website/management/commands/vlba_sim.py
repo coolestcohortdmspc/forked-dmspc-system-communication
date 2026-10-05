@@ -52,8 +52,8 @@ For now this simulator represents the Hancock VLBA station.
 
 
 FAILURE_REASONS = {
-    -9: "The e-transfer process was terminated",
-    -6: "The connection to the e-transfer daemon was lost",
+    -9: "The ExpeDat transfer process was terminated",
+    -6: "The connection to the ExpeDat transfer daemon was lost",
 }
 
 MAX_RESUME_ATTEMPTS = 5
