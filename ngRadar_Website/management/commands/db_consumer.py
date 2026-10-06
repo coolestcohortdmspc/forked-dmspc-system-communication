@@ -2,9 +2,10 @@ import json, os
 from ngRadar_Website.enums import Message, UIEvent
 from ngRadar_Website.models.models import ObservatoryEvent
 
+from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter # or HTTP
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter  # or HTTP
 from opentelemetry.sdk.trace.sampling import ALWAYS_ON
 from opentelemetry import trace, propagate
 from opentelemetry.trace import SpanKind, StatusCode
@@ -35,12 +36,12 @@ tracer = trace.get_tracer(f"db_consumer.kafka")
 
 
 def process_msg(
-    msg,
-    producer_topic,
-    producer_config,
+        msg,
+        producer_topic,
+        producer_config,
 ):
     carrier = {}
-        
+
     for name, value in (msg.headers() or []):
         if value is not None:
             carrier[name] = value.decode("utf-8")
@@ -57,7 +58,7 @@ def process_msg(
             "messaging.operation.name": "process",
             "messaging.kafka.partition": msg.partition(),
             "messaging.kafka.offset": msg.offset(),
-            "messaging.consumer.group.name": "ngradar-db",
+            "messaging.consumer.group.name": os.getenv("DB_KAFKA_GROUP_ID", "ngradar-db"),
         },
     )
 
@@ -75,19 +76,27 @@ def process_msg(
             return True
         if incoming_key == UIEvent.IMAGE_CHANGED:
             return True
-        
+
+        try:
+            span.set_attribute("ngradar.message.name", Message(int(incoming_key)).name)
+        except (ValueError, TypeError):
+            span.set_attribute("ngradar.message.name", incoming_key)
 
         topic = msg.topic()
 
-        payload = json.loads(msg.value().decode("utf-8"))
+        with tracer.start_as_current_span("decode DB event"):
+            payload = json.loads(msg.value().decode("utf-8"))
 
+        for key in ("event_uuid", "gbt_uuid", "transfer_uuid", "station", "target"):
+            if payload.get(key) is not None:
+                span.set_attribute(f"ngradar.{key}", str(payload[key]))
 
-        with transaction.atomic():
+        with tracer.start_as_current_span("persist DB event transaction"), transaction.atomic():
             event, created = record_obs_event(
                 payload
             )
 
-           # Capture values needed for the UI event
+            # Capture values needed for the UI event
             event_uuid = str(event.uuid)
             image_key = event.image_key
             rcvr_station = event.rcvr_station
@@ -97,9 +106,10 @@ def process_msg(
                     topic=topic,
                     producer_config=producer_config,
                     payload=payload,
+                    parent_context=ctx,
                 )
             )
-            
+
             # Only publish image_changed SSE event type when
             # this event actually has an image.
             if image_key:
@@ -107,6 +117,7 @@ def process_msg(
                     lambda: publish_ui_event(
                         topic=topic,
                         producer_config=producer_config,
+                        parent_context=ctx,
                         event_type=UIEvent.IMAGE_CHANGED,
                         key=event_uuid,
                         data={
@@ -120,6 +131,8 @@ def process_msg(
 
 
     except json.JSONDecodeError as error:
+        span.record_exception(error)
+        span.set_status(TraceStatus(StatusCode.ERROR, str(error)))
         print(
             "DB consumer received "
             "invalid JSON: "
@@ -128,10 +141,12 @@ def process_msg(
         return False
 
     except (
-        KeyError,
-        TypeError,
-        ValueError,
+            KeyError,
+            TypeError,
+            ValueError,
     ) as error:
+        span.record_exception(error)
+        span.set_status(TraceStatus(StatusCode.ERROR, str(error)))
         print(
             "DB consumer received "
             "invalid payload: "
@@ -144,72 +159,77 @@ def process_msg(
 
         span.record_exception(exc)
         span.set_status(TraceStatus(StatusCode.ERROR, str(exc)))
-        span.end() # Safely closing the span in case it wasn't already closed in the business logic above
         raise
 
     finally:
-        detach(token) # Detach the context to avoid leaking it to other spans
+        detach(token)  # Detach the context to avoid leaking it to other spans
+        span.end()
 
 
 def record_obs_event(payload):
-    obs_event, created = (
-        ObservatoryEvent.objects.update_or_create(
-            uuid=payload["event_uuid"],
-            defaults={
-                "gbt_uuid": payload.get("gbt_uuid"),
-                "transfer_uuid": payload.get("transfer_uuid"),
-                "object_id": payload.get("object_id"),
-                "target": payload.get("target"),
-                "waveform_requester": payload.get("waveform_requester"),
-                "tx_waveform": payload.get("tx_waveform"),
-                "rec_waveform": payload.get("rec_waveform"),
-                "product_type": payload.get("product_type"),
-                "product_id": payload.get("product_id"),
-                "station": payload.get("station"),
-                "event_time": payload["event_time"],
-                "xmit_station": payload.get("xmit_station"),
-                "rcvr_station": payload.get("rcvr_station"),
-                "image_key": payload.get("image_key"),
-                "num_bytes": payload.get("num_bytes"),
-                "latency_ms": payload.get("latency_ms", 0.0,),
-                "status": payload.get("status"),
-                "message": payload.get("message","",),
-            },
+    with tracer.start_as_current_span("upsert ObservatoryEvent") as db_span:
+        obs_event, created = (
+            ObservatoryEvent.objects.update_or_create(
+                uuid=payload["event_uuid"],
+                defaults={
+                    "gbt_uuid": payload.get("gbt_uuid"),
+                    "transfer_uuid": payload.get("transfer_uuid"),
+                    "object_id": payload.get("object_id"),
+                    "target": payload.get("target"),
+                    "waveform_requester": payload.get("waveform_requester"),
+                    "tx_waveform": payload.get("tx_waveform"),
+                    "rec_waveform": payload.get("rec_waveform"),
+                    "product_type": payload.get("product_type"),
+                    "product_id": payload.get("product_id"),
+                    "station": payload.get("station"),
+                    "event_time": payload["event_time"],
+                    "xmit_station": payload.get("xmit_station"),
+                    "rcvr_station": payload.get("rcvr_station"),
+                    "image_key": payload.get("image_key"),
+                    "num_bytes": payload.get("num_bytes"),
+                    "latency_ms": payload.get("latency_ms", 0.0, ),
+                    "status": payload.get("status"),
+                    "message": payload.get("message", "", ),
+                },
+            )
         )
-    )
+        db_span.set_attribute("ngradar.db.created", created)
 
     return obs_event, created
 
 
 def publish_db_committed(
-    *,
-    topic,
-    producer_config,
-    payload,
+        *,
+        topic,
+        producer_config,
+        payload,
+        parent_context=None,
 ):
     notification = {
         "event_type": "db_committed",
         "data": payload,
     }
 
-    produce(
-        topic,
-        producer_config,
-        str(
-            Message.DB_COMMITTED.value
-        ),
-        json.dumps(notification),
-        station=station,
-    )
+    with tracer.start_as_current_span("publish DB committed", context=parent_context):
+        produce(
+            topic,
+            producer_config,
+            str(
+                Message.DB_COMMITTED.value
+            ),
+            json.dumps(notification),
+            station=station,
+        )
 
 
 def publish_ui_event(
-    *,
-    topic,
-    producer_config,
-    event_type,
-    key,
-    data,
+        *,
+        topic,
+        producer_config,
+        event_type,
+        key,
+        data,
+        parent_context=None,
 ):
     notification = {
         "event_type": event_type,
@@ -217,16 +237,13 @@ def publish_ui_event(
         "data": data,
     }
 
-    produce(
-        topic,
-        producer_config,
-        event_type,
-        json.dumps(notification),
-    )
-
-
-
-
+    with tracer.start_as_current_span("publish image changed", context=parent_context):
+        produce(
+            topic,
+            producer_config,
+            event_type,
+            json.dumps(notification),
+        )
 
 
 class Command(BaseCommand):
@@ -235,11 +252,14 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         print("Starting DB consumer")
 
-        provider = TracerProvider(sampler=ALWAYS_ON)
-        processor = BatchSpanProcessor(OTLPSpanExporter(endpoint="http://otel-collector:4317")) 
+        provider = TracerProvider(
+            sampler=ALWAYS_ON,
+            resource=Resource.create({"service.name": "db_consumer"}),
+        )
+        processor = BatchSpanProcessor(OTLPSpanExporter(endpoint="http://otel-collector:4317"))
         provider.add_span_processor(processor)
         trace.set_tracer_provider(provider)
-        
+
         bootstrap_servers = os.environ["KAFKA_BOOTSTRAP_SERVERS"]
 
         topics = [
