@@ -679,7 +679,7 @@ services:
     container_name: vlba-SC
     environment:
       STATION_NAME: SC
-      OTEL_SERVICE_NAME: "vlba-sc.kafka.operations"
+      OTEL_SERVICE_NAME: "vlba-sc"
 
 
   vlba-hn:
@@ -688,7 +688,7 @@ services:
     container_name: vlba-HN
     environment:
       STATION_NAME: HN
-      OTEL_SERVICE_NAME: "vlba-hn.kafka.operations"
+      OTEL_SERVICE_NAME: "vlba-hn"
   
 
   vlba-nl:
@@ -697,7 +697,7 @@ services:
     container_name: vlba-NL
     environment:
       STATION_NAME: NL
-      OTEL_SERVICE_NAME: "vlba-nl.kafka.operations"
+      OTEL_SERVICE_NAME: "vlba-nl"
 
   vlba-fd:
     extends:
@@ -705,7 +705,7 @@ services:
     container_name: vlba-FD
     environment:
       STATION_NAME: FD
-      OTEL_SERVICE_NAME: "vlba-fd.kafka.operations"
+      OTEL_SERVICE_NAME: "vlba-fd"
 
   vlba-la:
     extends:
@@ -713,7 +713,7 @@ services:
     container_name: vlba-LA
     environment:
       STATION_NAME: LA
-      OTEL_SERVICE_NAME: "vlba-la.kafka.operations"
+      OTEL_SERVICE_NAME: "vlba-la"
 
   vlba-pt:
     extends:
@@ -721,7 +721,7 @@ services:
     container_name: vlba-PT
     environment:
       STATION_NAME: PT
-      OTEL_SERVICE_NAME: "vlba-pt.kafka.operations"
+      OTEL_SERVICE_NAME: "vlba-pt"
 
   vlba-kp:
     extends:
@@ -729,7 +729,7 @@ services:
     container_name: vlba-KP
     environment:
       STATION_NAME: KP
-      OTEL_SERVICE_NAME: "vlba-kp.kafka.operations"
+      OTEL_SERVICE_NAME: "vlba-kp"
 
   vlba-ov:
     extends:
@@ -737,7 +737,7 @@ services:
     container_name: vlba-OV
     environment:
       STATION_NAME: OV
-      OTEL_SERVICE_NAME: "vlba-ov.kafka.operations"
+      OTEL_SERVICE_NAME: "vlba-ov"
 
   vlba-br:
     extends:
@@ -745,7 +745,7 @@ services:
     container_name: vlba-BR
     environment:
       STATION_NAME: BR
-      OTEL_SERVICE_NAME: "vlba-br.kafka.operations"
+      OTEL_SERVICE_NAME: "vlba-br"
 
   vlba-mk:
     extends:
@@ -753,7 +753,7 @@ services:
     container_name: vlba-MK
     environment:
       STATION_NAME: MK
-      OTEL_SERVICE_NAME: "vlba-mk.kafka.operations"
+      OTEL_SERVICE_NAME: "vlba-mk"
 
 
 # Consumes kafka messages and writes them to the database.
