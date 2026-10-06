@@ -503,7 +503,7 @@ def process_msg(
                     rcvr_station=(vlba_station),
                     message=(
                         f"{vlba_station.name} requested a storage check at DSOC. "
-                        f"DSOC responded that it does not have enough storage and cannot begin the etransfer."
+                        f"DSOC responded that it does not have enough storage and cannot begin the ExpeDat transfer."
                         f"Failed after "
                         f"{next_retry_count} "
                         "storage checks."
@@ -546,7 +546,7 @@ def process_msg(
                 xmit_station=(Stations.GBT),
                 rcvr_station=(vlba_station),
 
-                message=f"{vlba_station.name} requested a storage check at DSOC. DSOC responded that it does not have enough storage and cannot begin the etransfer.",
+                message=f"{vlba_station.name} requested a storage check at DSOC. DSOC responded that it does not have enough storage and cannot begin the ExpeDat transfer.",
             )
 
             print(
@@ -585,14 +585,14 @@ def process_msg(
                 xmit_station=(Stations.GBT),
                 rcvr_station=(vlba_station),
 
-                message=f"DSOC reponded that it has enough storage. {vlba_station.name} may begin the etransfer.",
+                message=f"DSOC reponded that it has enough storage. {vlba_station.name} may begin the ExpeDat transfer.",
             )
 
             print(
                 "DSOC has enough storage "
                 "to accept the incoming "
                 "data. Awaiting "
-                "e-transfer..."
+                "streaming..."
             )
 
     # =========================================================
@@ -793,7 +793,7 @@ def process_msg(
             rcvr_station=(vlba_station),
             message=(
                 f"DSOC verified {vlba_station.label}'s "
-                "e-transfer, generated "
+                "streaming, generated "
                 "the DDM image, stored "
                 "the image, and completed "
                 f"processing. {vlba_station.label} may "

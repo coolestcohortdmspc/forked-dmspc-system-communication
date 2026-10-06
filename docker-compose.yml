@@ -68,6 +68,7 @@ services:
       - "9092:9092" # kafka broker
       - "4004:4004" # etransfer command port
       - "8008:8008/udp" # etransfer data port
+      - "8080:8080/udp" # expedat data port 
 
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -81,6 +82,7 @@ services:
       - "--entrypoints.kafka.address=:9092"
       - "--entrypoints.etransfer-command.address=:4004"
       - "--entrypoints.etransfer-data.address=:8008/udp"
+      - "--entrypoints.expedat-data.address=:8080/udp"
 
       # Dedicated Prometheus metrics endpoint
       - "--entrypoints.metrics.address=:8082"
@@ -148,6 +150,7 @@ services:
       # - "9092:9092" # kafka broker
       - "4004:4004" # etransfer command port
       - "8008:8008/udp" # etransfer data port
+      - "8080:8080/udp" # expedat data port
 
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -159,6 +162,7 @@ services:
       # - "--entrypoints.kafka-1.address=:9092"
       - "--entrypoints.etransfer-command.address=:4004"
       - "--entrypoints.etransfer-data.address=:8008/udp"
+      - "--entrypoints.expedat-data.address=:8080/udp"
 
       # Dedicated Prometheus metrics endpoint
       - "--entrypoints.metrics.address=:8082"
@@ -652,9 +656,10 @@ services:
 
   vlba:
     container_name: vlba
+    # this for local development on Mac since we use linux build x86 
     build:
       context: .
-      target: etc
+      target: expedat-client
     env_file:
       - .env
     volumes:
@@ -666,8 +671,11 @@ services:
     restart: unless-stopped
     environment:
       BOOTSTRAP_SERVER: ${KAFKA_BOOTSTRAP_SERVERS} # needs all 3 brokers bootstrap server
-      ETD_HOST: ${ETD_HOST}
-      ETD_COMMAND_PORT: ${ETD_COMMAND_PORT:-4004}
+      SVD_IP: ${SVD_IP} 
+      RECIPIENT_DIR: /dsoc/incoming
+      MVD_LOC: /usr/local/bin/
+      EXPEDAT_MODE: ${EXPEDAT_MODE}
+      EXPEDAT_STREAM_MB: ${EXPEDAT_STREAM_MB}
     entrypoint:
       - python
       - manage.py
@@ -893,6 +901,36 @@ services:
       - tcp://:4004
       - --data
       - srt://:8008
+
+  expedat_server:
+    container_name: expedat_server
+    restart: unless-stopped
+    build:
+      context: .
+      target: expedat-server
+    profiles: ["kafka"]
+    user: "33:33"   # non root user: www-data
+    depends_on:
+      dsoc-volume-init:
+        condition: service_completed_successfully
+    networks:
+      - ngradar_website_network
+      - proxy
+    volumes:
+      - dsoc_transfer:/dsoc/incoming
+    environment:
+      SVD_USER: ${SVD_USER} 
+      SVD_PASSWORD: ${SVD_PASSWORD}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      - "traefik.udp.routers.expedat-data.entrypoints=expedat-data"
+      - "traefik.udp.routers.expedat-data.service=expedat-data"
+      - "traefik.udp.services.expedat-data.loadbalancer.server.port=8080"
+    command:
+      - sh 
+      - -c 
+      - echo "$$SVD_USER:$$SVD_PASSWORD:/dsoc/incoming" > /tmp/svpassword && exec servedat -A /tmp/svpassword
 
 
 #===============================

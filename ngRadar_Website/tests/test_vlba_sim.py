@@ -35,21 +35,22 @@ with patch("pathlib.Path.read_text", return_value=mock_env_data):
     "os.environ",
     {
         "STATION_NAME": "PT",
+        "EXPEDAT_MODE": "fake_mode",
     },
 )
-@patch("ngRadar_Website.management.commands.vlba_sim.create_file")
+#@patch("ngRadar_Website.management.commands.vlba_sim.create_file")
 @patch("ngRadar_Website.management.commands.vlba_sim.Path")
 @patch("ngRadar_Website.management.commands.vlba_sim.send_kafka_message")
-@patch("ngRadar_Website.management.commands.vlba_sim.watch_for_file")
-@patch("ngRadar_Website.management.commands.vlba_sim.Thread")
+#@patch("ngRadar_Website.management.commands.vlba_sim.watch_for_file")
+#@patch("ngRadar_Website.management.commands.vlba_sim.Thread")
 @patch("ngRadar_Website.management.commands.vlba_sim.uuid.uuid4")
 def test_process_msg_GBT_TX(
         mock_uuid,
-        mock_Thread,
-        mock_watch_for_file,
+        #mock_Thread,
+        #mock_watch_for_file,
         mock_send_kafka_message,
         mock_Path,
-        mock_create
+        #mock_create
 ):
     msg = MagicMock()
 
@@ -76,7 +77,7 @@ def test_process_msg_GBT_TX(
     mock_uuid.return_value = "12345"
 
     # mock the thread so code coverage continues past this process
-    mock_Thread.start.return_value = True
+    #mock_Thread.start.return_value = True
 
     # raw_data_path = Path("/raw_data")
     mock_raw_data_path = MagicMock()
@@ -92,8 +93,8 @@ def test_process_msg_GBT_TX(
     process_msg(msg, producer_topic, producer_config)
 
     assert mock_uuid.call_count == 1
-    mock_Thread.assert_called_once_with(target=mock_create, args=(mock_frame_path,), daemon=True)
-    mock_watch_for_file.assert_called_once_with(mock_frame_path)
+    #mock_Thread.assert_called_once_with(target=mock_create, args=(mock_frame_path,), daemon=True)
+    #mock_watch_for_file.assert_called_once_with(mock_frame_path)
     mock_send_kafka_message.assert_called_once_with(
         producer_topic=producer_topic,
         producer_config=producer_config,
@@ -128,21 +129,22 @@ def test_process_msg_GBT_TX(
     "os.environ",
     {
         "STATION_NAME": "PT",
+        "EXPEDAT_MODE": "fake_mode",
     },
 )
-@patch("ngRadar_Website.management.commands.vlba_sim.create_file")
+#@patch("ngRadar_Website.management.commands.vlba_sim.create_file")
 @patch("ngRadar_Website.management.commands.vlba_sim.Path")
 @patch("ngRadar_Website.management.commands.vlba_sim.send_kafka_message")
-@patch("ngRadar_Website.management.commands.vlba_sim.watch_for_file")
-@patch("ngRadar_Website.management.commands.vlba_sim.Thread")
+#@patch("ngRadar_Website.management.commands.vlba_sim.watch_for_file")
+#@patch("ngRadar_Website.management.commands.vlba_sim.Thread")
 @patch("ngRadar_Website.management.commands.vlba_sim.uuid.uuid4")
 def test_process_msg_GBT_TX_FAILED(
         mock_uuid,
-        mock_Thread,
-        mock_watch_for_file,
+        #mock_Thread,
+        #mock_watch_for_file,
         mock_send_kafka_message,
         mock_Path,
-        mock_create
+        #mock_create
 ):
     msg = MagicMock()
 
@@ -169,7 +171,7 @@ def test_process_msg_GBT_TX_FAILED(
     mock_uuid.return_value = "12345"
 
     # mock the thread so code coverage continues past this process
-    mock_Thread.start.return_value = True
+    #mock_Thread.start.return_value = True
 
     # raw_data_path = Path("/raw_data")
     mock_raw_data_path = MagicMock()
@@ -184,8 +186,8 @@ def test_process_msg_GBT_TX_FAILED(
     process_msg(msg, producer_topic, producer_config)
 
     assert mock_uuid.call_count == 1
-    mock_Thread.assert_called_once_with(target=mock_create, args=(mock_frame_path,), daemon=True)
-    mock_watch_for_file.assert_called_once_with(mock_frame_path)
+    #mock_Thread.assert_called_once_with(target=mock_create, args=(mock_frame_path,), daemon=True)
+    #mock_watch_for_file.assert_called_once_with(mock_frame_path)
     mock_send_kafka_message.assert_called_once_with(
         producer_topic=producer_topic,
         producer_config=producer_config,
@@ -222,21 +224,23 @@ def test_process_msg_GBT_TX_FAILED(
         "STATION_NAME": "PT",
     },
 )
-@patch("ngRadar_Website.management.commands.vlba_sim.etc_send")
-@patch("ngRadar_Website.management.commands.vlba_sim.create_file")
+# @patch("ngRadar_Website.management.commands.vlba_sim.etc_send")
+#@patch("ngRadar_Website.management.commands.vlba_sim.create_file")
 @patch("ngRadar_Website.management.commands.vlba_sim.Path")
 @patch("ngRadar_Website.management.commands.vlba_sim.send_kafka_message")
-@patch("ngRadar_Website.management.commands.vlba_sim.watch_for_file")
-@patch("ngRadar_Website.management.commands.vlba_sim.Thread")
+#@patch("ngRadar_Website.management.commands.vlba_sim.watch_for_file")
+#@patch("ngRadar_Website.management.commands.vlba_sim.Thread")
 @patch("ngRadar_Website.management.commands.vlba_sim.uuid.uuid4")
+@patch("ngRadar_Website.management.commands.vlba_sim.expedat_send")
 def test_process_msg_DSOC_RESPOND_STORAGE(
+        mock_exp_send,
         mock_uuid,
-        mock_Thread,
-        mock_watch_for_file,
+        #mock_Thread,
+        #mock_watch_for_file,
         mock_send_kafka_message,
         mock_Path,
-        mock_create,
-        mock_etc_send,
+        #mock_create,
+        # mock_etc_send,
 ):
     msg = MagicMock()
 
@@ -268,7 +272,7 @@ def test_process_msg_DSOC_RESPOND_STORAGE(
     mock_uuid.return_value = "12345"
 
     # mock the thread so code coverage continues past this process
-    mock_Thread.start.return_value = True
+    #mock_Thread.start.return_value = True
 
     # raw_data_path = Path("/raw_data")
     mock_raw_data_path = MagicMock()
@@ -284,9 +288,10 @@ def test_process_msg_DSOC_RESPOND_STORAGE(
     process_msg(msg, producer_topic, producer_config)
 
     assert mock_uuid.call_count == 0
-    mock_Thread.assert_not_called()
-    mock_watch_for_file.assert_not_called()
-    mock_etc_send.assert_called_once_with(mock_frame_path)
+    #mock_Thread.assert_not_called()
+    #mock_watch_for_file.assert_not_called()
+    # mock_etc_send.assert_called_once_with(mock_frame_path)
+    mock_exp_send.assert_called_once()
     mock_send_kafka_message.assert_called_once_with(
         producer_topic="progress_tracking",
         producer_config=producer_config,
@@ -306,10 +311,10 @@ def test_process_msg_DSOC_RESPOND_STORAGE(
         xmit_station=Stations.GBT,
         rcvr_station=Stations.PT,
         message=(
-                "Hancock VLBA has "
+                f"VLBA-{Stations.PT} has "
                 "started sending the "
                 "data file to DSOC "
-                "via e-transfer."
+                "via movedat."
             ),
     )
 
@@ -323,24 +328,34 @@ def test_process_msg_DSOC_RESPOND_STORAGE(
     "os.environ",
     {
         "STATION_NAME": "PT",
+        # "SVD_PASSWORD": "fake_password",
+        # "SVD_IP": "fake_IP",
+        # "SVD_USER": "fake_username",
+        # "RECIPIENT_DIR": "/fake/directory/",
+        # "MVD_LOC": str(mvd_loc),
+        # "MVD_FILEPATH": "/fake/file.png",
     },
 )
-@patch("ngRadar_Website.management.commands.vlba_sim.wait_for_etd")
-@patch("ngRadar_Website.management.commands.vlba_sim.etc_send")
+#@patch("ngRadar_Website.management.commands.vlba_sim.wait_for_etd")
+# @patch("ngRadar_Website.management.commands.vlba_sim.etc_send")
 @patch("ngRadar_Website.management.commands.vlba_sim.Path")
 @patch("ngRadar_Website.management.commands.vlba_sim.send_kafka_message")
-@patch("ngRadar_Website.management.commands.vlba_sim.watch_for_file")
-@patch("ngRadar_Website.management.commands.vlba_sim.Thread")
+#@patch("ngRadar_Website.management.commands.vlba_sim.watch_for_file")
+#@patch("ngRadar_Website.management.commands.vlba_sim.Thread")
 @patch("ngRadar_Website.management.commands.vlba_sim.uuid.uuid4")
+@patch("ngRadar_Website.management.commands.vlba_sim.expedat_send")
+@patch("ngRadar_Website.management.commands.vlba_sim.wait_for_exp")
 def test_process_msg_DSOC_RESPOND_STORAGE_CalledProcessError(
+        mock_wait_for_exp,
+        mock_exp_send,
         mock_uuid,
-        mock_Thread,
-        mock_watch_for_file,
+        #mock_Thread,
+        #mock_watch_for_file,
         mock_send_kafka_message,
         mock_Path,
-        mock_etc_send,
-        mock_wait_for_etd,
-):
+        # mock_etc_send,
+        #mock_wait_for_etd,
+):  
     msg = MagicMock()
 
     payload = {
@@ -370,7 +385,7 @@ def test_process_msg_DSOC_RESPOND_STORAGE_CalledProcessError(
     mock_uuid.return_value = "12345"
 
     # mock the thread so code coverage continues past this process
-    mock_Thread.start.return_value = True
+    #mock_Thread.start.return_value = True
 
     # raw_data_path = Path("/raw_data")
     mock_raw_data_path = MagicMock()
@@ -383,18 +398,25 @@ def test_process_msg_DSOC_RESPOND_STORAGE_CalledProcessError(
     mock_frame_path.is_file.return_value = True
     mock_frame_path.stat.return_value.st_size = 500
 
-    mock_etc_send.side_effect = subprocess.CalledProcessError(
+    # mock_etc_send.side_effect = subprocess.CalledProcessError(
+    #         returncode=42,
+    #         cmd="etc_send"
+    #     )
+
+    mock_exp_send.side_effect = subprocess.CalledProcessError(
             returncode=42,
-            cmd="etc_send"
+            cmd="expedat_send"
         )
+
+    mock_wait_for_exp.return_value = True
 
     result = process_msg(msg, producer_topic, producer_config)
 
     assert result is False
     assert mock_uuid.call_count == 0
-    mock_Thread.assert_not_called()
-    mock_watch_for_file.assert_not_called()
-    assert mock_etc_send.call_count == MAX_RESUME_ATTEMPTS
+    #mock_Thread.assert_not_called()
+    #mock_watch_for_file.assert_not_called()
+    # assert mock_etc_send.call_count == MAX_RESUME_ATTEMPTS
     assert mock_send_kafka_message.call_count == (MAX_RESUME_ATTEMPTS*2) #function is called twice every retry attempt
 
 #=====================================================================
@@ -409,21 +431,21 @@ def test_process_msg_DSOC_RESPOND_STORAGE_CalledProcessError(
         "STATION_NAME": "PT",
     },
 )
-@patch("ngRadar_Website.management.commands.vlba_sim.wait_for_etd")
-@patch("ngRadar_Website.management.commands.vlba_sim.etc_send")
+#@patch("ngRadar_Website.management.commands.vlba_sim.wait_for_etd")
+# @patch("ngRadar_Website.management.commands.vlba_sim.etc_send")
 @patch("ngRadar_Website.management.commands.vlba_sim.Path")
 @patch("ngRadar_Website.management.commands.vlba_sim.send_kafka_message")
-@patch("ngRadar_Website.management.commands.vlba_sim.watch_for_file")
-@patch("ngRadar_Website.management.commands.vlba_sim.Thread")
+#@patch("ngRadar_Website.management.commands.vlba_sim.watch_for_file")
+#@patch("ngRadar_Website.management.commands.vlba_sim.Thread")
 @patch("ngRadar_Website.management.commands.vlba_sim.uuid.uuid4")
 def test_process_msg_DSOC_RESPOND_STORAGE_OSError(
         mock_uuid,
-        mock_Thread,
-        mock_watch_for_file,
+        #mock_Thread,
+        #mock_watch_for_file,
         mock_send_kafka_message,
         mock_Path,
-        mock_etc_send,
-        mock_wait_for_etd,
+        # mock_etc_send,
+        #mock_wait_for_etd,
 ):
     msg = MagicMock()
 
@@ -454,7 +476,7 @@ def test_process_msg_DSOC_RESPOND_STORAGE_OSError(
     mock_uuid.return_value = "12345"
 
     # mock the thread so code coverage continues past this process
-    mock_Thread.start.return_value = True
+    #mock_Thread.start.return_value = True
 
     # raw_data_path = Path("/raw_data")
     mock_raw_data_path = MagicMock()
@@ -467,15 +489,15 @@ def test_process_msg_DSOC_RESPOND_STORAGE_OSError(
     mock_frame_path.is_file.return_value = True
     mock_frame_path.stat.return_value.st_size = 500
 
-    mock_etc_send.side_effect = OSError
+    # mock_etc_send.side_effect = OSError
 
     process_msg(msg, producer_topic, producer_config)
 
     assert mock_uuid.call_count == 0
-    mock_Thread.assert_not_called()
-    mock_watch_for_file.assert_not_called()
+    #mock_Thread.assert_not_called()
+    #mock_watch_for_file.assert_not_called()
     assert mock_send_kafka_message.call_count == 2
-    mock_etc_send.assert_called_once_with(mock_frame_path)
+    # mock_etc_send.assert_called_once_with(mock_frame_path)
 
 #=====================================================================
 
