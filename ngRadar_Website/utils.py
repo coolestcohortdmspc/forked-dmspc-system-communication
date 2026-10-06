@@ -9,6 +9,7 @@ import select
 import subprocess
 import time
 import uuid
+import atexit
 
 import boto3
 
@@ -18,23 +19,20 @@ from botocore.exceptions import (
     ConnectionError,
     EndpointConnectionError,
 )
+from ngRadar_Website.enums import Stations
 
+from opentelemetry import trace
+from opentelemetry.propagate import inject
+from opentelemetry.trace import SpanKind, StatusCode
+from opentelemetry.trace.status import Status as TraceStatus
 from confluent_kafka import (
     Consumer,
     KafkaError,
     Producer,
 )
-
 from confluent_kafka.admin import AdminClient
 
 from dotenv import load_dotenv
-
-from ngRadar_Website.enums import (
-    Stations,
-    Status,
-)
-
-from ngRadar_Website.models.models import ObservatoryEvent
 
 # =============================================================
 # FUNCTIONS IN THIS FILE
@@ -71,6 +69,7 @@ MAX_BYTES = 8_388_608
 ETD_MAX_CONN_RETRY = 90
 ETD_RETRY_CONN_DELAY = 10
 
+tracer = trace.get_tracer(f"kafka.producer")
 
 # =============================================================
 # REGEX PATTERNS
@@ -306,67 +305,133 @@ def bootstrap(sim):
 # KAFKA PRODUCER / CONSUMER
 # =============================================================
 
-def produce(topic, config, key, value):
+# Internal reference to hold a single producer instance
+_producer_instance = None
+
+def get_kafka_producer(config: dict = None) -> Producer:
     """
-    Produce one Kafka message.
+    Thread-safe lazy initializer for the Kafka Producer singleton.
+    Guarantees only one instance lives per service process.
+
+    We previously were creating a new Producer for EVERY MESSAGE, which is inefficient and can lead to resource exhaustion.
+    """
+    global _producer_instance
+    
+    if _producer_instance is None:
+        if config is None:
+            # Fallback or lookup configuration if not passed explicitly
+            raise ValueError("Kafka configuration must be provided for initial setup.")
+            
+        print("Initializing persistent Kafka Producer...")
+        _producer_instance = Producer(config)
+        
+        # Automatically register a hook to flush messages when the service exits
+        atexit.register(shutdown_kafka_producer)
+        
+    return _producer_instance
+
+
+def shutdown_kafka_producer():
+    """Flushes remaining messages right before the service shuts down."""
+    global _producer_instance
+    if _producer_instance is not None:
+        print("Service shutting down: flushing outstanding Kafka messages...")
+        # Block up to 10 seconds to make sure all in-flight spans/messages clear out
+        _producer_instance.flush(10)
+        _producer_instance = None
+
+
+def produce(topic, config, key, value, station):
+    """
+    Produce one Kafka message. Synchronously awaits delivery to ensure accurate OpenTelemetry span timings and correct delivery status.
 
     Returns:
         True  - message delivered successfully
         False - delivery failed
     """
 
-    delivery_error = None
+    delivery_status = {"success": True, "error": None}
+    callback_completed = {"done": False} # tracking that delivery_report is finished
+
+    # grabbing the context from the current trace to propagate it downstream into the child span
+    parent_span = trace.get_current_span()
+
+    # child span to trace our produce operation
+    with trace.use_span(parent_span, end_on_exit=False):
+        span = tracer.start_span(
+            f"send message to {topic}",
+            kind=SpanKind.PRODUCER,
+            attributes={
+                "messaging.system": "kafka",
+                "messaging.destination.name": topic,
+                "messaging.operation.name": "send",
+            },
+        )
+    # Inject the child span's info into the outbound Kafka headers
+    with trace.use_span(span, end_on_exit=False):
+        headers = {}
+        inject(headers)
+        kafka_headers = [(k, v.encode('utf-8')) for k, v in headers.items()]
 
     def delivery_report(err, msg):
-        nonlocal delivery_error
-
+        print("Checking if message was delivered...")
         if err is not None:
-            delivery_error = err
+            # Record the error in the delivery_status dictionary and mark the span as errored
+            delivery_status["error"] = err
+            delivery_status["success"] = False
+            span.record_exception(err)
+            span.set_status(TraceStatus(StatusCode.ERROR, str(err)))
+        else:
+            # Record the successful delivery in the span attributes
+            span.set_attribute("messaging.kafka.partition", msg.partition())
+            span.set_attribute("messaging.kafka.offset", msg.offset())
+            span.set_status(trace.Status(StatusCode.OK))
+
+        ctx = span.get_span_context()
+        print(
+            "delivery callback:",
+            "error=", err,
+            "trace_id=", f"{ctx.trace_id:032x}",
+            "sampled=", ctx.trace_flags.sampled,
+        )
+        callback_completed["done"] = True
 
     try:
-        producer = Producer(config)
+        producer = get_kafka_producer(config)
 
         producer.produce(
             topic,
             key=key,
             value=value,
+            headers=kafka_headers,
             callback=delivery_report,
         )
 
-        remaining = (producer.flush(2))
+        # Block until the message is acknowledged so the callback executes.
+        # This guarantees the span reflects the real network duration and records any errors.
+        start_time = time.time()
+        while not callback_completed["done"]:
+            producer.poll(0.1) # Process background callbacks
+            if time.time() - start_time > 2.0: # 2-second safety timeout
+                raise RuntimeError("Delivery callback timed out.")
 
-        if delivery_error is not None:
-            print(
-                "Failed to produce message "
-                f"to {topic}: "
-                f"{delivery_error}"
-            )
+        # span.end() # ending span after delivery callback is complete to ensure accurate timing
+        print(f"Produced message to topic {topic} with key {key}.")
+        
+        return delivery_status["success"] # returns True
 
-            return False
-
-        if remaining > 0:
-            print(
-                "Kafka broker did not "
-                "respond while publishing "
-                f"to {topic}."
-            )
-
-            return False
-
-        print(
-            "Produced message to topic "
-            f"{topic} with key {key}."
-        )
-
-        return True
 
     except Exception as exc:
-        print(
-            "Failed to send Kafka message "
-            f"to {topic}: {exc}"
-        )
-
+        print(f"Failed to send Kafka message to {topic}: {exc}")
+        span.record_exception(exc)
+        span.set_status(TraceStatus(StatusCode.ERROR, str(exc)))
+        # span.end()
         return False
+
+
+    finally:
+        span.end()
+
 
 
 def consume(
@@ -578,6 +643,7 @@ def send_kafka_message(
         producer_config,
         str(message_type.value),
         json.dumps(payload),
+        station,
     )
 
     if not success:

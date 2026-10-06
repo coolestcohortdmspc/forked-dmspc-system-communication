@@ -585,11 +585,11 @@ services:
     profiles: ["kafka"]
     environment:
       BOOTSTRAP_SERVER: ${KAFKA_BOOTSTRAP_SERVERS} # needs all 3 brokers
+      OTEL_SERVICE_NAME: "gbt"
     entrypoint:
         - python
         - manage.py
         - gbt_sim
-
 
 
   dsoc:
@@ -619,12 +619,12 @@ services:
     environment:
       BOOTSTRAP_SERVER: ${KAFKA_BOOTSTRAP_SERVERS} #needs all 3 brokers
       DSOC_VOLUME_SIZE: ${DSOC_VOLUME_SIZE}
+      OTEL_SERVICE_NAME: "dsoc"
     entrypoint:
         - python
         - manage.py
         - dsoc_sim
   
-
 
   progress_tracker:
     container_name: progress_tracker
@@ -646,12 +646,11 @@ services:
     environment:
       # BOOTSTRAP_SERVER: kafka-broker:29092
       BOOTSTRAP_SERVER: ${BOOTSTRAP_SERVER:-kafka-broker:29092}
+      OTEL_SERVICE_NAME: "progress_tracker"
     entrypoint:
         - python
         - manage.py
         - progress_tracker
-
-
 
 
   vlba:
@@ -688,6 +687,7 @@ services:
     container_name: vlba-SC
     environment:
       STATION_NAME: SC
+      OTEL_SERVICE_NAME: "vlba-sc"
 
 
   vlba-hn:
@@ -696,6 +696,7 @@ services:
     container_name: vlba-HN
     environment:
       STATION_NAME: HN
+      OTEL_SERVICE_NAME: "vlba-hn"
   
 
   vlba-nl:
@@ -704,7 +705,7 @@ services:
     container_name: vlba-NL
     environment:
       STATION_NAME: NL
-
+      OTEL_SERVICE_NAME: "vlba-nl"
 
   vlba-fd:
     extends:
@@ -712,15 +713,15 @@ services:
     container_name: vlba-FD
     environment:
       STATION_NAME: FD
+      OTEL_SERVICE_NAME: "vlba-fd"
 
-  
   vlba-la:
     extends:
       service: vlba
     container_name: vlba-LA
     environment:
       STATION_NAME: LA
-
+      OTEL_SERVICE_NAME: "vlba-la"
 
   vlba-pt:
     extends:
@@ -728,7 +729,7 @@ services:
     container_name: vlba-PT
     environment:
       STATION_NAME: PT
-  
+      OTEL_SERVICE_NAME: "vlba-pt"
 
   vlba-kp:
     extends:
@@ -736,7 +737,7 @@ services:
     container_name: vlba-KP
     environment:
       STATION_NAME: KP
-
+      OTEL_SERVICE_NAME: "vlba-kp"
 
   vlba-ov:
     extends:
@@ -744,7 +745,7 @@ services:
     container_name: vlba-OV
     environment:
       STATION_NAME: OV
-  
+      OTEL_SERVICE_NAME: "vlba-ov"
 
   vlba-br:
     extends:
@@ -752,7 +753,7 @@ services:
     container_name: vlba-BR
     environment:
       STATION_NAME: BR
-
+      OTEL_SERVICE_NAME: "vlba-br"
 
   vlba-mk:
     extends:
@@ -760,6 +761,7 @@ services:
     container_name: vlba-MK
     environment:
       STATION_NAME: MK
+      OTEL_SERVICE_NAME: "vlba-mk"
 
 
 # Consumes kafka messages and writes them to the database.
@@ -767,6 +769,7 @@ services:
 # The UI consumer is part of the ngradar_website service, while this db_consumer is a separate service
 # that runs in the background and writes to the database.
   db_consumer:
+    container_name: db_consumer
     build:
       context: .
       target: app
@@ -784,6 +787,7 @@ services:
       DB_KAFKA_TOPICS: "GBT_notif,VLBA_notif,DSOC_notif"
       DB_KAFKA_GROUP_ID: "ngradar-db"
       KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS}
+      OTEL_SERVICE_NAME: "db_consumer"
     command: >
       python manage.py db_consumer
 
@@ -956,6 +960,27 @@ services:
       - "--storage.tsdb.retention.time=15d"
       - "--web.enable-remote-write-receiver"
 
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:nightly
+    container_name: otel-collector
+    restart: unless-stopped
+    volumes:
+      - ./otel-collector/otelcol-config.yml:/etc/otelcol-contrib/config.yaml:ro
+    networks:
+      - ngradar_website_network
+    depends_on:
+      - tempo
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+
+  tempo:
+    image: grafana/tempo:main-ff11875-2195-1
+    container_name: tempo
+    volumes:
+      - ./otel-collector/tempo.yml:/etc/tempo.yaml:ro
+      - tempo_data:/var/tempo
+    networks:
+      - ngradar_website_network
+    command: ["-config.file=/etc/tempo.yaml"]
 
   grafana:
     image: grafana/grafana:latest
@@ -969,6 +994,7 @@ services:
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
     networks:
       - proxy
+      - ngradar_website_network
     environment:
       - GF_SECURITY_ADMIN_USER=${GRAFANA_USER}
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
@@ -1042,7 +1068,7 @@ volumes:
   portainer_data:
   prometheus_data:
   grafana_data:
-  volumes:
+  tempo_data:
 
 networks:
   ngradar_website_network:

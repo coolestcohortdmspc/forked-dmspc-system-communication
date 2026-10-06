@@ -40,3 +40,10 @@ scrape_configs:
           - "kafka-node-1:7071"
           - "kafka-node-2:7071"
           - "kafka-node-3:7071"
+
+
+  # OpenTelemetry Collector
+  - job_name: "otel-collector"
+    static_configs:
+      - targets:
+          - "otel-collector:8889"

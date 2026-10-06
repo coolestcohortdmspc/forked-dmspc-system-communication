@@ -1,5 +1,3 @@
-from ast import For
-
 from django.db import models
 
 class Stations(models.IntegerChoices):
