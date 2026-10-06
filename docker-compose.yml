@@ -642,7 +642,7 @@ services:
     environment:
       # BOOTSTRAP_SERVER: kafka-broker:29092
       BOOTSTRAP_SERVER: ${BOOTSTRAP_SERVER:-kafka-broker:29092}
-      OTEL_SERVICE_NAME: "progress_tracker.kafka.operations"
+      OTEL_SERVICE_NAME: "progress_tracker"
     entrypoint:
         - python
         - manage.py
