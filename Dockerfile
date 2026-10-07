@@ -63,19 +63,6 @@ COPY /expedat/movedat /usr/local/bin/
 COPY /expedat/mtping /usr/local/bin/
 
 
-#================
-# load-staging-data
-#================
-FROM postgres:18-alpine AS load-staging-data
-
-WORKDIR /scripts
-
-COPY load-staging-data.sh .
-
-RUN chmod +x load-staging-data.sh
-
-CMD ["./load-staging-data.sh"]
-
 
 #================
 # seaweedfs
