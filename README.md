@@ -3,6 +3,8 @@ Code for prototyping system communication for the ngRadar project. This code is 
 
 
 # How to run locally:
+__Please Note:__ This system does not work unless another trial of ExpeDat is obtained (either a free trial or purchased rights). If you do get access to the ExpeDat executables, an "expedat" directory will need to be added to the project root with all of the downloadable files inside of it.
+
 | File | Purpose |
 | :---: | :---: |
 | `Dockerfile` | Builds the app image: installs Python deps, collects Django static files, runs the dev server |
@@ -64,51 +66,38 @@ The commands below are the most useful to start up this system locally. Please s
 ## Summary of Containers:
 For local dev, we spin up the following Docker containers, which you can see on a GUI using Docker Desktop:  
 
-        1. Kafka Services:
-                - kafka-node-1
-                - kafka-node-2
-                - kafka-node-3
-                - kafka-ui
-                - seaweedfs
-                        - Object store for DDM images
-                - dsoc-volume-init
-                        - Creates necessary Docker volumes
-                - db_consumer
-                        - Kafka consumer to store all events in the database
-                - kafka-init
-                        - Creates necessary Kafka topics
-        2. Website/Database Services:
-                - traefik_http
-                - ngradar_website
-                        - The website
-                - postgres
-                        - PostgreSQL database
-        3. Sim and Metric Services:
-                - expedat_server
-                        - The recipient of ExpeDat streamed data 
-                        - servedat is installed and running here
-                - gbt
-                - vlba-sc
-                - vlba-hn
-                - vlba-nl
-                - vlba-fd
-                - vlba-la
-                - vlba-pt
-                - vlba-kp
-                - vlba-ov
-                - vlba-br
-                - vlba-mk
-                - dsoc
-                - progress_tracker
-                        - Tracks ExpeDat stream progress to display on UI
-                - portainer
-                        - A web-version of Docker Desktop
-                - prometheus
-                        - Scrapes system metrics
-                - grafana
-                        - Compiles and displays system metrics
-                - tempo
-                - otel-collector
-                - postgres_exporter
-                - kafka-exporter
-                - k6
+| Container Name | Description |
+| :---: | :---: |
+| kafka-node-1 | - |
+| kafka-node-2 | - |
+| kafka-node-3 | - |
+| kafka-ui | GUI to see Kafka information (topics, messages, etc.) |
+| seaweedfs | Object store for DDM images |
+| dsoc-volume-init | Creates necessary Docker volumes |
+| db_consumer | Kafka consumer to store all events in the database |
+| kafka-init | Creates necessary Kafka topics |
+| traefik_http | - |
+| ngradar_website | The website |
+| postgres | PostgreSQL database |
+| expedat_server | Recipient of ExpeDat streamed data (servedat is installed and running here) |
+| gbt | Green Bank Telescope simulator |
+| vlba-sc | VLBA Site (St. Croix) |
+| vlba-hn | VLBA Site (Hancock) |
+| vlba-nl | VLBA Site (North Liberty) |
+| vlba-fd | VLBA Site (Fort Davis) |
+| vlba-la | VLBA Site (Los Alamos) |
+| vlba-pt | VLBA Site (Pie Town) |
+| vlba-kp | VLBA Site (Kitt Peak) |
+| vlba-ov | VLBA Site (Owens Valley) |
+| vlba-br | VLBA Site (Brewster) |
+| vlba-mk | VLBA Site (Mauna Kea) |
+| dsoc | DSOC (Domenici Socorro Operations Center) simulator |
+| progress_tracker | Tracks ExpeDat stream progress to display on UI |
+| portainer | A web-version of Docker Desktop |
+| prometheus | Scrapes system metrics |
+| grafana | Compiles and displays system metrics |
+| tempo | - |
+| otel-collector | - |
+| postgres_exporter | - |
+| kafka-exporter | - |
+| k6 | - |
