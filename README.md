@@ -62,19 +62,53 @@ The commands below are the most useful to start up this system locally. Please s
 
 
 ## Summary of Containers:
-For local dev, we have the following services spun up in local Docker containers, which you can see on a GUI using Docker Desktop:  
-- Our website that you can visit via localhost in your preferred browser.  
-- A local postgreSQL database that you can connect to using DBeaver.  
-- When you do a ./control.sh system-up you start the following:     
-    1. Kafka services:   
-            - ZooKeeper  
-            - Kafka broker  
-            - Kafka UI  
-            - Kafka topic initialization
-            - SeaweedFS  
-    2. Sim services:  
-            - E-Transfer daemon  
-            - GBT sim  
-            - VLBA sim  
-            - DSOC sim 
+For local dev, we spin up the following Docker containers, which you can see on a GUI using Docker Desktop:  
 
+        1. Kafka Services:
+                - kafka-node-1
+                - kafka-node-2
+                - kafka-node-3
+                - kafka-ui
+                - seaweedfs
+                        - Object store for DDM images
+                - dsoc-volume-init
+                        - Creates necessary Docker volumes
+                - db_consumer
+                        - Kafka consumer to store all events in the database
+                - kafka-init
+                        - Creates necessary Kafka topics
+        2. Website/Database Services:
+                - traefik_http
+                - ngradar_website
+                        - The website
+                - postgres
+                        - PostgreSQL database
+        3. Sim and Metric Services:
+                - expedat_server
+                        - The recipient of ExpeDat streamed data 
+                        - servedat is installed and running here
+                - gbt
+                - vlba-sc
+                - vlba-hn
+                - vlba-nl
+                - vlba-fd
+                - vlba-la
+                - vlba-pt
+                - vlba-kp
+                - vlba-ov
+                - vlba-br
+                - vlba-mk
+                - dsoc
+                - progress_tracker
+                        - Tracks ExpeDat stream progress to display on UI
+                - portainer
+                        - A web-version of Docker Desktop
+                - prometheus
+                        - Scrapes system metrics
+                - grafana
+                        - Compiles and displays system metrics
+                - tempo
+                - otel-collector
+                - postgres_exporter
+                - kafka-exporter
+                - k6
