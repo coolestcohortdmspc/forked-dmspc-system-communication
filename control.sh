@@ -43,7 +43,7 @@ KAFKA_PROFILES="--profile kafka"
 # the order of these services matter!! learned the hard way..
 KAFKA_SERVICES="kafka-node-1 kafka-node-2 kafka-node-3 kafka-ui seaweedfs dsoc-volume-init db_consumer"
 SIM_SERVICES="expedat_server gbt vlba-sc vlba-hn vlba-nl vlba-fd vlba-la vlba-pt vlba-kp vlba-ov vlba-br vlba-mk dsoc progress_tracker"
-METRIC_SERVICES="portainer prometheus grafana otel-collector postgres_exporter kafka-exporter k6"
+METRIC_SERVICES="portainer prometheus grafana tempo otel-collector postgres_exporter kafka-exporter k6"
 
 PORTAINER_SERVICE="portainer"
 AGENT_SERVICE="portainer_agent"
