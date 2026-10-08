@@ -820,7 +820,7 @@ def upload_seaweedfs(s3, image_key, file_data,):
 
 
 # =============================================================
-# E-TRANSFER PROGRESS
+# EXPEDAT PROGRESS
 # =============================================================
 
 def write_transfer_progress(

@@ -1,4 +1,4 @@
-"""Track incoming e-transfers and notify DSOC when they complete.
+"""Track incoming expedat streams and notify DSOC when they complete.
 
 The db_consumer owns persistence of workflow events.
 """
@@ -151,10 +151,10 @@ def get_transfer_progress(
 
     if total_bytes <= 0:
         with tracer.start_as_current_span(
-            "e-transfer tracking error", context=tracking_context,
+            "expedat stream tracking error", context=tracking_context,
             attributes=span_attributes,
         ):
-            raise ValueError("Expected transfer size must be greater than zero.")
+            raise ValueError("Expected stream size must be greater than zero.")
 
     temp_file = tracked_file.with_name(tracked_file.name + "-sv.tmp")
 
@@ -174,7 +174,7 @@ def get_transfer_progress(
         last_progress_at = time.monotonic()
         percent = min(100.0, current_bytes / total_bytes * 100)
         with tracer.start_as_current_span(
-            "e-transfer progress update", context=tracking_context,
+            "expedat streams progress update", context=tracking_context,
             attributes={
                 **span_attributes,
                 "ngradar.transfer.received_bytes": current_bytes,
@@ -195,9 +195,9 @@ def get_transfer_progress(
                 },
             )
             if delivered is False:
-                raise RuntimeError("Failed to publish e-transfer progress.")
+                raise RuntimeError("Failed to publish expedat stream progress.")
         print(
-            f"Transfer {transfer_uuid} from VLBA-{Stations(vlba_station_id).name}: "
+            f"Stream {transfer_uuid} from VLBA-{Stations(vlba_station_id).name}: "
             f"{percent:.2f}% ({current_bytes}/{total_bytes})"
         )
 
@@ -210,7 +210,7 @@ def get_transfer_progress(
     if current_bytes >= total_bytes:
         elapsed_seconds = time.monotonic() - payload["tracking_started_at"]
         with tracer.start_as_current_span(
-            "e-transfer completed", context=tracking_context,
+            "expedat stream completed", context=tracking_context,
             attributes={
                 **span_attributes,
                 "ngradar.transfer.received_bytes": current_bytes,
@@ -218,7 +218,7 @@ def get_transfer_progress(
                 "ngradar.transfer.elapsed_seconds": elapsed_seconds,
             },
         ):
-            print(f"Transfer of <{tracked_file}> COMPLETE.")
+            print(f"Stream of <{tracked_file}> COMPLETE.")
             send_kafka_message(
                 producer_topic=producer_topic,
                 producer_config=producer_config,
@@ -247,7 +247,7 @@ def get_transfer_progress(
         vlba_station = Stations(vlba_station_id)
         vlba_consumer_group = f"{vlba_station.name.lower()}-consumer-group"
         with tracer.start_as_current_span(
-            "e-transfer stall check", context=tracking_context,
+            "expedat stream stall check", context=tracking_context,
             attributes={**span_attributes, "ngradar.transfer.received_bytes": current_bytes},
         ) as stall_span:
             vlba_alive = consumer_group_has_members(vlba_consumer_group)
@@ -265,10 +265,10 @@ def get_transfer_progress(
 
 
 class Command(BaseCommand):
-    help = "Runs the e-transfer progress tracking simulator"
+    help = "Runs the expedat stream progress tracking simulator"
 
     def handle(self, *args, **options):
-        print("Starting e-transfer progress tracking simulator")
+        print("Starting expedat stream progress tracking simulator")
         provider = TracerProvider(
             sampler=ALWAYS_ON,
             resource=Resource.create({"service.name": "progress_tracker"}),

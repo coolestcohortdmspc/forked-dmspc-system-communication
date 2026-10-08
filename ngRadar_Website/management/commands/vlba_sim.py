@@ -391,7 +391,7 @@ def process_msg(
                             "expedat transfer..."
                         )
 
-                        # with tracer.start_as_current_span("send e-transfer",
+                        # with tracer.start_as_current_span("send expedat stream",
                         #                           attributes={"ngradar.transfer.attempt": attempts + 1,
                         #                                       "ngradar.transfer_uuid": str(transfer_uuid),
                         #                                       "ngradar.transfer.total_bytes": num_bytes}):
@@ -473,7 +473,7 @@ def process_msg(
                             "come back..."
                         )
 
-                    # with tracer.start_as_current_span("wait for e-transfer daemon"):
+                    # with tracer.start_as_current_span("wait for expedat server"):
                         if not wait_for_exp():
                             print(
                                 "Expedat server "

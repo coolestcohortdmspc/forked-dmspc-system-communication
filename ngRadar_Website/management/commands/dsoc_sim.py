@@ -478,13 +478,13 @@ def process_msg(
                     "DSOC has enough storage "
                     "to accept the incoming "
                     "data. Awaiting "
-                    "e-transfer..."
+                    "expedat stream..."
                 )
 
         # =========================================================
         # VLBA -> DSOC
         #
-        # VLBA has started the e-transfer.
+        # VLBA has started the expedat stream.
         # =========================================================
 
         elif incoming_key == Message.PROGRESS_COMPLETE.value:
