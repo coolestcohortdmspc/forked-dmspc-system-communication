@@ -653,7 +653,7 @@ class Command(BaseCommand):
         )
 
         # process_msg can remain blocked while
-        # wait_for_etd() waits for the daemon to
+        # wait_for_exp() waits for the daemon to
         # return.
         #
         # Increase Kafka's allowed poll interval

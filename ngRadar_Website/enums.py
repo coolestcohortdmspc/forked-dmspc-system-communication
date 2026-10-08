@@ -23,7 +23,7 @@ class Status(models.IntegerChoices):
     BLOCKED = 3, "Blocked"              # Won't worry about this status for now, I feel like it would be closely tied to the QUEUED status.
     TRANSFERRING = 4, "Transferring"    # Used when the expedat stream is actively in progress. 
     VERIFYING = 5, "Verifying"          # Will verify the number of bytes received at DSOC matches the expected number of bytes being sent from VLBA. 
-    TRANSFERRED = 6, "Transferred"      # This status would be used when the expedat stream has completed from etc -> etd successfully, will be the status sent by kafka to DSOC to begin DSOC workflow.
+    TRANSFERRED = 6, "Transferred"      # This status would be used when the expedat stream has completed from client to server successfully, will be the status sent by kafka to DSOC to begin DSOC workflow.
     VERIFIED = 7, "Verified"            # This status would be used when the expedat stream has completed successfully and the data has been verified, processed, and stored appropriately.
     FAILED = 8, "Failed"        
     COMPLETED = 9, "Completed"          # This status would be used when the expedat stream has completed successfully and the data has been verified, processed, and stored appropriately.

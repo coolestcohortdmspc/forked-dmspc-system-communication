@@ -41,6 +41,8 @@ from dotenv import load_dotenv
 latency_calc
 config_func
 bootstrap
+get_kafka_producer
+shutdown_kafka_producer
 produce
 consume
 send_kafka_message
@@ -50,11 +52,8 @@ ensure_bucket_exists
 create_presigned_url
 upload_seaweedfs
 write_transfer_progress
-parse_etc_progress
-wait_for_etd
-etc_send
-create_file
-watch_for_file
+wait_for_exp
+expedat_send
 delete_observation_data
 get_folder_size
 """
@@ -70,35 +69,6 @@ EXPEDAT_MAX_CONN_RETRY = 90
 EXPEDAT_RETRY_CONN_DELAY = 10
 
 tracer = trace.get_tracer(f"kafka.producer")
-
-# =============================================================
-# REGEX PATTERNS
-# =============================================================
-
-# Matches progress output from the etc CLI.
-PROGRESS_RE = re.compile(
-    r"\]\s+"
-    r"(?P<percent>\d+(?:\.\d+)?)%\s+"
-    r"(?P<received>\d+(?:\.\d+)?)\s+"
-    r"(?P<received_unit>\S+)\s+/\s+"
-    r"(?P<total>\d+(?:\.\d+)?)\s+"
-    r"(?P<total_unit>\S+)"
-)
-
-# Removes terminal escape sequences such as ESC[K.
-ANSI_RE = re.compile(
-    r"\x1b\[[0-9;]*[A-Za-z]"
-)
-
-EXPEDAT_PROGRESS_RE = re.compile(
-    r"^\s*P\s+"
-    r"\S+\s+\S+\s+"       # date/time
-    r"\S+\s+"             # S
-    r"\S+\s+"             # transfer ID
-    r"(?P<duration>\d+)\s+"
-    r"(?P<received>\d+)\s+"
-    r"(?P<total>\d+)"
-)
 
 # =============================================================
 # GENERAL HELPERS

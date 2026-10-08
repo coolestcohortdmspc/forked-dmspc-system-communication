@@ -840,7 +840,7 @@ services:
 #==========================
 # data transfer containers:
 #==========================
-# a one-shot init service that creates the volume before etd starts
+# a one-shot init service that creates the volume before expedat starts
   dsoc-volume-init:
     container_name: dsoc-volume-init
     image: alpine:3.20
