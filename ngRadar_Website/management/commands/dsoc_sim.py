@@ -476,7 +476,6 @@ def process_msg(
                     retry_count=(retry_count),
                     xmit_station=(Stations.GBT),
                     rcvr_station=(vlba_station),
-
                     message=f"DSOC reponded that it has enough storage. {vlba_station.name} may begin the etransfer.",
                 )
 
