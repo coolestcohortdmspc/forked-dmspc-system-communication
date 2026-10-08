@@ -80,7 +80,7 @@ def get_latest_image_event():
 
 def get_latest_image_events():
     """
-    Return the most recent events with a SeaweedFS image (from 10 vlba etransfers).
+    Return the most recent events with a SeaweedFS image (from 10 vlba ExpeDat transfers).
     """
 
     vlba_stations = [

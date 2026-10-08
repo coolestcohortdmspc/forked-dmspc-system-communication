@@ -240,7 +240,7 @@ def test_process_msg_VLBA_REQUEST_STORAGE(
                 xmit_station=(Stations.GBT),
                 rcvr_station=(Stations.PT),
 
-                message=f"DSOC reponded that it has enough storage. {Stations.PT.name} may begin the etransfer.",
+                message=f"DSOC reponded that it has enough storage. {Stations.PT.name} may begin the ExpeDat transfer.",
             )
 #=====================================================================
 
@@ -319,7 +319,7 @@ def test_process_msg_VLBA_REQUEST_STORAGE_Retry(
                 retry_count=(6),
                 xmit_station=(Stations.GBT),
                 rcvr_station=(Stations.PT),
-                message=f"{Stations.PT.name} requested a storage check at DSOC. DSOC responded that it does not have enough storage and cannot begin the etransfer.",
+                message=f"{Stations.PT.name} requested a storage check at DSOC. DSOC responded that it does not have enough storage and cannot begin the ExpeDat transfer.",
                             )
 
 #=====================================================================
@@ -401,7 +401,7 @@ def test_process_msg_VLBA_REQUEST_STORAGE_Failed(
                 rcvr_station=(Stations.PT),
                 message=(
                             f"{Stations.PT.name} requested a storage check at DSOC. "
-                            f"DSOC responded that it does not have enough storage and cannot begin the etransfer."
+                            f"DSOC responded that it does not have enough storage and cannot begin the ExpeDat transfer."
                             f"Failed after "
                             f"{16} "
                             "storage checks."
