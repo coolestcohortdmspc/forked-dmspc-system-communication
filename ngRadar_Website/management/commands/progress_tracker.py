@@ -38,7 +38,6 @@ def publish_progress(*, producer_config, payload):
         producer_config,
         str(Message.PROGRESS_UPDATE.value),
         json.dumps(payload),
-        station=station,
     )
 
 

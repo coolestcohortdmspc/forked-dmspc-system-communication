@@ -643,7 +643,6 @@ def send_kafka_message(
         producer_config,
         str(message_type.value),
         json.dumps(payload),
-        station,
     )
 
     if not success:
