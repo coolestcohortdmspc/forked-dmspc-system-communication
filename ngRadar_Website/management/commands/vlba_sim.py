@@ -39,9 +39,9 @@ This simulator:
 - Consumes GBT_TX events from Kafka.
 - Generates/stages VLBA observation data.
 - Requests DSOC storage availability.
-- Sends the data to DSOC using e-transfer.
+- Sends the data to DSOC using expedat.
 - Publishes VLBA state changes to Kafka.
-- Does NOT write ObservatoryEvent directly.
+- Does NOT write to ObservatoryEvent directly.
 
 The db_consumer is responsible for consuming these Kafka
 messages and persisting them to ObservatoryEvent.
@@ -55,10 +55,6 @@ FAILURE_REASONS = {
 }
 
 MAX_RESUME_ATTEMPTS = 5
-
-STATION = Stations[os.environ.get("STATION_NAME")]
-tracer = trace.get_tracer(f"{Stations(STATION).name}.kafka.consumer")
-
 
 # def create_traced_file(frame_path, parent_context, attributes):
 #     # Threads do not automatically inherit the active OpenTelemetry context.
@@ -79,6 +75,8 @@ def process_msg(
     producer_topic,
     producer_config,
 ):
+    STATION = Stations[os.environ.get("STATION_NAME")]
+    tracer = trace.get_tracer(f"{Stations(STATION).name}.kafka.consumer")
     carrier = {}
 
     for name, value in (msg.headers() or []):
