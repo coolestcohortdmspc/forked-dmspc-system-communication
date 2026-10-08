@@ -982,7 +982,6 @@ def expedat_send(mvd_filepath):
 
                 # the randomly generated data:
                 buffer = random.randbytes(size)
-
                 process.stdin.write(buffer)
                 process.stdin.flush()
 
