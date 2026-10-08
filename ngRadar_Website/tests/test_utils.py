@@ -39,6 +39,7 @@ with patch("pathlib.Path.read_text", return_value=mock_env_data):
         MAX_BYTES,
         consumer_group_has_members,
         get_kafka_producer,
+        wait_for_exp,
 
     )
 
@@ -1080,4 +1081,31 @@ def test_get_kafka_producer_fail():
         producer = get_kafka_producer(config)
 
     assert exc_info.value.args[0] == "Kafka configuration must be provided for initial setup."
-    # mock_Producer.assert_called_once_with(config)
+
+# ==============================================================================
+# 15. wait_for_exp Test
+# ==============================================================================
+
+@patch.dict(
+    "os.environ",
+    {
+        "SVD_IP": "fake_host",
+        "MVD_LOC": "/fake/directory/",
+    },
+)
+@patch("ngRadar_Website.utils.subprocess.run")
+def test_wait_for_exp(mock_subprocess):
+
+    mock_subprocess.return_value = MagicMock(returncode=0)
+
+    result = wait_for_exp()
+
+    assert result == True
+    mock_subprocess.assert_called_once_with(
+        [
+            "./mtping",
+            "fake_host",
+        ],
+        capture_output=True,
+        cwd="/fake/directory/",
+    )

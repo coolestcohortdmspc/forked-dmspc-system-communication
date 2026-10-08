@@ -269,5 +269,4 @@ def test_publish_db_committed(mock_trace, mock_produce):
                                                 "event_type": "db_committed",
                                                 "data": "payload",
                                             }),
-                                         station="DB_CONSUMER",
                                         )
