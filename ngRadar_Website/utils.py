@@ -341,7 +341,7 @@ def shutdown_kafka_producer():
         _producer_instance = None
 
 
-def produce(topic, config, key, value, station):
+def produce(topic, config, key, value):
     """
     Produce one Kafka message. Synchronously awaits delivery to ensure accurate OpenTelemetry span timings and correct delivery status.
 

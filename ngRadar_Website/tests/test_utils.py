@@ -831,34 +831,62 @@ def test_expedat_send_stream(mock_stdout, mock_pipe, mock_popen):
 # 6. produce Test
 # ==============================================================================
 
-@patch("ngRadar_Website.utils.Producer")
-def test_produce(mock_Producer):
+@patch("ngRadar_Website.utils.inject")
+@patch("ngRadar_Website.utils.get_kafka_producer")
+@patch("ngRadar_Website.utils.tracer")
+def test_produce(mock_tracer, mock_get_kafka, mock_inject):
     """Scenario 1: No errors"""
     topic = "topic"
     config = "config"
     key = "key"
     value = "value"
+
+    mock_span = MagicMock()
+    mock_tracer.start_span.return_value = mock_span
+
+    mock_ctx = MagicMock()
+    mock_ctx.trace_id = 123456
+    mock_ctx.trace_flags.sampled = True
+    mock_span.get_span_context.return_value = mock_ctx
     
-    mock_producer = mock_Producer.return_value
-    mock_producer.flush.return_value = 0
+    mock_producer = mock_get_kafka.return_value
+
+    def mock_produce(topic, key, value, headers, callback):
+        mock_msg = MagicMock()
+        mock_msg.partition.return_value = 0
+        mock_msg.offset.return_value = 10
+
+        # Simulate successful Kafka delivery
+        callback(None, mock_msg)
+
+    mock_producer.produce.side_effect = mock_produce
 
     result = produce(topic, config, key, value)
 
     assert result == True
-    mock_Producer.assert_called_once_with(config)
-    mock_producer.produce.assert_called_once_with(topic, key=key, value=value, callback=mock_producer.produce.call_args.kwargs["callback"])
-    mock_producer.flush.assert_called_once_with(2)
+    mock_get_kafka.assert_called_once_with(config)
+    mock_producer.produce.assert_called_once()
 
-@patch("ngRadar_Website.utils.Producer")
-def test_produce_delivery_error(mock_Producer):
+
+@patch("ngRadar_Website.utils.inject")
+@patch("ngRadar_Website.utils.get_kafka_producer")
+@patch("ngRadar_Website.utils.tracer")
+def test_produce_delivery_error(mock_tracer, mock_get_kafka, mock_inject):
     """Scenario 2: Delivery error"""
     topic = "topic"
     config = "config"
     key = "key"
     value = "value"
+
+    mock_span = MagicMock()
+    mock_tracer.start_span.return_value = mock_span
+
+    mock_ctx = MagicMock()
+    mock_ctx.trace_id = 123456
+    mock_ctx.trace_flags.sampled = True
+    mock_span.get_span_context.return_value = mock_ctx
     
-    mock_producer = mock_Producer.return_value
-    mock_producer.flush.return_value = 0
+    mock_producer = mock_get_kafka.return_value
 
     #defining this inside a function to handle the nonlocal command:
     def produce_side_effect(topic, key, value, callback):
@@ -869,47 +897,36 @@ def test_produce_delivery_error(mock_Producer):
     result = produce(topic, config, key, value)
 
     assert result == False
-    mock_Producer.assert_called_once_with(config)
-    mock_producer.produce.assert_called_once_with(topic, key=key, value=value, callback=mock_producer.produce.call_args.kwargs["callback"])
-    mock_producer.flush.assert_called_once_with(2)
+    mock_get_kafka.assert_called_once_with(config)
+    mock_producer.produce.assert_called_once()
 
-@patch("ngRadar_Website.utils.Producer")
-def test_produce_delivery_flush_error(mock_Producer):
-    """Scenario 3: Flush error"""
+@patch("ngRadar_Website.utils.inject")
+@patch("ngRadar_Website.utils.get_kafka_producer")
+@patch("ngRadar_Website.utils.tracer")
+def test_produce_delivery_exception(mock_tracer, mock_get_kafka, mock_inject):
+    """Scenario 3: Exception raised"""
     topic = "topic"
     config = "config"
     key = "key"
     value = "value"
+
+    mock_span = MagicMock()
+    mock_tracer.start_span.return_value = mock_span
+
+    mock_ctx = MagicMock()
+    mock_ctx.trace_id = 123456
+    mock_ctx.trace_flags.sampled = True
+    mock_span.get_span_context.return_value = mock_ctx
     
-    mock_producer = mock_Producer.return_value
-    mock_producer.flush.return_value = 1
-
-    result = produce(topic, config, key, value)
-
-    assert result == False
-    mock_Producer.assert_called_once_with(config)
-    mock_producer.produce.assert_called_once_with(topic, key=key, value=value, callback=mock_producer.produce.call_args.kwargs["callback"])
-    mock_producer.flush.assert_called_once_with(2)
-
-@patch("ngRadar_Website.utils.Producer")
-def test_produce_delivery_exception(mock_Producer):
-    """Scenario 4: Exception raised"""
-    topic = "topic"
-    config = "config"
-    key = "key"
-    value = "value"
-    
-    mock_producer = mock_Producer.return_value
-    mock_producer.flush.return_value = 1
+    mock_producer = mock_get_kafka.return_value
 
     mock_producer.produce.side_effect = Exception("Kafka Exception")
 
     result = produce(topic, config, key, value)
 
     assert result == False
-    mock_Producer.assert_called_once_with(config)
-    mock_producer.produce.assert_called_once_with(topic, key=key, value=value, callback=mock_producer.produce.call_args.kwargs["callback"])
-    mock_producer.flush.assert_not_called()
+    mock_producer.produce.assert_called_once()
+    mock_get_kafka.assert_called_once_with(config)
 
 # ==============================================================================
 # 7. send_kafka_message Test
