@@ -66,8 +66,8 @@ get_folder_size
 SESSION_TIMEOUT_MS = 10_000
 MAX_BYTES = 8_388_608
 
-ETD_MAX_CONN_RETRY = 90
-ETD_RETRY_CONN_DELAY = 10
+EXPEDAT_MAX_CONN_RETRY = 90
+EXPEDAT_RETRY_CONN_DELAY = 10
 
 tracer = trace.get_tracer(f"kafka.producer")
 

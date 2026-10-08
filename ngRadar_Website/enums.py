@@ -34,9 +34,9 @@ class Status(models.IntegerChoices):
 class Message(models.IntegerChoices):
     VLBA_READY = 1, "VLBA is ready to transfer data."
     VLBA_REQUEST_STORAGE = 2, "VLBA requests DSOC storage check."
-    VLBA_TRANSFERRING = 3, "VLBA notifies DSOC that etransfer has started."
+    VLBA_TRANSFERRING = 3, "VLBA notifies DSOC that expedat stream has started."
     VLBA_DELETE = 4, "DSOC gives VLBA green light to delete raw data."
-    VLBA_FAILED = 5, "VLBA notifies DSOC that etransfer has failed."
+    VLBA_FAILED = 5, "VLBA notifies DSOC that expedat stream has failed."
     DSOC_RESPOND_STORAGE = 6, "DSOC sends result from storage check."
     GBT_TX = 7, "GBT is transmitting."
     UI_EVENT = 8, "Submit Waveform from UI."

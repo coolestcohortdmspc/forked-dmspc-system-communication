@@ -476,7 +476,7 @@ def process_msg(
                     retry_count=(retry_count),
                     xmit_station=(Stations.GBT),
                     rcvr_station=(vlba_station),
-                    message=f"DSOC reponded that it has enough storage. {vlba_station.name} may begin the expedat stream.",
+                    message=f"DSOC responded that it has enough storage. {vlba_station.name} may begin the expedat stream.",
                 )
 
                 print(

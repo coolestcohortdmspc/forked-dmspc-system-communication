@@ -240,7 +240,7 @@ def test_process_msg_VLBA_REQUEST_STORAGE(
                 xmit_station=(Stations.GBT),
                 rcvr_station=(Stations.PT),
 
-                message=f"DSOC responded that it has enough storage. {Stations.PT.name} may begin the ExpeDat transfer.",
+                message=f"DSOC responded that it has enough storage. {Stations.PT.name} may begin the expedat stream.",
             )
 #=====================================================================
 

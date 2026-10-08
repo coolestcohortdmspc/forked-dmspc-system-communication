@@ -66,8 +66,6 @@ services:
       - "127.0.0.1:8080:8080" # Dashboard
       - "5432:5432" # postgres
       - "9092:9092" # kafka broker
-      - "4004:4004" # etransfer command port
-      - "8008:8008/udp" # etransfer data port
       - "8080:8080/udp" # expedat data port 
 
     volumes:
@@ -80,8 +78,6 @@ services:
       - "--entrypoints.websecure.address=:443"
       - "--entrypoints.postgres.address=:5432"
       - "--entrypoints.kafka.address=:9092"
-      - "--entrypoints.etransfer-command.address=:4004"
-      - "--entrypoints.etransfer-data.address=:8008/udp"
       - "--entrypoints.expedat-data.address=:8080/udp"
 
       # Dedicated Prometheus metrics endpoint
@@ -147,9 +143,6 @@ services:
       - "80:80" # website HTTP
       - "127.0.0.1:8080:8080" # dashboard
       - "5432:5432" # postgres
-      # - "9092:9092" # kafka broker
-      - "4004:4004" # etransfer command port
-      - "8008:8008/udp" # etransfer data port
       - "8080:8080/udp" # expedat data port
 
     volumes:
@@ -159,9 +152,6 @@ services:
       # EntryPoints
       - "--entrypoints.web.address=:80"
       - "--entrypoints.postgres.address=:5432"
-      # - "--entrypoints.kafka-1.address=:9092"
-      - "--entrypoints.etransfer-command.address=:4004"
-      - "--entrypoints.etransfer-data.address=:8008/udp"
       - "--entrypoints.expedat-data.address=:8080/udp"
 
       # Dedicated Prometheus metrics endpoint
@@ -848,7 +838,7 @@ services:
 
 
 #==========================
-# etransfer containers:
+# data transfer containers:
 #==========================
 # a one-shot init service that creates the volume before etd starts
   dsoc-volume-init:

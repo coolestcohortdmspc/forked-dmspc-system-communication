@@ -26,9 +26,9 @@ from ngRadar_Website.utils import (
     send_kafka_message,
     expedat_send,
     delete_observation_data,
-    ETD_MAX_CONN_RETRY,
-    ETD_RETRY_CONN_DELAY,
     wait_for_exp,
+    EXPEDAT_MAX_CONN_RETRY,
+    EXPEDAT_RETRY_CONN_DELAY,
 )
 
 """
@@ -464,7 +464,7 @@ def process_msg(
                             )
 
                             span.set_status(
-                                TraceStatus(StatusCode.ERROR, "e-transfer retries exhausted or daemon unavailable"))
+                                TraceStatus(StatusCode.ERROR, "expedat retries exhausted or daemon unavailable"))
                             return False
 
                         print(
@@ -482,7 +482,7 @@ def process_msg(
                             )
 
                             span.set_status(
-                                TraceStatus(StatusCode.ERROR, "e-transfer retries exhausted or daemon unavailable"))
+                                TraceStatus(StatusCode.ERROR, "expedat retries exhausted or daemon unavailable"))
                             return False
 
                         print(
@@ -658,7 +658,7 @@ class Command(BaseCommand):
         #
         # Increase Kafka's allowed poll interval
         # accordingly.
-        consumer_config["max.poll.interval.ms"] = ((ETD_MAX_CONN_RETRY * ETD_RETRY_CONN_DELAY) + 300) * 1000
+        consumer_config["max.poll.interval.ms"] = ((EXPEDAT_MAX_CONN_RETRY * EXPEDAT_RETRY_CONN_DELAY) + 300) * 1000
 
         consume(
             consumer_topic,
