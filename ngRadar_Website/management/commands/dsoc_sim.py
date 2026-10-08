@@ -51,12 +51,7 @@ This simulator:
 - Stores the DDM image in SeaweedFS.
 - Sends DSOC state/workflow events to Kafka.
 
-This simulator does NOT write directly to:
-
-- gbtEvent
-- dsocEvent
-- ETransferEvent
-- ObservatoryEvent
+This simulator does NOT write directly to the database (the ObservatoryEvent table).
 
 The db_consumer is solely responsible for persisting
 Kafka events to ObservatoryEvent.

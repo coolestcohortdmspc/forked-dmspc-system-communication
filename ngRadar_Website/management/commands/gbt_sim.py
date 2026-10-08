@@ -34,12 +34,7 @@ This simulator:
 - Turns the transmitter OFF and then ON with the requested waveform.
 - Sends VLBA state/workflow events via Kafka.
 
-This simulator does NOT write directly to:
-
-- gbtEvent
-- dsocEvent
-- ETransferEvent
-- ObservatoryEvent
+This simulator does NOT write directly to the database (the ObservatoryEvent table).
 
 The db_consumer is solely responsible for persisting
 Kafka events to ObservatoryEvent.
