@@ -4,6 +4,12 @@ Code for prototyping system communication for the ngRadar project. This code is 
 
 # How to run locally:
 __Please Note:__ This system does not work unless another trial of ExpeDat is obtained (either a free trial or purchased rights). If you do get access to the ExpeDat executables, an "expedat" directory will need to be added to the project root with all of the downloadable files inside of it.
+# Note on ExpeDat code:
+When downloading a free trial or licensed version of ExpeDat, make sure to select the correct version for your operating system and hardware:
+For Windows or Linux computers (or virtual machines) using Intel or AMD processors, select the x86-64 version.
+For Linux computers (or virtual machines) using ARM processors, select Linux ARM64 Version
+For Mac Computers, select macOS
+To run, make sure the expedat folder is added to this repository. It needs to be in all lowercase letters to work properly.
 
 | File | Purpose |
 | :---: | :---: |
