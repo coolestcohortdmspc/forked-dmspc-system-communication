@@ -3,6 +3,8 @@ Code for prototyping system communication for the ngRadar project. This code is 
 
 
 # How to run locally:
+__Please Note:__ This system does not work unless another trial of ExpeDat is obtained (either a free trial or purchased rights). If you do get access to the ExpeDat executables, an "expedat" directory will need to be added to the project root with all of the downloadable files inside of it.
+
 | File | Purpose |
 | :---: | :---: |
 | `Dockerfile` | Builds the app image: installs Python deps, collects Django static files, runs the dev server |
@@ -12,70 +14,90 @@ Code for prototyping system communication for the ngRadar project. This code is 
 | `.env` | Environment variables consumed by `/settings.py` (our .env file is never committed to Github - please ask team for the .env file for local dev) |
 
 # Create a Virtual Environment
-# python3 -m venv .venv
+`$python3 -m venv .venv`
 
 # Start the Virtual Environment
-# source .venv/bin/activate
+`$source .venv/bin/activate`
 
 
 ## For your convenience, use the below `control.sh` wrapper controls:
 
-These `control.sh` wrap common operations.
-Run these commands in your terminal to accomplish any of the following:
+`control.sh` wraps common operations.
+The commands below are the most useful to start up this system locally. Please see the control.sh file for the full list of additional commands. Run these commands in your terminal to accomplish any of the following:
 ```
-./control.sh start          # Does a `docker compose up -d`
-                            # ^ if you get an error, make sure your Docker Desktop is open
-                            
-./control.sh rebuild        # Does a `docker compose up -d --build` so it starts + rebuilds image
+./control.sh system-up      # This is all you need to start up the entire system. Starts 
+                            # the Kafka (kafka-up), website/database (start) and sim 
+                            # (sims-up) services.
+                            # This command initiates each Docker container in a specific 
+                            # order to prevent race conditions.
 
-./control.sh system-up      # Starts the Kafka (kafka-up) and sim (sims-up) services within the container, make sure the container is started before running
-                            # This ensures that the containers spin up in the correct order
+./control.sh rebuild        # Requires an input after rebuild; takes a container name to
+                            # specify which container to rebuild. Can give multiple inputs
+                            # separated by a single space.
 
-./control.sh system-down    # Stops both the kafka (kafka-down) and sim (sims-down) services in the correct order; your local dev docker container will still be running
+./control.sh rebuild-all    # Rebuilds all containers. Performs a system-down, deletes all
+                            # Docker volumes, rebuilds all services, and initiates all 
+                            # containers.
 
-./control.sh stop           # Does a `docker-compose down`
+./control.sh hard-reset     # (destructive) Clears database, removes caching, and force 
+                            # recreates all containers.
 
-./control.sh shell          # Does a `docker exec -it ngradar_website_service bash` this allows you to enter the container shell and run commands inside        
-                            # the container if needed
+./control.sh system-down    # Stops all system containers.
 
-./control.sh log            # Does a `docker logs -f ngradar_website_service`
+./control.sh shell          # Brings the user to the website container shell, allowing 
+                            # the user to run commands inside.
 
-./control.sh attach         # Does a `docker attach ngradar_website_service`
+./control.sh testcov        # Calculates unit test coverage and prints the test results in 
+                            # the terminal.
 
-./control.sh hard-reset     # (destructive) removes all containers/images/volumes for this prototype AND rebuilds + starts your docker container from scratch
-
-./control.sh testcov        # Calculates unit test coverage and prints the test results in the terminal
-
-./control.sh droplets-up    # Brings up all Digital Ocean droplets remotely via SSH and more control.sh commands
-
-./control.sh droplets-down  # Brings all droplets back down. Leaves the portainer services running so we can always monitor with the Portainer UI
-
-./control.sh <sim>-up       # When on a droplet, i.e. the dsoc droplet, you can run a dsoc-up to bring up exactly what that droplet needs.
-
-./control.sh portainer-up   # If the dsoc droplet's portainer service fails, start it up with run this command
-
-./control.sh agent-up       # If the gbt or vlba droplet's agent fails, start it up again with this command.
+./control.sh refresh        # Force recreates all containers, retaining cache and Docker
+                            # images.
 ```
 # Commands Within the Control Shell
-python3 manage.py migrate       # Retrieves the latest database migrations and applies them
-python3 manage.py makemigrations       # Creates new database changes
-python3 manage.py createsuperuser       # Allows for a new website user to be created after hard reset or database deletion
+`$python3 manage.py migrate`            # Retrieves the latest database migrations and 
+                                        # applies them.
+
+`$python3 manage.py makemigrations`     # Creates new database changes.
+
+`$python3 manage.py createsuperuser`    # Allows for a new website user to be created 
+                                        # after hard reset or database deletion.
 
 
 ## Summary of Containers:
-For local dev, we have the following services spun up in local Docker containers which you will see using Docker Desktop:  
-- Our website that you can visit via localhost in your preferred browser.  
-- A local postgreSQL database that you can connect to using DBeaver.  
-- When you do a ./control.sh system-up you start the following:     
-    1. Kafka services:   
-            - ZooKeeper  
-            - Kafka broker  
-            - Kafka UI  
-            - Kafka topic initialization
-            - SeaweedFS  
-    2. Sim services:  
-            - E-Transfer daemon  
-            - GBT sim  
-            - VLBA sim  
-            - DSOC sim 
+For local dev, we spin up the following Docker containers, which you can see on a GUI using Docker Desktop:  
 
+| Container Name | Description |
+| :---: | :---: |
+| kafka-node-1 | - |
+| kafka-node-2 | - |
+| kafka-node-3 | - |
+| kafka-ui | GUI to see Kafka information (topics, messages, etc.) |
+| seaweedfs | Object store for DDM images |
+| dsoc-volume-init | Creates necessary Docker volumes |
+| db_consumer | Kafka consumer to store all events in the database |
+| kafka-init | Creates necessary Kafka topics |
+| traefik_http | - |
+| ngradar_website | The website |
+| postgres | PostgreSQL database |
+| expedat_server | Recipient of ExpeDat streamed data (servedat is installed and running here) |
+| gbt | Green Bank Telescope simulator |
+| vlba-sc | VLBA Site (St. Croix) |
+| vlba-hn | VLBA Site (Hancock) |
+| vlba-nl | VLBA Site (North Liberty) |
+| vlba-fd | VLBA Site (Fort Davis) |
+| vlba-la | VLBA Site (Los Alamos) |
+| vlba-pt | VLBA Site (Pie Town) |
+| vlba-kp | VLBA Site (Kitt Peak) |
+| vlba-ov | VLBA Site (Owens Valley) |
+| vlba-br | VLBA Site (Brewster) |
+| vlba-mk | VLBA Site (Mauna Kea) |
+| dsoc | DSOC (Domenici Socorro Operations Center) simulator |
+| progress_tracker | Tracks ExpeDat stream progress to display on UI |
+| portainer | A web-version of Docker Desktop |
+| prometheus | Scrapes system metrics |
+| grafana | Compiles and displays system metrics |
+| tempo | - |
+| otel-collector | - |
+| postgres_exporter | - |
+| kafka-exporter | - |
+| k6 | - |

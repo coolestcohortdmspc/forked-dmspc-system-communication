@@ -228,7 +228,7 @@ def test_process_msg_VLBA_REQUEST_STORAGE(
                 transfer_uuid=(transfer_uuid),
                 gbt_uuid=gbt_uuid,
                 gbt_event_time=str("2026-07-15T12:00:00+00:00"),
-                station=Stations.PT,
+                station=Stations.DSOC,
                 status=Status.READY,
                 object_id=str("fake_object_id"),
                 target=str("fake_target"),
@@ -240,7 +240,7 @@ def test_process_msg_VLBA_REQUEST_STORAGE(
                 xmit_station=(Stations.GBT),
                 rcvr_station=(Stations.PT),
 
-                message=f"DSOC reponded that it has enough storage. {Stations.PT.name} may begin the etransfer.",
+                message=f"DSOC responded that it has enough storage. {Stations.PT.name} may begin the expedat stream.",
             )
 #=====================================================================
 
@@ -319,7 +319,7 @@ def test_process_msg_VLBA_REQUEST_STORAGE_Retry(
                 retry_count=(6),
                 xmit_station=(Stations.GBT),
                 rcvr_station=(Stations.PT),
-                message=f"{Stations.PT.name} requested a storage check at DSOC. DSOC responded that it does not have enough storage and cannot begin the etransfer.",
+                message=f"{Stations.PT.name} requested a storage check at DSOC. DSOC responded that it does not have enough storage and cannot begin the expedat stream.",
                             )
 
 #=====================================================================
@@ -401,7 +401,7 @@ def test_process_msg_VLBA_REQUEST_STORAGE_Failed(
                 rcvr_station=(Stations.PT),
                 message=(
                             f"{Stations.PT.name} requested a storage check at DSOC. "
-                            f"DSOC responded that it does not have enough storage and cannot begin the etransfer."
+                            f"DSOC responded that it does not have enough storage and cannot begin the expedat stream."
                             f"Failed after "
                             f"{16} "
                             "storage checks."

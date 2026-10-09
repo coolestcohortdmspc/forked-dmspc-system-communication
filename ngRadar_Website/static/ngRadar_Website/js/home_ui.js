@@ -146,7 +146,7 @@ function updateVlbaState(event) {
 }
 
 // =========================================================
-// VLBA eTransfer Progress Rows
+// VLBA expedat Progress Rows
 // =========================================================
 
 function createProgressRow(

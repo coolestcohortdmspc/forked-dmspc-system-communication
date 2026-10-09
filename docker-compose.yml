@@ -66,8 +66,6 @@ services:
       - "127.0.0.1:8080:8080" # Dashboard
       - "5432:5432" # postgres
       - "9092:9092" # kafka broker
-      - "4004:4004" # etransfer command port
-      - "8008:8008/udp" # etransfer data port
       - "8080:8080/udp" # expedat data port 
 
     volumes:
@@ -80,8 +78,6 @@ services:
       - "--entrypoints.websecure.address=:443"
       - "--entrypoints.postgres.address=:5432"
       - "--entrypoints.kafka.address=:9092"
-      - "--entrypoints.etransfer-command.address=:4004"
-      - "--entrypoints.etransfer-data.address=:8008/udp"
       - "--entrypoints.expedat-data.address=:8080/udp"
 
       # Dedicated Prometheus metrics endpoint
@@ -147,9 +143,6 @@ services:
       - "80:80" # website HTTP
       - "127.0.0.1:8080:8080" # dashboard
       - "5432:5432" # postgres
-      # - "9092:9092" # kafka broker
-      - "4004:4004" # etransfer command port
-      - "8008:8008/udp" # etransfer data port
       - "8080:8080/udp" # expedat data port
 
     volumes:
@@ -159,9 +152,6 @@ services:
       # EntryPoints
       - "--entrypoints.web.address=:80"
       - "--entrypoints.postgres.address=:5432"
-      # - "--entrypoints.kafka-1.address=:9092"
-      - "--entrypoints.etransfer-command.address=:4004"
-      - "--entrypoints.etransfer-data.address=:8008/udp"
       - "--entrypoints.expedat-data.address=:8080/udp"
 
       # Dedicated Prometheus metrics endpoint
@@ -848,9 +838,9 @@ services:
 
 
 #==========================
-# etransfer containers:
+# data transfer containers:
 #==========================
-# a one-shot init service that creates the volume before etd starts
+# a one-shot init service that creates the volume before expedat starts
   dsoc-volume-init:
     container_name: dsoc-volume-init
     image: alpine:3.20
@@ -865,46 +855,7 @@ services:
         mkdir -p /dsoc/incoming
         chown -R 33:33 /dsoc/incoming
         chmod 775 /dsoc/incoming
-
-  etr_daemon:
-    container_name: etr_daemon
-    build:
-      context: .
-      target: etd
-    profiles: ["kafka"]
-    user: "33:33"   # non root user: www-data
-    # ports:
-    #   - "${PUBLIC_BIND_IP:-127.0.0.1}:4004:4004/tcp"
-    #   - "${PUBLIC_BIND_IP:-127.0.0.1}:8008:8008/udp"
-    depends_on:
-      dsoc-volume-init:
-        condition: service_completed_successfully
-    networks:
-      - ngradar_website_network
-      - proxy
-    volumes:
-      - dsoc_transfer:/dsoc/incoming
-    labels:
-      - "traefik.enable=true"
-      - "traefik.docker.network=proxy"
-
-      # TCP traffic on port 4004
-      - "traefik.tcp.routers.etransfer-command.rule=HostSNI(`*`)"
-      - "traefik.tcp.routers.etransfer-command.entrypoints=etransfer-command"
-      - "traefik.tcp.routers.etransfer-command.service=etransfer-command"
-      - "traefik.tcp.services.etransfer-command.loadbalancer.server.port=4004"
-
-      # UDP/SRT traffic on port 8008
-      - "traefik.udp.routers.etransfer-data.entrypoints=etransfer-data"
-      - "traefik.udp.routers.etransfer-data.service=etransfer-data"
-      - "traefik.udp.services.etransfer-data.loadbalancer.server.port=8008"
-    command:
-      - etd
-      - -f
-      - --command
-      - tcp://:4004
-      - --data
-      - srt://:8008
+        
 
   expedat_server:
     container_name: expedat_server

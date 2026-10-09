@@ -402,7 +402,7 @@ def test_dashboard_view(mock_get_dashboard_context, mock_render):
     output = dashboard_view(request)
 
     assert output == response
-    mock_render.assert_called_once_with(request, "ngRadar_Website/dashboard.html", mock_get_dashboard_context())
+    mock_render.assert_called_once_with(request, "ngRadar_Website/history.html", mock_get_dashboard_context())
 
 
 # ==============================================================================
@@ -425,7 +425,7 @@ def test_event_table_partial(mock_get_dashboard_context, mock_render):
     output = event_table_partial(request)
 
     assert output == response
-    mock_render.assert_called_once_with(request, "ngRadar_Website/partials/dashboard_updates.html", mock_get_dashboard_context.return_value)
+    mock_render.assert_called_once_with(request, "ngRadar_Website/partials/history_updates.html", mock_get_dashboard_context.return_value)
 
 # ==============================================================================
 # 11. get_latest_image_events Test

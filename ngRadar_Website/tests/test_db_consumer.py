@@ -23,8 +23,26 @@ with patch("pathlib.Path.read_text", return_value=mock_env_data):
 @patch("ngRadar_Website.management.commands.db_consumer.record_obs_event")
 @patch("ngRadar_Website.management.commands.db_consumer.publish_db_committed")
 @patch("ngRadar_Website.management.commands.db_consumer.transaction")
-def test_process_msg_db_success(mock_transaction, mock_publish, mock_record):
+@patch("ngRadar_Website.management.commands.db_consumer.trace")
+@patch("ngRadar_Website.management.commands.db_consumer.attach")
+def test_process_msg_db_success(mock_attach, mock_trace, mock_transaction, mock_publish, mock_record):
     """Scenario 1: the 'try' is successful."""
+
+    mock_tracer = MagicMock()
+    mock_trace.get_tracer.return_value = mock_tracer
+
+    mock_span = MagicMock()
+    mock_tracer.start_span.return_value.__enter__.return_value = mock_span
+
+    mock_ctx = MagicMock()
+    mock_trace.set_span_in_context.return_value = mock_ctx
+
+    mock_token = MagicMock()
+    mock_attach.return_value = mock_token
+
+    mock_span.set_attribute.return_value = None
+
+    mock_tracer.start_as_current_span.return_value.__enter__.return_value = True
 
     msg = MagicMock()
 
@@ -64,6 +82,7 @@ def test_process_msg_db_success(mock_transaction, mock_publish, mock_record):
         topic="fake topic",
         producer_config="fake config",
         payload=payload,
+        parent_context=mock_ctx,
     )
 
     assert result is True
@@ -116,6 +135,80 @@ def test_process_msg_db_key_error(mock_transaction, mock_publish, mock_record, c
     captured = capsys.readouterr()
     assert "DB consumer received invalid payload:" in captured.out
 
+#===================================================
+# Test image_created sse produced from db_consumer
+# to DSOC_notif
+#===================================================
+@patch("ngRadar_Website.management.commands.db_consumer." "publish_ui_event")
+@patch("ngRadar_Website.management.commands.db_consumer.record_obs_event")
+@patch("ngRadar_Website.management.commands.db_consumer.publish_db_committed")
+@patch("ngRadar_Website.management.commands.db_consumer.transaction")
+@patch("ngRadar_Website.management.commands.db_consumer.trace")
+@patch("ngRadar_Website.management.commands.db_consumer.attach")
+def test_process_msg_db_success(mock_attach, mock_trace, mock_transaction, mock_publish, mock_record, mock_publish_ui):
+
+    mock_tracer = MagicMock()
+    mock_trace.get_tracer.return_value = mock_tracer
+
+    mock_span = MagicMock()
+    mock_tracer.start_span.return_value.__enter__.return_value = mock_span
+
+    mock_ctx = MagicMock()
+    mock_trace.set_span_in_context.return_value = mock_ctx
+
+    mock_token = MagicMock()
+    mock_attach.return_value = mock_token
+
+    mock_span.set_attribute.return_value = None
+
+    mock_tracer.start_as_current_span.return_value.__enter__.return_value = True
+
+    msg = MagicMock()
+
+    payload = {
+        "event_uuid":
+            "11111111-1111-1111-1111-111111111111",
+        "image_key":
+            "ddm/Moretus/image.png",
+        "rcvr_station":
+            Stations.PT,
+    }
+
+    msg.value.return_value = (json.dumps(payload).encode("utf-8"))
+
+    msg.key.return_value = str(Message.DSOC_RESPOND_STORAGE.value).encode("utf-8")
+
+    msg.topic.return_value = "DSOC_notif"
+
+    mock_event = MagicMock()
+    mock_event.uuid = payload["event_uuid"]
+    mock_event.image_key = payload["image_key"]
+    mock_event.rcvr_station = Stations.PT
+
+    mock_record.return_value = (mock_event, True)
+
+    mock_transaction.on_commit.side_effect = (lambda callback: callback())
+
+    result = process_msg(
+        msg,
+        "DSOC_notif",
+        "fake config",
+    )
+
+    mock_publish_ui.assert_called_once_with(
+        topic="DSOC_notif",
+        producer_config="fake config",
+        parent_context=mock_ctx,
+        event_type=UIEvent.IMAGE_CHANGED,
+        key="11111111-1111-1111-1111-111111111111",
+        data={
+            "event_uuid": "11111111-1111-1111-1111-111111111111",
+            "rcvr_station": Stations.PT,
+        },
+    )
+
+    assert result is True
+
 # ==============================================================================
 # 2. record_obs_event Test
 # ==============================================================================
@@ -157,7 +250,13 @@ def test_record_obs_event(mock_ObservatoryEvent):
 # ==============================================================================
 
 @patch("ngRadar_Website.management.commands.db_consumer.produce")
-def test_publish_db_committed(mock_produce):
+@patch("ngRadar_Website.management.commands.db_consumer.trace")
+def test_publish_db_committed(mock_trace, mock_produce):
+
+    mock_tracer = MagicMock()
+    mock_trace.get_tracer.return_value = mock_tracer
+
+    mock_tracer.start_as_current_span.return_value.__enter__.return_value = MagicMock()
 
     mock_produce.return_value = None
 
@@ -169,60 +268,5 @@ def test_publish_db_committed(mock_produce):
                                          json.dumps({
                                                 "event_type": "db_committed",
                                                 "data": "payload",
-                                            }))
-
-
-
-#===================================================
-# Test image_created sse produced from db_consumer
-# to DSOC_notif
-#===================================================
-@patch("ngRadar_Website.management.commands.db_consumer." "publish_ui_event")
-@patch("ngRadar_Website.management.commands.db_consumer." "record_obs_event")
-@patch("ngRadar_Website.management.commands.db_consumer." "publish_db_committed")
-@patch("ngRadar_Website.management.commands.db_consumer." "transaction")
-def test_process_msg_publishes_image_changed(mock_transaction, mock_publish_db, mock_record, mock_publish_ui):
-    msg = MagicMock()
-
-    payload = {
-        "event_uuid":
-            "11111111-1111-1111-1111-111111111111",
-        "image_key":
-            "ddm/Moretus/image.png",
-        "rcvr_station":
-            Stations.PT,
-    }
-
-    msg.value.return_value = (json.dumps(payload).encode("utf-8"))
-
-    msg.key.return_value = str(Message.DSOC_RESPOND_STORAGE.value).encode("utf-8")
-
-    msg.topic.return_value = "DSOC_notif"
-
-    mock_event = MagicMock()
-    mock_event.uuid = payload["event_uuid"]
-    mock_event.image_key = payload["image_key"]
-    mock_event.rcvr_station = Stations.PT
-
-    mock_record.return_value = (mock_event, True)
-
-    mock_transaction.on_commit.side_effect = (lambda callback: callback())
-
-    result = process_msg(
-        msg,
-        "DSOC_notif",
-        "fake config",
-    )
-
-    mock_publish_ui.assert_called_once_with(
-        topic="DSOC_notif",
-        producer_config="fake config",
-        event_type=UIEvent.IMAGE_CHANGED,
-        key=payload["event_uuid"],
-        data={
-            "event_uuid": payload["event_uuid"],
-            "rcvr_station": Stations.PT,
-        },
-    )
-
-    assert result is True
+                                            }),
+                                        )

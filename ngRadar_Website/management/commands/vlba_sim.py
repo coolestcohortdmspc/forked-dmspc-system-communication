@@ -26,9 +26,9 @@ from ngRadar_Website.utils import (
     send_kafka_message,
     expedat_send,
     delete_observation_data,
-    ETD_MAX_CONN_RETRY,
-    ETD_RETRY_CONN_DELAY,
     wait_for_exp,
+    EXPEDAT_MAX_CONN_RETRY,
+    EXPEDAT_RETRY_CONN_DELAY,
 )
 
 """
@@ -39,9 +39,9 @@ This simulator:
 - Consumes GBT_TX events from Kafka.
 - Generates/stages VLBA observation data.
 - Requests DSOC storage availability.
-- Sends the data to DSOC using e-transfer.
+- Sends the data to DSOC using expedat.
 - Publishes VLBA state changes to Kafka.
-- Does NOT write ObservatoryEvent directly.
+- Does NOT write to ObservatoryEvent directly.
 
 The db_consumer is responsible for consuming these Kafka
 messages and persisting them to ObservatoryEvent.
@@ -55,10 +55,6 @@ FAILURE_REASONS = {
 }
 
 MAX_RESUME_ATTEMPTS = 5
-
-STATION = Stations[os.environ.get("STATION_NAME")]
-tracer = trace.get_tracer(f"{Stations(STATION).name}.kafka.consumer")
-
 
 # def create_traced_file(frame_path, parent_context, attributes):
 #     # Threads do not automatically inherit the active OpenTelemetry context.
@@ -79,6 +75,8 @@ def process_msg(
     producer_topic,
     producer_config,
 ):
+    STATION = Stations[os.environ.get("STATION_NAME")]
+    tracer = trace.get_tracer(f"{Stations(STATION).name}.kafka.consumer")
     carrier = {}
 
     for name, value in (msg.headers() or []):
@@ -215,6 +213,38 @@ def process_msg(
                             "check at DSOC."
                         )
                     )
+
+                print(
+                    "VLBA requesting DSOC "
+                    "check storage..."
+                )
+
+            elif expedat_mode == "stream":
+                num_bytes = int(os.environ["EXPEDAT_STREAM_MB"]) * 1024 * 1024
+                
+                send_kafka_message(
+                    producer_topic=producer_topic,
+                    producer_config=producer_config,
+                    waveform_requester=waveform_requester,
+                    message_type=(Message.VLBA_REQUEST_STORAGE),
+                    transfer_uuid=transfer_uuid,
+                    gbt_uuid=gbt_uuid,
+                    gbt_event_time=gbt_event_time,
+                    station=STATION,
+                    status=Status.QUEUED,
+                    object_id=object_id,
+                    target=target,
+                    tx_waveform=tx_waveform,
+                    rec_waveform=rec_waveform,
+                    num_bytes=num_bytes,
+                    filename=frame_path.name,
+                    xmit_station=Stations.GBT,
+                    rcvr_station=STATION,
+                    message=(
+                        "VLBA requested a storage "
+                        "check at DSOC."
+                    )
+                )
 
                 print(
                     "VLBA requesting DSOC "
@@ -361,7 +391,7 @@ def process_msg(
                             "expedat transfer..."
                         )
 
-                        # with tracer.start_as_current_span("send e-transfer",
+                        # with tracer.start_as_current_span("send expedat stream",
                         #                           attributes={"ngradar.transfer.attempt": attempts + 1,
                         #                                       "ngradar.transfer_uuid": str(transfer_uuid),
                         #                                       "ngradar.transfer.total_bytes": num_bytes}):
@@ -434,7 +464,7 @@ def process_msg(
                             )
 
                             span.set_status(
-                                TraceStatus(StatusCode.ERROR, "e-transfer retries exhausted or daemon unavailable"))
+                                TraceStatus(StatusCode.ERROR, "expedat retries exhausted or daemon unavailable"))
                             return False
 
                         print(
@@ -443,7 +473,7 @@ def process_msg(
                             "come back..."
                         )
 
-                    # with tracer.start_as_current_span("wait for e-transfer daemon"):
+                    # with tracer.start_as_current_span("wait for expedat server"):
                         if not wait_for_exp():
                             print(
                                 "Expedat server "
@@ -452,7 +482,7 @@ def process_msg(
                             )
 
                             span.set_status(
-                                TraceStatus(StatusCode.ERROR, "e-transfer retries exhausted or daemon unavailable"))
+                                TraceStatus(StatusCode.ERROR, "expedat retries exhausted or daemon unavailable"))
                             return False
 
                         print(
@@ -623,12 +653,12 @@ class Command(BaseCommand):
         )
 
         # process_msg can remain blocked while
-        # wait_for_etd() waits for the daemon to
+        # wait_for_exp() waits for the daemon to
         # return.
         #
         # Increase Kafka's allowed poll interval
         # accordingly.
-        consumer_config["max.poll.interval.ms"] = ((ETD_MAX_CONN_RETRY * ETD_RETRY_CONN_DELAY) + 300) * 1000
+        consumer_config["max.poll.interval.ms"] = ((EXPEDAT_MAX_CONN_RETRY * EXPEDAT_RETRY_CONN_DELAY) + 300) * 1000
 
         consume(
             consumer_topic,

@@ -218,7 +218,6 @@ def publish_db_committed(
                 Message.DB_COMMITTED.value
             ),
             json.dumps(notification),
-            station=station,
         )
 
 

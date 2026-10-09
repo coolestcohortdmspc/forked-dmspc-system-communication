@@ -41,6 +41,8 @@ from dotenv import load_dotenv
 latency_calc
 config_func
 bootstrap
+get_kafka_producer
+shutdown_kafka_producer
 produce
 consume
 send_kafka_message
@@ -50,11 +52,8 @@ ensure_bucket_exists
 create_presigned_url
 upload_seaweedfs
 write_transfer_progress
-parse_etc_progress
-wait_for_etd
-etc_send
-create_file
-watch_for_file
+wait_for_exp
+expedat_send
 delete_observation_data
 get_folder_size
 """
@@ -66,39 +65,10 @@ get_folder_size
 SESSION_TIMEOUT_MS = 10_000
 MAX_BYTES = 8_388_608
 
-ETD_MAX_CONN_RETRY = 90
-ETD_RETRY_CONN_DELAY = 10
+EXPEDAT_MAX_CONN_RETRY = 90
+EXPEDAT_RETRY_CONN_DELAY = 10
 
 tracer = trace.get_tracer(f"kafka.producer")
-
-# =============================================================
-# REGEX PATTERNS
-# =============================================================
-
-# Matches progress output from the etc CLI.
-PROGRESS_RE = re.compile(
-    r"\]\s+"
-    r"(?P<percent>\d+(?:\.\d+)?)%\s+"
-    r"(?P<received>\d+(?:\.\d+)?)\s+"
-    r"(?P<received_unit>\S+)\s+/\s+"
-    r"(?P<total>\d+(?:\.\d+)?)\s+"
-    r"(?P<total_unit>\S+)"
-)
-
-# Removes terminal escape sequences such as ESC[K.
-ANSI_RE = re.compile(
-    r"\x1b\[[0-9;]*[A-Za-z]"
-)
-
-EXPEDAT_PROGRESS_RE = re.compile(
-    r"^\s*P\s+"
-    r"\S+\s+\S+\s+"       # date/time
-    r"\S+\s+"             # S
-    r"\S+\s+"             # transfer ID
-    r"(?P<duration>\d+)\s+"
-    r"(?P<received>\d+)\s+"
-    r"(?P<total>\d+)"
-)
 
 # =============================================================
 # GENERAL HELPERS
@@ -341,7 +311,7 @@ def shutdown_kafka_producer():
         _producer_instance = None
 
 
-def produce(topic, config, key, value, station):
+def produce(topic, config, key, value):
     """
     Produce one Kafka message. Synchronously awaits delivery to ensure accurate OpenTelemetry span timings and correct delivery status.
 
@@ -643,7 +613,6 @@ def send_kafka_message(
         producer_config,
         str(message_type.value),
         json.dumps(payload),
-        station,
     )
 
     if not success:
@@ -821,7 +790,7 @@ def upload_seaweedfs(s3, image_key, file_data,):
 
 
 # =============================================================
-# E-TRANSFER PROGRESS
+# EXPEDAT PROGRESS
 # =============================================================
 
 def write_transfer_progress(
@@ -855,97 +824,6 @@ def write_transfer_progress(
 
     os.replace(temp_path, progress_path)
 
-
-# Intercepts etc CLI and parses output:
-# def parse_etc_progress(line, *, expected_num_bytes, transfer_id):
-#     # Remove terminal escape sequences such as ESC[K.
-#     clean_line = ANSI_RE.sub("", line)
-
-#     match = PROGRESS_RE.search(clean_line)
-
-#     if not match:
-#         return
-
-#     percent = float(match.group("percent"))
-
-#     received_bytes = round(
-#         expected_num_bytes * (percent / 100.0)
-#     )
-
-#     if percent >= 100.0:
-#         received_bytes = expected_num_bytes
-
-#     print(
-#         f"Transfer progress: "
-#         f"{received_bytes}/{expected_num_bytes} bytes "
-#         f"({percent:.1f}%)"
-#     )
-
-    # Progress currently also gets measured from
-    # the receiving DSOC side.
-    #
-    # Re-enable this later if etc should become
-    # the authoritative progress source.
-    #
-    # write_transfer_progress(
-    #     received_bytes=received_bytes,
-    #     total_bytes=expected_num_bytes,
-    #     percent=percent,
-    #     transfer_id=transfer_id,
-    # )
-
-# TODO see if we actually need this
-def parse_expedat_progress(line, *, transfer_id):
-    match = EXPEDAT_PROGRESS_RE.search(line)
-
-    if not match:
-        return
-
-    received_bytes = int(match.group("received"))
-    total_bytes = int(match.group("total"))
-
-    if total_bytes:
-        percent = (received_bytes / total_bytes) * 100
-    else:
-        percent = 0.0
-
-    if percent >= 100.0:
-        received_bytes = total_bytes
-        percent = 100.0
-
-    print(
-        f"Transfer progress: "
-        f"{received_bytes}/{total_bytes} bytes "
-        f"({percent:.1f}%)"
-    )
-
-# =============================================================
-# E-TRANSFER CONNECTION / COMMANDS
-# =============================================================
-
-# def wait_for_etd():
-#     """
-#     Wait for the e-transfer daemon to become reachable again.
-
-#     Use only for etransfer!
-
-#     Returns:
-#         True  - daemon responded
-#         False - retry limit exhausted
-#     """
-
-#     result = subprocess.run(
-#         [
-#             "etc",
-#             "--list",
-#             os.environ["ETD_DESTINATION"],
-#             "--max-conn-retry", str(ETD_MAX_CONN_RETRY),
-#             "--retry-conn-delay", str(ETD_RETRY_CONN_DELAY),
-#         ],
-#         capture_output=True,
-#     )
-#     return result.returncode == 0
-
 def wait_for_exp():
     """
     Wait for the expedat server to become reachable again.
@@ -965,116 +843,6 @@ def wait_for_exp():
         capture_output=True,cwd=os.environ["MVD_LOC"],
     )
     return result.returncode == 0
-
-
-# etransfer command to send data from client -> daemon
-# def etc_send(frame_path):
-#     """
-#     Send one raw-data file from VLBA to DSOC using e-transfer.
-
-#     Used only for e-transfer!
-
-#     Uses --resume so an interrupted transfer can continue
-#     using the partially received destination file.
-#     """
-
-#     expected_num_bytes = frame_path.stat().st_size
-#     transfer_id = str(uuid.uuid4())
-#     # Reset progress at the beginning of a new transfer.
-#     # write_transfer_progress(
-#     #     received_bytes=0,
-#     #     total_bytes=expected_num_bytes,
-#     #     percent=0.0,
-#     #     transfer_id=transfer_id,
-#     # )
-
-#     master_fd, receiver_fd = os.openpty()
-
-#     etd_host = os.environ["ETD_HOST"]
-#     etd_command_port = os.environ.get("ETD_COMMAND_PORT", "4004")
-
-#     etd_destination = (
-#         f"tcp://{etd_host}#{etd_command_port}:/dsoc/incoming/"
-#     )
-
-#     os.environ["ETD_DESTINATION"] = etd_destination
-
-#     process = subprocess.Popen(
-#         [
-#             "etc",
-#             str(frame_path),
-#             etd_destination,
-#             "--resume",
-#         ],
-#         stdin=receiver_fd,
-#         stdout=receiver_fd,
-#         stderr=receiver_fd,
-#         close_fds=True,
-#     )
-
-#     os.close(receiver_fd)
-
-#     buffer = ""
-
-#     try:
-#         while process.poll() is None:
-#             readable, _, _ = select.select(
-#                 [master_fd],
-#                 [],
-#                 [],
-#                 0.5,
-#             )
-
-#             if not readable:
-#                 continue
-
-#             try:
-
-#                 terminal_output = os.read(master_fd, 4096).decode(
-#                     "utf-8",
-#                     errors="replace",
-#                 )
-
-#             except OSError:
-#                 break
-
-#             # Print the actual etc output to Docker logs.
-#             print(terminal_output, end="", flush=True)
-
-#             buffer += terminal_output
-
-#             # etc redraws the same terminal line using carriage returns.
-#             parts = re.split(r"[\r\n]", buffer)
-
-#             # Save any incomplete piece for the next chunk.
-#             buffer = parts.pop()
-
-#             for line in parts:
-#                 parse_etc_progress(
-#                     line,
-#                     expected_num_bytes=expected_num_bytes,
-#                     transfer_id=transfer_id,
-#                 )
-
-#         # Process anything left in the buffer.
-#         if buffer:
-#             parse_etc_progress(
-#                 buffer,
-#                 expected_num_bytes=expected_num_bytes,
-#                 transfer_id=transfer_id,
-#             )
-
-#     finally:
-#         os.close(master_fd)
-
-#     return_code = process.wait()
-
-#     if return_code != 0:
-#         raise subprocess.CalledProcessError(
-#             return_code,
-#             process.args,
-#         )
-
 
 def expedat_send(mvd_filepath):
     """
@@ -1177,19 +945,27 @@ def expedat_send(mvd_filepath):
             buffer_size = file_size_bytes // num_buffers
             remainder = file_size_bytes % num_buffers
 
-            for index in range(num_buffers):
-                size = buffer_size + (
-                    1 if index < remainder else 0
-                )
+            with open(mvd_filepath, "wb") as file:
+                for index in range(num_buffers):
+                    size = buffer_size + (
+                        1 if index < remainder else 0
+                    )
 
-                # the randomly generated data:
-                buffer = random.randbytes(size)
+                    # the randomly generated data:
+                    buffer = random.randbytes(size)
+                    process.stdin.write(buffer)
+                    process.stdin.flush()
 
-                process.stdin.write(buffer)
-                process.stdin.flush()
+                    file.write(buffer)
 
-            # No more data is coming.
-            process.stdin.close()
+                # No more data is coming.
+                process.stdin.close()
+
+            print(
+                "Successfully created a "
+                f"{num_mb}MB random binary "
+                f"file at {mvd_filepath}"
+    )
 
             # Read movedat output after sending the data.
             for output in process.stdout:
@@ -1226,76 +1002,6 @@ def expedat_send(mvd_filepath):
 # =============================================================
 # FILE / STORAGE HELPERS
 # =============================================================
-
-# def create_file(
-#     file_path,
-#     file_mb=20,
-# ):
-#     """
-#     Create a random binary file for simulated VLBA data.
-
-#     Used only for e-transfer and expedat transfer mode (?)
-#     """
-
-#     file_size_bytes = (
-#         file_mb
-#         * 1024
-#         * 1024
-#     )
-
-#     num_buffers = 100
-
-#     buffer_size = (file_size_bytes // num_buffers)
-
-#     remainder = (file_size_bytes % num_buffers)
-
-#     with open(file_path, "wb") as file:
-#         for index in range(num_buffers):
-#             size = (buffer_size + (1 if index < remainder else 0))
-
-#             buffer = (random.randbytes(size))
-
-#             file.write(
-#                 buffer
-#             )
-
-#     print(
-#         "Successfully created a "
-#         f"{file_mb}MB random binary "
-#         f"file at {file_path}"
-#     )
-
-
-# def watch_for_file(
-#     file_path,
-# ):
-#     """
-#     Wait until no process has the file open.
-
-#     Should only be used for e-transfer, and for expedat transfer mode (?)
-#     """
-
-#     while True:
-#         result = subprocess.run(
-#             [
-#                 "lsof",
-#                 file_path,
-#             ],
-#             capture_output=True,
-#             text=True,
-#         )
-
-#         output = (
-#             result.stdout
-#         )
-
-#         if output.strip():
-#             print("Output:\n", output)
-#         else:
-#             break
-
-#         time.sleep(1)
-
 
 def delete_observation_data(
     file_name,

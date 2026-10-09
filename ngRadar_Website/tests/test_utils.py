@@ -7,7 +7,6 @@ from pathlib import Path
 from botocore.config import Config
 from botocore.exceptions import (
     EndpointConnectionError,
-    ConnectionError,
     ClientError,
 )
 from confluent_kafka import KafkaError
@@ -28,12 +27,9 @@ with patch("pathlib.Path.read_text", return_value=mock_env_data):
         config_func,
         bootstrap,
         consume,
-        # create_file,
         delete_observation_data,
         create_s3_client,
         ensure_bucket_exists,
-        # etc_send,
-        # watch_for_file,
         expedat_send,
         produce,
         send_kafka_message,
@@ -42,6 +38,8 @@ with patch("pathlib.Path.read_text", return_value=mock_env_data):
         upload_seaweedfs,
         MAX_BYTES,
         consumer_group_has_members,
+        get_kafka_producer,
+        wait_for_exp,
 
     )
 
@@ -488,21 +486,9 @@ def test_consume_partition_error(mock_Consumer, capsys):
     mock_consumer.subscribe.assert_called_once_with("topic")
     assert captured.out.strip() == "Consumer reached partition EOF."
 
-# ==============================================================================
-# X. create_file Test
-# ==============================================================================
-
-# def test_create_file(tmp_path):
-#     file_path = tmp_path / "test.bin"
-
-#     # create_file(file_path, file_mb=1)
-
-#     assert file_path.exists()
-#     assert file_path.stat().st_size == 1 * 1024 * 1024
-
 
 # ==============================================================================
-# X. delete_observation_data Test
+# 5. delete_observation_data Test
 # ==============================================================================
 
 def test_delete_observation_data_exist(tmp_path):
@@ -525,7 +511,9 @@ def test_delete_observation_data_not_exist(capsys, tmp_path):
     captured = capsys.readouterr()
 
     assert captured.out.strip() == f"File {temp_file_name} does not exists"
-# 4. create_s3_client Test
+
+# ==============================================================================
+# 6. create_s3_client Test
 # ==============================================================================
 
 @patch.dict(
@@ -645,7 +633,7 @@ def test_create_s3_client_client_error(mock_Config, mock_ensure_bucket, mock_bot
 
 
 # ==============================================================================
-# 5. ensure_bucket_exists Test
+# 7. ensure_bucket_exists Test
 # ==============================================================================
 
 @patch.dict(
@@ -695,7 +683,7 @@ def test_ensure_bucket_exists_created():
 
 
 # ==============================================================================
-# 5. expedat_send Test
+# 8. expedat_send Test
 # ==============================================================================
 @patch.dict(
     "os.environ",
@@ -799,66 +787,65 @@ def test_expedat_send_stream(mock_stdout, mock_pipe, mock_popen):
 
 
 # ==============================================================================
-# 5. watch_for_file Test
+# 9. produce Test
 # ==============================================================================
 
-# @patch("ngRadar_Website.utils.subprocess.run")
-# @patch("ngRadar_Website.utils.time.sleep")
-# def test_watch_for_file(mock_sleep, mock_subprocess):
-#     file_path = "filepath"
-
-#     first_result = MagicMock()
-#     first_result.stdout = "exists"
-#     second_result = MagicMock()
-#     second_result.stdout = ""
-
-#     mock_subprocess.side_effect = [first_result, second_result]
-
-#     mock_sleep.return_value = None
-
-#     # watch_for_file(file_path)
-
-#     first = mock_subprocess.call_args_list[0]
-#     second = mock_subprocess.call_args_list[1]
-
-#     mock_sleep.assert_called_once()
-#     assert mock_subprocess.call_count == 2
-#     assert first.kwargs["capture_output"] == True
-#     assert second.kwargs["capture_output"] == True
-
-
-# ==============================================================================
-# 6. produce Test
-# ==============================================================================
-
-@patch("ngRadar_Website.utils.Producer")
-def test_produce(mock_Producer):
+@patch("ngRadar_Website.utils.inject")
+@patch("ngRadar_Website.utils.get_kafka_producer")
+@patch("ngRadar_Website.utils.tracer")
+def test_produce(mock_tracer, mock_get_kafka, mock_inject):
     """Scenario 1: No errors"""
     topic = "topic"
     config = "config"
     key = "key"
     value = "value"
+
+    mock_span = MagicMock()
+    mock_tracer.start_span.return_value = mock_span
+
+    mock_ctx = MagicMock()
+    mock_ctx.trace_id = 123456
+    mock_ctx.trace_flags.sampled = True
+    mock_span.get_span_context.return_value = mock_ctx
     
-    mock_producer = mock_Producer.return_value
-    mock_producer.flush.return_value = 0
+    mock_producer = mock_get_kafka.return_value
+
+    def mock_produce(topic, key, value, headers, callback):
+        mock_msg = MagicMock()
+        mock_msg.partition.return_value = 0
+        mock_msg.offset.return_value = 10
+
+        # Simulate successful Kafka delivery
+        callback(None, mock_msg)
+
+    mock_producer.produce.side_effect = mock_produce
 
     result = produce(topic, config, key, value)
 
     assert result == True
-    mock_Producer.assert_called_once_with(config)
-    mock_producer.produce.assert_called_once_with(topic, key=key, value=value, callback=mock_producer.produce.call_args.kwargs["callback"])
-    mock_producer.flush.assert_called_once_with(2)
+    mock_get_kafka.assert_called_once_with(config)
+    mock_producer.produce.assert_called_once()
 
-@patch("ngRadar_Website.utils.Producer")
-def test_produce_delivery_error(mock_Producer):
+
+@patch("ngRadar_Website.utils.inject")
+@patch("ngRadar_Website.utils.get_kafka_producer")
+@patch("ngRadar_Website.utils.tracer")
+def test_produce_delivery_error(mock_tracer, mock_get_kafka, mock_inject):
     """Scenario 2: Delivery error"""
     topic = "topic"
     config = "config"
     key = "key"
     value = "value"
+
+    mock_span = MagicMock()
+    mock_tracer.start_span.return_value = mock_span
+
+    mock_ctx = MagicMock()
+    mock_ctx.trace_id = 123456
+    mock_ctx.trace_flags.sampled = True
+    mock_span.get_span_context.return_value = mock_ctx
     
-    mock_producer = mock_Producer.return_value
-    mock_producer.flush.return_value = 0
+    mock_producer = mock_get_kafka.return_value
 
     #defining this inside a function to handle the nonlocal command:
     def produce_side_effect(topic, key, value, callback):
@@ -869,50 +856,39 @@ def test_produce_delivery_error(mock_Producer):
     result = produce(topic, config, key, value)
 
     assert result == False
-    mock_Producer.assert_called_once_with(config)
-    mock_producer.produce.assert_called_once_with(topic, key=key, value=value, callback=mock_producer.produce.call_args.kwargs["callback"])
-    mock_producer.flush.assert_called_once_with(2)
+    mock_get_kafka.assert_called_once_with(config)
+    mock_producer.produce.assert_called_once()
 
-@patch("ngRadar_Website.utils.Producer")
-def test_produce_delivery_flush_error(mock_Producer):
-    """Scenario 3: Flush error"""
+@patch("ngRadar_Website.utils.inject")
+@patch("ngRadar_Website.utils.get_kafka_producer")
+@patch("ngRadar_Website.utils.tracer")
+def test_produce_delivery_exception(mock_tracer, mock_get_kafka, mock_inject):
+    """Scenario 3: Exception raised"""
     topic = "topic"
     config = "config"
     key = "key"
     value = "value"
+
+    mock_span = MagicMock()
+    mock_tracer.start_span.return_value = mock_span
+
+    mock_ctx = MagicMock()
+    mock_ctx.trace_id = 123456
+    mock_ctx.trace_flags.sampled = True
+    mock_span.get_span_context.return_value = mock_ctx
     
-    mock_producer = mock_Producer.return_value
-    mock_producer.flush.return_value = 1
-
-    result = produce(topic, config, key, value)
-
-    assert result == False
-    mock_Producer.assert_called_once_with(config)
-    mock_producer.produce.assert_called_once_with(topic, key=key, value=value, callback=mock_producer.produce.call_args.kwargs["callback"])
-    mock_producer.flush.assert_called_once_with(2)
-
-@patch("ngRadar_Website.utils.Producer")
-def test_produce_delivery_exception(mock_Producer):
-    """Scenario 4: Exception raised"""
-    topic = "topic"
-    config = "config"
-    key = "key"
-    value = "value"
-    
-    mock_producer = mock_Producer.return_value
-    mock_producer.flush.return_value = 1
+    mock_producer = mock_get_kafka.return_value
 
     mock_producer.produce.side_effect = Exception("Kafka Exception")
 
     result = produce(topic, config, key, value)
 
     assert result == False
-    mock_Producer.assert_called_once_with(config)
-    mock_producer.produce.assert_called_once_with(topic, key=key, value=value, callback=mock_producer.produce.call_args.kwargs["callback"])
-    mock_producer.flush.assert_not_called()
+    mock_producer.produce.assert_called_once()
+    mock_get_kafka.assert_called_once_with(config)
 
 # ==============================================================================
-# 7. send_kafka_message Test
+# 10. send_kafka_message Test
 # ==============================================================================
 
 @patch("ngRadar_Website.utils.produce")
@@ -958,7 +934,7 @@ def test_send_kafka_message(mock_uuid, mock_datetime, mock_produce):
 
 
 # ==============================================================================
-# 9. get_folder_size Test
+# 11. get_folder_size Test
 # ==============================================================================
 
 def test_get_folder_size(tmp_path):
@@ -993,7 +969,7 @@ def test_get_folder_size_FileNotFoundError(tmp_path):
 
 
 # ==============================================================================
-# 10. write_transfer_progress Test
+# 12. write_transfer_progress Test
 # ==============================================================================
 
 @patch("ngRadar_Website.utils.open")
@@ -1046,7 +1022,7 @@ def test_write_transfer_progress(
     )
 
 # ==============================================================================
-# 11. consumer_group_has_members Test
+# 13. consumer_group_has_members Test
 # ==============================================================================
 
 @patch.dict(
@@ -1072,3 +1048,64 @@ def test_consumer_group_has_members(mock_adminclient):
     result = consumer_group_has_members(group_id)
 
     assert result == True
+
+
+# ==============================================================================
+# 14. get_kafka_producer Test
+# ==============================================================================
+
+@patch("ngRadar_Website.utils.Producer")
+@patch("ngRadar_Website.utils.atexit")
+def test_get_kafka_producer(mock_atexit, mock_Producer):
+    """Scenario 1: Success"""
+
+    mock_atexit.register.return_value = None
+
+    mock_producer_instance = MagicMock()
+    mock_Producer.return_value = mock_producer_instance
+
+    config = {"bootstrap.servers": "fake_server"}
+
+    producer = get_kafka_producer(config)
+
+    assert producer == mock_producer_instance
+    mock_Producer.assert_called_once_with(config)
+
+@patch("ngRadar_Website.utils._producer_instance", None)
+def test_get_kafka_producer_fail():
+    """Scenario 2: No config provided"""
+
+    config = None
+
+    with pytest.raises(ValueError) as exc_info:
+        producer = get_kafka_producer(config)
+
+    assert exc_info.value.args[0] == "Kafka configuration must be provided for initial setup."
+
+# ==============================================================================
+# 15. wait_for_exp Test
+# ==============================================================================
+
+@patch.dict(
+    "os.environ",
+    {
+        "SVD_IP": "fake_host",
+        "MVD_LOC": "/fake/directory/",
+    },
+)
+@patch("ngRadar_Website.utils.subprocess.run")
+def test_wait_for_exp(mock_subprocess):
+
+    mock_subprocess.return_value = MagicMock(returncode=0)
+
+    result = wait_for_exp()
+
+    assert result == True
+    mock_subprocess.assert_called_once_with(
+        [
+            "./mtping",
+            "fake_host",
+        ],
+        capture_output=True,
+        cwd="/fake/directory/",
+    )
