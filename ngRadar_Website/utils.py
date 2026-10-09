@@ -945,18 +945,27 @@ def expedat_send(mvd_filepath):
             buffer_size = file_size_bytes // num_buffers
             remainder = file_size_bytes % num_buffers
 
-            for index in range(num_buffers):
-                size = buffer_size + (
-                    1 if index < remainder else 0
-                )
+            with open(mvd_filepath, "wb") as file:
+                for index in range(num_buffers):
+                    size = buffer_size + (
+                        1 if index < remainder else 0
+                    )
 
-                # the randomly generated data:
-                buffer = random.randbytes(size)
-                process.stdin.write(buffer)
-                process.stdin.flush()
+                    # the randomly generated data:
+                    buffer = random.randbytes(size)
+                    process.stdin.write(buffer)
+                    process.stdin.flush()
 
-            # No more data is coming.
-            process.stdin.close()
+                    file.write(buffer)
+
+                # No more data is coming.
+                process.stdin.close()
+
+            print(
+                "Successfully created a "
+                f"{num_mb}MB random binary "
+                f"file at {mvd_filepath}"
+    )
 
             # Read movedat output after sending the data.
             for output in process.stdout:

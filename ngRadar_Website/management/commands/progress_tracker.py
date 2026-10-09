@@ -207,7 +207,7 @@ def get_transfer_progress(
     # Transfer complete.
     # -----------------------------------------------------
 
-    if current_bytes >= total_bytes:
+    if current_bytes >= total_bytes and tracked_file.exists():
         elapsed_seconds = time.monotonic() - payload["tracking_started_at"]
         with tracer.start_as_current_span(
             "expedat stream completed", context=tracking_context,
