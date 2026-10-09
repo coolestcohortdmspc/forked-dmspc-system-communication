@@ -9,7 +9,19 @@ When downloading a free trial or licensed version of ExpeDat, make sure to selec
 For Windows or Linux computers (or virtual machines) using Intel or AMD processors, select the x86-64 version.
 For Linux computers (or virtual machines) using ARM processors, select Linux ARM64 Version
 For Mac Computers, select macOS
-To run, make sure the expedat folder is added to this repository. It needs to be in all lowercase letters to work properly.
+To run, make sure the expedat folder is named in all lowercase letters.
+Open the expedat folder and within it there are 4 sub-folders.
+Delete the folders named "Web" and "Documentation", they are not needed.
+Within the "Client Files" folder, copy the "movedat" file into the outer expedat folder, then delete the "Client Files" folder
+Within the "Server Files" folder, copy the "mtping" and "servedat" files into the outer expedat folder, then delete the "Server Files" folder
+Lastly, within the expedat folder, there should be only 3 files - movedat, mtping, and servedat
+
+
+
+
+
+added to this repository. It needs to be in all lowercase letters to work properly.
+
 
 | File | Purpose |
 | :---: | :---: |
