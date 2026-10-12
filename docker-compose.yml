@@ -20,8 +20,6 @@ services:
     security_opt:
       - no-new-privileges:true
     ports:
-      # - "9000:9000"
-      # - "9443:9443"
       - "127.0.0.1:9000:9000"
       - "127.0.0.1:9443:9443"
     volumes:
@@ -34,9 +32,6 @@ services:
     container_name: portainer_agent
     security_opt:
       - no-new-privileges:true
-    # environment:
-    #   # Optional: Restrict agent access to your Portainer Server IP for security
-    #   - AGENT_SECRET=your_optional_secret_key
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /var/lib/docker/volumes:/var/lib/docker/volumes
@@ -94,7 +89,6 @@ services:
       - "--providers.docker.network=proxy"
 
       # Let's Encrypt / ACME
-      # - "--certificatesresolvers.le.acme.email=${COHORT_EMAIL}"
       - "--certificatesresolvers.le.acme.storage=/letsencrypt/acme.json" 
       - "--certificatesresolvers.le.acme.httpchallenge=true"
       - "--certificatesresolvers.le.acme.httpchallenge.entrypoint=web"
@@ -199,8 +193,6 @@ services:
           condition: service_healthy
     volumes:
       - .:/service
-    # ports:
-    #   - 8000:8000
     networks:
       ngradar_website_network:
         aliases:
@@ -238,9 +230,6 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql
       - ./postgres/init:/docker-entrypoint-initdb.d
-    # ports:
-    #   # - ${WEBSITE_DOMAIN}:5432:5432
-    #   - "${PUBLIC_BIND_IP:-127.0.0.1}:5432:5432"
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
@@ -279,9 +268,6 @@ services:
   kafka-init:
     container_name: kafka-init
     image: confluentinc/cp-kafka:7.5.1
-    # depends_on:
-    #   kafka-node-1:
-    #     condition: service_healthy
     profiles: ["kafka"]
     environment:
       - KAFKA_BOOTSTRAP_SERVERS=${KAFKA_BOOTSTRAP_SERVERS}
@@ -339,12 +325,10 @@ services:
 
   kafka-node-1:
     container_name: kafka-node-1
-    hostname: ${KAFKA_EXTERNAL_HOST:-kafka-node-1} # default localhost?
+    hostname: ${KAFKA_EXTERNAL_HOST:-kafka-node-1} 
     user: "0:0"
     image: apache/kafka:4.1.2
     profiles: ["kafka"]
-    # depends_on:
-    #   - zookeeper
     ports:
       - "9091:9091"
       - "19092:19092"
@@ -378,38 +362,14 @@ services:
         -javaagent:/opt/jmx-exporter/jmx_prometheus_javaagent-1.6.0.jar=7071:/opt/jmx-exporter/kafka.yml
     networks:
       - ngradar_website_network
-      # - proxy
-    # labels:
-    #   - "traefik.enable=true"
-    #   - "traefik.docker.network=proxy"
-
-    #   - "traefik.tcp.routers.kafka.rule=HostSNI(`*`)"
-    #   - "traefik.tcp.routers.kafka.entrypoints=kafka"
-    #   - "traefik.tcp.routers.kafka.service=kafka"
-
-    #   # Kafka's internal container port
-    #   - "traefik.tcp.services.kafka.loadbalancer.server.port=9092"
-    # healthcheck:
-    #   test:
-    #     [
-    #       "CMD-SHELL",
-    #       "KAFKA_OPTS='' kafka-topics --bootstrap-server ${KAFKA_EXTERNAL_HOST:-kafka-node-1}:9091 --list >/dev/null 2>&1",
-    #     ]
-    #   interval: 5s
-    #   timeout: 5s
-    #   retries: 20
-    #   start_period: 15s
-
 
 
   kafka-node-2:
     container_name: kafka-node-2
-    hostname: ${KAFKA_EXTERNAL_HOST:-kafka-node-2} # default localhost?
+    hostname: ${KAFKA_EXTERNAL_HOST:-kafka-node-2} 
     user: "0:0"
     image: apache/kafka:4.1.2
     profiles: ["kafka"]
-    # depends_on:
-    #   - zookeeper
     ports:
       - "9092:9092"
       - "29092:29092"
@@ -443,38 +403,14 @@ services:
         -javaagent:/opt/jmx-exporter/jmx_prometheus_javaagent-1.6.0.jar=7071:/opt/jmx-exporter/kafka.yml
     networks:
       - ngradar_website_network
-      # - proxy
-    # labels:
-    #   - "traefik.enable=true"
-    #   - "traefik.docker.network=proxy"
-
-    #   - "traefik.tcp.routers.kafka.rule=HostSNI(`*`)"
-    #   - "traefik.tcp.routers.kafka.entrypoints=kafka"
-    #   - "traefik.tcp.routers.kafka.service=kafka"
-
-    #   # Kafka's internal container port
-    #   - "traefik.tcp.services.kafka.loadbalancer.server.port=9092"
-    # healthcheck:
-    #   test:
-    #     [
-    #       "CMD-SHELL",
-    #       "KAFKA_OPTS='' kafka-topics --bootstrap-server ${KAFKA_EXTERNAL_HOST:-kafka-node-2}:9092 --list >/dev/null 2>&1",
-    #     ]
-    #   interval: 5s
-    #   timeout: 5s
-    #   retries: 20
-    #   start_period: 15s
-
 
 
   kafka-node-3:
     container_name: kafka-node-3
-    hostname: ${KAFKA_EXTERNAL_HOST:-kafka-node-3} # default localhost?
+    hostname: ${KAFKA_EXTERNAL_HOST:-kafka-node-3} 
     user: "0:0"
     image: apache/kafka:4.1.2
     profiles: ["kafka"]
-    # depends_on:
-    #   - zookeeper
     ports:
       - "9093:9093"
       - "39092:39092"
@@ -508,29 +444,6 @@ services:
         -javaagent:/opt/jmx-exporter/jmx_prometheus_javaagent-1.6.0.jar=7071:/opt/jmx-exporter/kafka.yml
     networks:
       - ngradar_website_network
-      # - proxy
-    # labels:
-    #   - "traefik.enable=true"
-    #   - "traefik.docker.network=proxy"
-
-    #   - "traefik.tcp.routers.kafka.rule=HostSNI(`*`)"
-    #   - "traefik.tcp.routers.kafka.entrypoints=kafka"
-    #   - "traefik.tcp.routers.kafka.service=kafka"
-
-    #   # Kafka's internal container port
-    #   - "traefik.tcp.services.kafka.loadbalancer.server.port=9092"
-    # healthcheck:
-    #   test:
-    #     [
-    #       "CMD-SHELL",
-    #       "KAFKA_OPTS='' kafka-topics --bootstrap-server ${KAFKA_EXTERNAL_HOST:-kafka-node-3}:9093 --list >/dev/null 2>&1",
-    #     ]
-    #   interval: 5s
-    #   timeout: 5s
-    #   retries: 20
-    #   start_period: 15s
-    
-
 
   kafka-ui:
     container_name: kafka-ui
@@ -561,13 +474,6 @@ services:
       target: base
     env_file:
       - .env
-    # depends_on:
-    #   postgres:
-    #     condition: service_healthy
-    #   kafka-broker:
-    #     condition: service_healthy
-    #   kafka-init:
-    #     condition: service_completed_successfully
     volumes:
       - .:/service
     networks:
@@ -594,8 +500,6 @@ services:
         condition: service_completed_successfully
       postgres:
         condition: service_healthy
-      # kafka-node-1:
-      #   condition: service_healthy
       kafka-init:
         condition: service_completed_successfully
       seaweedfs:
@@ -634,8 +538,7 @@ services:
     profiles: ["kafka"]
     restart: unless-stopped
     environment:
-      # BOOTSTRAP_SERVER: kafka-broker:29092
-      BOOTSTRAP_SERVER: ${BOOTSTRAP_SERVER:-kafka-broker:29092}
+      BOOTSTRAP_SERVER: ${KAFKA_BOOTSTRAP_SERVERS}
       OTEL_SERVICE_NAME: "progress_tracker"
     entrypoint:
         - python
@@ -795,10 +698,6 @@ services:
       DATABASE_URL: ${DATABASE_URL}
       WEED_S3_ACCESS_KEY: ${WEED_S3_ACCESS_KEY}
       WEED_S3_SECRET_KEY: ${WEED_S3_SECRET_KEY}
-    # ports:
-    #   - "8333:8333" # SeaweedFS S3 gateway (ngrok exposes this during demos for our cloud-hosted website to retrieve images)
-    #   - "8888:8888"
-    #   - "9333:9333"
     volumes:
       - seaweed_data:/data
     depends_on:
@@ -818,23 +717,6 @@ services:
       - "traefik.http.routers.seaweedfs.tls=${TLS:-false}" #false when local, true on droplet
       - "${SEAWEEDFS_CERTRESOLVER}" # reads dummy label when local, and certificate resolver when deployed on droplets with HTTPS
       - "traefik.http.services.seaweedfs.loadbalancer.server.port=8333"
-
-
-
-# Commenting this out because we never use this, but keeping it in case we want to? 
-# You can also visit the filer port of the seaweedfs container and view the filer there too.
-  # storage-ui:
-  #   image: mastertinner/s3manager:latest
-  #   platform: linux/amd64
-  #   ports:
-  #     - "${GUI_PORT:-3000}:8080" 
-  #   environment:
-  #     - ACCESS_KEY_ID=${WEED_S3_ACCESS_KEY:-anykey}
-  #     - SECRET_ACCESS_KEY=${WEED_S3_SECRET_KEY:-anysecret}
-  #     - ENDPOINT=seaweedfs:8333 
-  #     - USE_SSL=false
-  #   networks:
-  #     - ngradar_website_network
 
 
 #==========================
@@ -999,9 +881,6 @@ services:
       - "--kafka.server=kafka-node-1:19092"
       - "--topic.exclude=^__.*"
       - "--refresh.metadata=15s"
-    # depends_on:
-    #   kafka-node-1:
-    #     condition: service_healthy
     networks:
       - ngradar_website_network
 
