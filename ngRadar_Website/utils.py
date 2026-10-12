@@ -166,8 +166,6 @@ def config_func(
 
         producer_config = {
             "bootstrap.servers": (bootstrap_server),
-            # "message.max.bytes": (MAX_BYTES),
-            # "message.timeout.ms": 2000,
             "client.id": (
                 f"{sim.name.lower()}"
                 "-producer"
@@ -222,8 +220,6 @@ def config_func(
 
     consumer_config = {
         "bootstrap.servers": (bootstrap_server),
-        # "fetch.max.bytes": (MAX_BYTES),
-        # "session.timeout.ms": (SESSION_TIMEOUT_MS),
         "client.id": (
             f"{sim.name.lower()}"
             "-consumer"
@@ -246,7 +242,7 @@ def config_func(
         "metadata.max.age.ms": 300000,
 
         "enable.auto.commit": False,
-    } # TODO make sure this works
+    } 
 
     return (
         producer_topic,

@@ -2,19 +2,11 @@ from unittest.mock import patch, MagicMock
 from ngRadar_Website.models.models import ObservatoryEvent
 from ngRadar_Website.enums import Message, Stations, UIEvent
 import json
-
-# ==============================================================================
-# IMPORTANT:
-# Because we read "ngrok_endpoint.env" on import, we need to patch the Path globally
-# before importing all the functions we want to test.
-# ==============================================================================
-mock_env_data = "BOOTSTRAP_SERVER=localhost:9092\nSOME_OTHER_VAR=value" 
-with patch("pathlib.Path.read_text", return_value=mock_env_data):
-    from ngRadar_Website.management.commands.db_consumer import (
-        process_msg,
-        record_obs_event,
-        publish_db_committed,
-    )
+from ngRadar_Website.management.commands.db_consumer import (
+    process_msg,
+    record_obs_event,
+    publish_db_committed,
+)
 
 # ==============================================================================
 # 1. process_msg Test

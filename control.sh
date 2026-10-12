@@ -384,7 +384,7 @@ droplets-checkout)
     echo "To run test coverage on this branch, run:"
     echo "./control.sh testcov"
     echo
-    echo "To control all droplets from a remote device, use the following commands:"
+    echo "If deploying on a Digital Ocean droplet, control all droplets from a remote device using the following commands:"
     echo "./control.sh droplets-up"
     echo "./control.sh droplets-down"
     echo

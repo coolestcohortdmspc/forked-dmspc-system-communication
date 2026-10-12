@@ -5,24 +5,14 @@ import uuid
 from pathlib import Path
 import subprocess
 import json
-
+from ngRadar_Website.management.commands.vlba_sim import (
+    process_msg,
+    MAX_RESUME_ATTEMPTS,
+)
 
 # =============================================
 # TEST THE STANDALONE FUNCTIONS FROM DSOC_SIM
 # =============================================
-
-# ==============================================================================
-# IMPORTANT:
-# Because we read "ngrok_endpoint.env" on import, we need to patch the Path globally
-# before importing all the functions we want to test.
-# ==============================================================================
-mock_env_data = "BOOTSTRAP_SERVER=localhost:9092\nSOME_OTHER_VAR=value"
-with patch("pathlib.Path.read_text", return_value=mock_env_data):
-    from ngRadar_Website.management.commands.vlba_sim import (
-        process_msg,
-        MAX_RESUME_ATTEMPTS,
-    )
-
 
 # ==============================================================================
 # 1. process_msg Tests

@@ -10,38 +10,29 @@ from botocore.exceptions import (
     ClientError,
 )
 from confluent_kafka import KafkaError
+from ngRadar_Website.utils import (
+    latency_calc,
+    config_func,
+    bootstrap,
+    consume,
+    delete_observation_data,
+    create_s3_client,
+    ensure_bucket_exists,
+    expedat_send,
+    produce,
+    send_kafka_message,
+    get_folder_size,
+    write_transfer_progress,
+    upload_seaweedfs,
+    MAX_BYTES,
+    consumer_group_has_members,
+    get_kafka_producer,
+    wait_for_exp,
+)
 
 # ===============================================
 # Here we can test all of our utility functions
 # ===============================================
-
-# ==============================================================================
-# IMPORTANT:
-# Because we read "ngrok_endpoint.env" on import, we need to patch the Path globally
-# before importing all the functions we want to test.
-# ==============================================================================
-mock_env_data = "BOOTSTRAP_SERVER=localhost:9092\nSOME_OTHER_VAR=value" 
-with patch("pathlib.Path.read_text", return_value=mock_env_data):
-    from ngRadar_Website.utils import (
-        latency_calc,
-        config_func,
-        bootstrap,
-        consume,
-        delete_observation_data,
-        create_s3_client,
-        ensure_bucket_exists,
-        expedat_send,
-        produce,
-        send_kafka_message,
-        get_folder_size,
-        write_transfer_progress,
-        upload_seaweedfs,
-        MAX_BYTES,
-        consumer_group_has_members,
-        get_kafka_producer,
-        wait_for_exp,
-
-    )
 
 # ==============================================================================
 # 1. latency_calc
