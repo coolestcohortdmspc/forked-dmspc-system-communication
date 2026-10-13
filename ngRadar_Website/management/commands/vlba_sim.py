@@ -480,23 +480,23 @@ def process_msg(
                             "come back..."
                         )
 
-                    # with tracer.start_as_current_span("wait for expedat server"):
-                        if not wait_for_exp():
+                        with tracer.start_as_current_span("wait for expedat server"):
+                            if not wait_for_exp():
+                                print(
+                                    "Expedat server "
+                                    "never came back. "
+                                    "Giving up."
+                                )
+
+                                span.set_status(
+                                    TraceStatus(StatusCode.ERROR, "expedat retries exhausted or daemon unavailable"))
+                                return False
+
                             print(
-                                "Expedat server "
-                                "never came back. "
-                                "Giving up."
+                                "Expedat server is "
+                                "back. Resuming the "
+                                "transfer..."
                             )
-
-                            span.set_status(
-                                TraceStatus(StatusCode.ERROR, "expedat retries exhausted or daemon unavailable"))
-                            return False
-
-                        print(
-                            "Expedat server is "
-                            "back. Resuming the "
-                            "transfer..."
-                        )
 
                     # =============================================
                     # Unexpected transfer failure

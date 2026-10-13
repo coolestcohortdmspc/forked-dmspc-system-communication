@@ -682,7 +682,7 @@ def test_ensure_bucket_exists_created():
         "SVD_PASSWORD": "fake_password",
         "SVD_IP": "fake_host",
         "SVD_USER": "fake_username",
-        "RECIPIENT_DIR": "/fake/directory/",
+        "RECIPIENT_DIR": "/fake/directory",
         "MVD_LOC": "/fake/movedat/directory/",
         "MVD_FILEPATH": "/fake/file.png",
         "EXPEDAT_MODE": "transfer",

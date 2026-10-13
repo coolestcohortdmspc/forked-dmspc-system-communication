@@ -1,3 +1,6 @@
+import os
+os.environ["STATION_NAME"] = "PT"
+
 from unittest.mock import patch, MagicMock, call
 from ngRadar_Website.enums import Stations, Status, Message
 from datetime import datetime, timezone
@@ -18,14 +21,15 @@ from ngRadar_Website.management.commands.vlba_sim import (
 # 1. process_msg Tests
 # ==============================================================================
 
-"""Scenario 1: GBT_TX incoming message. Clean run, no failure cases."""
+"""Scenario 1a: GBT_TX incoming message. Clean run, no failure cases. Streaming mode."""
 #=====================================================================
 
 @patch.dict(
     "os.environ",
     {
         "STATION_NAME": "PT",
-        "EXPEDAT_MODE": "fake_mode",
+        "EXPEDAT_MODE": "stream",
+        "EXPEDAT_STREAM_MB": "10",
     },
 )
 @patch("ngRadar_Website.management.commands.vlba_sim.Path")
@@ -61,6 +65,7 @@ def test_process_msg_GBT_TX(
 
     producer_topic = MagicMock()
     producer_config = MagicMock()
+    num_bytes = 10 * 1024 * 1024  # 10 MB
 
     mock_uuid.return_value = "12345"
 
@@ -71,7 +76,6 @@ def test_process_msg_GBT_TX(
     mock_raw_data_path.__truediv__.return_value = mock_frame_path
 
     mock_frame_path.is_file.return_value = True
-    mock_frame_path.stat.return_value.st_size = 500
 
     process_msg(msg, producer_topic, producer_config)
 
@@ -90,7 +94,101 @@ def test_process_msg_GBT_TX(
         target="Moretus",
         tx_waveform="SineWave",
         rec_waveform="SineWave",
-        num_bytes=500,
+        num_bytes=num_bytes,
+        filename=mock_frame_path.name,
+        xmit_station=Stations.GBT,
+        rcvr_station=Stations.PT,
+        message=(
+            "VLBA requested a storage "
+            "check at DSOC."
+        )
+    )
+
+#======================================================================
+"""Scenario 1b: GBT_TX incoming message. Clean run, no failure cases. Transfer mode."""
+#=====================================================================
+
+@patch.dict(
+    "os.environ",
+    {
+        "STATION_NAME": "PT",
+        "EXPEDAT_MODE": "transfer",
+        "EXPEDAT_STREAM_MB": "10",
+    },
+)
+@patch("ngRadar_Website.management.commands.vlba_sim.Path")
+@patch("ngRadar_Website.management.commands.vlba_sim.send_kafka_message")
+@patch("ngRadar_Website.management.commands.vlba_sim.uuid.uuid4")
+@patch("ngRadar_Website.management.commands.vlba_sim.tag_observation")
+@patch("ngRadar_Website.management.commands.vlba_sim.create_traced_file")
+@patch("ngRadar_Website.management.commands.vlba_sim.watch_for_file")
+def test_process_msg_GBT_TX(
+        mock_watch_for_file,
+        mock_create_traced_file,
+        mock_tag_obs,
+        mock_uuid,
+        mock_send_kafka_message,
+        mock_Path,
+):
+    mock_tag_obs.return_value = None
+    
+    msg = MagicMock()
+
+    payload = {
+        "gbt_uuid": "fake_uuid",
+        "station": Stations.GBT,
+        "event_time": "2026-09-21T12:00:00+00:00",
+        "object_id": "30104",
+        "target": "Moretus",
+        "tx_waveform": "SineWave",
+        "rec_waveform": "SineWave",
+        "waveform_requester": "username",
+    }
+
+    msg.value.return_value = json.dumps(payload).encode("utf-8")
+    
+    msg.key.return_value = str(
+        Message.GBT_TX.value
+    ).encode("utf-8")
+
+    producer_topic = MagicMock()
+    producer_config = MagicMock()
+    num_bytes = 10 * 1024 * 1024  # 10 MB
+
+    mock_uuid.return_value = "12345"
+
+    mock_raw_data_path = MagicMock()
+    mock_Path.return_value = mock_raw_data_path
+
+    mock_frame_path = MagicMock()
+    mock_raw_data_path.__truediv__.return_value = mock_frame_path
+
+    mock_frame_path.is_file.return_value = True
+    mock_frame_path.stat.return_value.st_size = 10 * 1024 * 1024  # 10 MB
+
+    process_msg(msg, producer_topic, producer_config)
+
+    assert mock_uuid.call_count == 1
+
+    assert mock_create_traced_file.call_count == 1
+
+    mock_watch_for_file.assert_called_once_with(mock_frame_path)
+
+    mock_send_kafka_message.assert_called_once_with(
+        producer_topic=producer_topic,
+        producer_config=producer_config,
+        waveform_requester="username",
+        message_type=(Message.VLBA_REQUEST_STORAGE),
+        transfer_uuid="12345",
+        gbt_uuid="fake_uuid",
+        gbt_event_time="2026-09-21T12:00:00+00:00",
+        station=Stations.PT,
+        status=Status.QUEUED,
+        object_id="30104",
+        target="Moretus",
+        tx_waveform="SineWave",
+        rec_waveform="SineWave",
+        num_bytes=num_bytes,
         filename=mock_frame_path.name,
         xmit_station=Stations.GBT,
         rcvr_station=Stations.PT,
