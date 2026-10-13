@@ -868,7 +868,7 @@ def expedat_send(mvd_filepath):
         terminal_command = [
             "./movedat",
             mvd_filepath,
-            f"{svd_user}:{svd_password}@{svd_ip}:{recipient_directory}",
+            f"{svd_user}:{svd_password}@{svd_ip}:{recipient_directory}/",
         ]
         
         process = subprocess.Popen(
@@ -918,7 +918,7 @@ def expedat_send(mvd_filepath):
             "./movedat",
             "-s",
             "-",
-            f"{svd_user}:{svd_password}@{svd_ip}:{recipient_directory}/{Path(mvd_filepath).name}",  # TODO test that this file gets created correctly
+            f"{svd_user}:{svd_password}@{svd_ip}:{recipient_directory}/{Path(mvd_filepath).name}",
         ]
 
         # Standard Input IN (stdin) and Standard Input OUT (stdout):
@@ -998,6 +998,70 @@ def expedat_send(mvd_filepath):
 # =============================================================
 # FILE / STORAGE HELPERS
 # =============================================================
+def create_file(
+    file_path,
+    file_mb=5,
+):
+    """
+    Create a random binary file for simulated VLBA data.
+    """
+
+    file_size_bytes = (
+        file_mb
+        * 1024
+        * 1024
+    )
+
+    num_buffers = 100
+
+    buffer_size = (file_size_bytes // num_buffers)
+
+    remainder = (file_size_bytes % num_buffers)
+
+    with open(file_path, "wb") as file:
+        for index in range(num_buffers):
+            size = (buffer_size + (1 if index < remainder else 0))
+
+            buffer = (random.randbytes(size))
+
+            file.write(
+                buffer
+            )
+
+    print(
+        "Successfully created a "
+        f"{file_mb}MB random binary "
+        f"file at {file_path}"
+    )
+
+def watch_for_file(
+    file_path,
+):
+    """
+    Wait until no process has the file open.
+    """
+
+    while True:
+        result = subprocess.run(
+            [
+                "lsof",
+                file_path,
+            ],
+            capture_output=True,
+            text=True,
+        )
+
+        output = (
+            result.stdout
+        )
+
+        if output.strip():
+            print("Output:\n", output)
+        else:
+            break
+
+        time.sleep(1)
+
 
 def delete_observation_data(
     file_name,
