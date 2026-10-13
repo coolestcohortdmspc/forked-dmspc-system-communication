@@ -36,15 +36,6 @@ def test_create_img_output():
 # 2. save_image_to_seaweedfs Test
 # ==============================================================================
 
-@patch.dict(
-    "os.environ",
-    {
-        "WEED_S3_INTERNAL_DOMAIN": "seaweedfs.fake.com",
-        "WEED_S3_ACCESS_KEY": "fake_access_key",
-        "WEED_S3_SECRET_KEY": "fake_key",
-        "WEED_S3_BUCKET": "fake_bucket",
-    },
-)
 @patch("ngRadar_Website.management.commands.dsoc_sim.create_s3_client") #fake the boto3 module which interacts with seaweedfs
 @patch("ngRadar_Website.management.commands.dsoc_sim.upload_seaweedfs")
 def test_save_image_to_seaweedfs_success(mock_upload, mock_s3):
