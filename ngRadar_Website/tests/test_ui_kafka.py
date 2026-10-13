@@ -6,8 +6,13 @@ import pytest
 from ngRadar_Website.enums import Stations, Message
 from uuid import uuid4
 
+import ngRadar_Website.ui_kafka as ui_kafka
 from ngRadar_Website.ui_kafka import (
     consume_ui_events,
+    start_ui_kafka_consumer,
+    _consumer_started,
+    _consumer_lock,
+    logger,
 )
 
 # ==============================================================================
@@ -35,3 +40,23 @@ def test_consume_ui_events(mock_getenv, mock_Consumer):
         consume_ui_events()
 
     mock_consumer.subscribe.assert_called_once()
+
+# ==============================================================================
+# 2. start_ui_kafka_consumer Test
+# ==============================================================================
+
+@patch("ngRadar_Website.ui_kafka.consume_ui_events")
+@patch("ngRadar_Website.ui_kafka.threading.Thread")
+def test_start_ui_kafka_consumer(mock_Thread, mock_consume_ui_events):
+    ui_kafka._consumer_started = False
+
+    mock_thread = mock_Thread.return_value
+
+    start_ui_kafka_consumer()
+
+    assert ui_kafka._consumer_started is True
+    mock_Thread.assert_called_once_with(
+        target=mock_consume_ui_events,
+        name="ui-kafka-consumer",
+        daemon=True,
+    )
