@@ -68,15 +68,16 @@ For local dev, we spin up the following Docker containers, which you can see on 
 
 | Container Name | Description |
 | :---: | :---: |
-| kafka-node-1 | - |
-| kafka-node-2 | - |
-| kafka-node-3 | - |
+| kafka-node-1 | 1st node of our 3-broker cluster |
+| kafka-node-2 | 2nd node of our 3-broker cluster |
+| kafka-node-3 | 3rd node of our 3-broker cluster |
 | kafka-ui | GUI to see Kafka information (topics, messages, etc.) |
 | seaweedfs | Object store for DDM images |
 | dsoc-volume-init | Creates necessary Docker volumes |
 | db_consumer | Kafka consumer to store all events in the database |
 | kafka-init | Creates necessary Kafka topics |
-| traefik_http | - |
+| traefik_http | Local dev reverse proxy (http) |
+| traefik | Production reverse proxy (https) |
 | ngradar_website | The website |
 | postgres | PostgreSQL database |
 | expedat_server | Recipient of ExpeDat streamed data (servedat is installed and running here) |
@@ -96,8 +97,8 @@ For local dev, we spin up the following Docker containers, which you can see on 
 | portainer | A web-version of Docker Desktop |
 | prometheus | Scrapes system metrics |
 | grafana | Compiles and displays system metrics |
-| tempo | - |
-| otel-collector | - |
-| postgres_exporter | - |
-| kafka-exporter | - |
-| k6 | - |
+| tempo | Stores traces to be visualized |
+| otel-collector | Gathers and processes traces |
+| postgres_exporter | Supporting container for prometheus metric scraping |
+| kafka-exporter | Supporting container for prometheus metric scraping |
+| k6 | Performance testing tool |
