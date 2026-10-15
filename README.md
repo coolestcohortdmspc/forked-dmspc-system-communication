@@ -4,6 +4,17 @@ Code for prototyping system communication for the ngRadar project. This code is 
 
 # How to run locally:
 __Please Note:__ This system does not work unless another trial of ExpeDat is obtained (either a free trial or purchased rights). If you do get access to the ExpeDat executables, an "expedat" directory will need to be added to the project root with all of the downloadable files inside of it.
+# Note on ExpeDat code:
+When downloading a free trial or licensed version of ExpeDat, make sure to select the correct version for your operating system and hardware:
+For Windows or Linux computers (or virtual machines) using Intel or AMD processors, select the x86-64 version.
+For Linux computers (or virtual machines) using ARM processors, select Linux ARM64 Version
+For Mac Computers, select macOS
+To run, make sure the expedat folder is named in all lowercase letters.
+Open the expedat folder and within it there are 4 sub-folders.
+Delete the folders named "Web" and "Documentation", they are not needed.
+Within the "Client Files" folder, copy the "movedat" file into the outer expedat folder, then delete the "Client Files" folder
+Within the "Server Files" folder, copy the "mtping" and "servedat" files into the outer expedat folder, then delete the "Server Files" folder
+Lastly, within the expedat folder, there should be only 3 files - movedat, mtping, and servedat
 
 | File | Purpose |
 | :---: | :---: |
