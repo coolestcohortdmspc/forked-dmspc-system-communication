@@ -8,3 +8,9 @@ datasources:
     url: http://prometheus:9090
     isDefault: true
     editable: true
+
+  - name: Tempo
+    type: tempo
+    url: http://tempo:3200
+    access: ngradar_website_network
+    uid: tempo
