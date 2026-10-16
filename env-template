@@ -52,11 +52,11 @@ VLBA_1_DROPLET_IP=DO-VLBA-1-DROPLET-IP-ADDRESS      # you must provide
 VLBA_2_DROPLET_IP=DO-VLBA-2-DROPLET-IP-ADDRESS      # you must provide
 VLBA_3_DROPLET_IP=DO-VLBA-3-DROPLET-IP-ADDRESS      # you must provide
 GBT_DROPLET_IP=DO-GBT-DROPLET-IP-ADDRESS            # you must provide
-REMOTE_REPO=forked-dmspc-system-communication
+REMOTE_REPO=name-of-your-remote-github-repo         # you must provide
 # k6 testing vars:
 K6_USERNAME=k6-testuser
 K6_PASSWORD=k6-password
-K6_IMAGE_ID=927ca21a-c45b-45f5-a24b-bb2811cbc8ac
+K6_IMAGE_ID=replace-with-an-imagekey-id-from-your-db
 #expedat vars:
 SVD_PASSWORD=your_mac_password                     # you must provide
 SVD_IP=expedat_server
@@ -117,11 +117,11 @@ EXPEDAT_STREAM_MB=100
 # SVD_USER=your_mac_username                      # you must provide
 # EXPEDAT_MODE=stream                             # can use 'stream' or 'transfer' modes if desired
 # EXPEDAT_STREAM_MB=10
-# REMOTE_REPO=forked-dmspc-system-communication
+# REMOTE_REPO=name-of-your-remote-github-repo         # you must provide
 # k6 vars:
 # K6_USERNAME=k6-testuser
 # K6_PASSWORD=k6-password
-# K6_IMAGE_ID=4fcc0a73-b5f2-4da9-be16-7434fc1785b5 # REPLACE WITH AN IMAGE ID FROM YOUR DATABASE
+# K6_IMAGE_ID=replace-with-an-imagekey-id-from-your-db # you must provide
 # grafana:
 # GRAFANA_USER=your-grafana-password
 # GRAFANA_ADMIN_PASSWORD=your-grafana-password
@@ -157,7 +157,7 @@ EXPEDAT_STREAM_MB=100
 # VLBA_2_DROPLET_IP=vlba-2-doplet-ip-address    # you must provide
 # VLBA_3_DROPLET_IP=vlba-3-doplet-ip-address    # you must provide
 # GBT_DROPLET_IP=gbt-droplet-ip-address         # you must provide
-# REMOTE_REPO=forked-dmspc-system-communication
+# REMOTE_REPO=name-of-your-remote-github-repo   # you must provide
 # if on dev branch, using expedat for data transport:
 # SVD_PASSWORD=your_mac_password                  # you must provide
 # SVD_IP=dsoc-droplet-ip-address                  # you must provide
@@ -195,7 +195,7 @@ EXPEDAT_STREAM_MB=100
 # VLBA_2_DROPLET_IP=vlba-2-doplet-ip-address    # you must provide
 # VLBA_3_DROPLET_IP=vlba-3-doplet-ip-address    # you must provide
 # GBT_DROPLET_IP=gbt-droplet-ip-address         # you must provide
-# REMOTE_REPO=forked-dmspc-system-communication
+# REMOTE_REPO=name-of-your-remote-github-repo   # you must provide
 # if on dev branch, using expedat for data transport:
 # SVD_PASSWORD=your_mac_password                  # you must provide
 # SVD_IP=dsoc-droplet-ip-address                  # you must provide
