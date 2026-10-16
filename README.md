@@ -7,14 +7,14 @@ __Please Note:__ This system does not work unless another trial of ExpeDat is ob
 # Note on ExpeDat code:
 When downloading a free trial or licensed version of ExpeDat, make sure to select the correct version for your operating system and hardware:
 For Windows or Linux computers (or virtual machines) using Intel or AMD processors, select the x86-64 version.
-For Linux computers (or virtual machines) using ARM processors, select Linux ARM64 Version
-For Mac Computers, select macOS
+For Linux computers (or virtual machines) using ARM processors, select Linux ARM64 Version.
+For Mac computers, select macOS.
 To run, make sure the expedat folder is named in all lowercase letters.
-Open the expedat folder and within it there are 4 sub-folders.
+Open the expedat folder. Within it, there are 4 sub-folders.
 Delete the folders named "Web" and "Documentation", they are not needed.
-Within the "Client Files" folder, copy the "movedat" file into the outer expedat folder, then delete the "Client Files" folder
-Within the "Server Files" folder, copy the "mtping" and "servedat" files into the outer expedat folder, then delete the "Server Files" folder
-Lastly, within the expedat folder, there should be only 3 files - movedat, mtping, and servedat
+Within the "Client Files" folder, copy the "movedat" file into the outer expedat folder, then delete the "Client Files" folder.
+Within the "Server Files" folder, copy the "mtping" and "servedat" files into the outer expedat folder, then delete the "Server Files" folder.
+To summarize, within the expedat folder, there should be only 3 files - movedat, mtping, and servedat.
 
 | File | Purpose |
 | :---: | :---: |
