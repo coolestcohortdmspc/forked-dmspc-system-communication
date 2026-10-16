@@ -4,25 +4,16 @@ from unittest.mock import call, patch, MagicMock
 from ngRadar_Website.enums import Status, Stations, Message
 import uuid
 import pytest
+from ngRadar_Website.management.commands.dsoc_sim import (
+    create_img,
+    save_image_to_seaweedfs,
+    verify_incoming_transfer,
+    process_msg,
+)
 
 # =============================================
 # TEST THE STANDALONE FUNCTIONS FROM DSOC_SIM
 # =============================================
-
-# ==============================================================================
-# IMPORTANT:
-# Because we read "ngrok_endpoint.env" on import, we need to patch the Path globally
-# before importing all the functions we want to test.
-# ==============================================================================
-mock_env_data = "BOOTSTRAP_SERVER=localhost:9092\nSOME_OTHER_VAR=value" 
-with patch("pathlib.Path.read_text", return_value=mock_env_data):
-    from ngRadar_Website.management.commands.dsoc_sim import (
-        create_img,
-        save_image_to_seaweedfs,
-        verify_incoming_transfer,
-        process_msg,
-    )
-
 
 # ==============================================================================
 # 1. create_img Test
@@ -45,15 +36,6 @@ def test_create_img_output():
 # 2. save_image_to_seaweedfs Test
 # ==============================================================================
 
-@patch.dict(
-    "os.environ",
-    {
-        "WEED_S3_INTERNAL_DOMAIN": "seaweedfs.fake.com",
-        "WEED_S3_ACCESS_KEY": "fake_access_key",
-        "WEED_S3_SECRET_KEY": "fake_key",
-        "WEED_S3_BUCKET": "fake_bucket",
-    },
-)
 @patch("ngRadar_Website.management.commands.dsoc_sim.create_s3_client") #fake the boto3 module which interacts with seaweedfs
 @patch("ngRadar_Website.management.commands.dsoc_sim.upload_seaweedfs")
 def test_save_image_to_seaweedfs_success(mock_upload, mock_s3):
@@ -228,7 +210,7 @@ def test_process_msg_VLBA_REQUEST_STORAGE(
                 transfer_uuid=(transfer_uuid),
                 gbt_uuid=gbt_uuid,
                 gbt_event_time=str("2026-07-15T12:00:00+00:00"),
-                station=Stations.PT,
+                station=Stations.DSOC,
                 status=Status.READY,
                 object_id=str("fake_object_id"),
                 target=str("fake_target"),
@@ -240,7 +222,7 @@ def test_process_msg_VLBA_REQUEST_STORAGE(
                 xmit_station=(Stations.GBT),
                 rcvr_station=(Stations.PT),
 
-                message=f"DSOC reponded that it has enough storage. {Stations.PT.name} may begin the etransfer.",
+                message=f"DSOC responded that it has enough storage. {Stations.PT.name} may begin the expedat stream.",
             )
 #=====================================================================
 
@@ -319,7 +301,7 @@ def test_process_msg_VLBA_REQUEST_STORAGE_Retry(
                 retry_count=(6),
                 xmit_station=(Stations.GBT),
                 rcvr_station=(Stations.PT),
-                message=f"{Stations.PT.name} requested a storage check at DSOC. DSOC responded that it does not have enough storage and cannot begin the etransfer.",
+                message=f"{Stations.PT.name} requested a storage check at DSOC. DSOC responded that it does not have enough storage and cannot begin the expedat stream.",
                             )
 
 #=====================================================================
@@ -401,7 +383,7 @@ def test_process_msg_VLBA_REQUEST_STORAGE_Failed(
                 rcvr_station=(Stations.PT),
                 message=(
                             f"{Stations.PT.name} requested a storage check at DSOC. "
-                            f"DSOC responded that it does not have enough storage and cannot begin the etransfer."
+                            f"DSOC responded that it does not have enough storage and cannot begin the expedat stream."
                             f"Failed after "
                             f"{16} "
                             "storage checks."
@@ -556,7 +538,7 @@ def test_process_msg_Message_PROGRESS_COMPLETE_value_success(
             rcvr_station=(Stations.PT),
             message=(
                 f"DSOC verified {Stations.PT.label}'s "
-                "e-transfer, generated "
+                "streaming, generated "
                 "the DDM image, stored "
                 "the image, and completed "
                 f"processing. {Stations.PT.label} may "

@@ -7,42 +7,32 @@ from pathlib import Path
 from botocore.config import Config
 from botocore.exceptions import (
     EndpointConnectionError,
-    ConnectionError,
     ClientError,
 )
 from confluent_kafka import KafkaError
+from ngRadar_Website.utils import (
+    latency_calc,
+    config_func,
+    bootstrap,
+    consume,
+    delete_observation_data,
+    create_s3_client,
+    ensure_bucket_exists,
+    expedat_send,
+    produce,
+    send_kafka_message,
+    get_folder_size,
+    write_transfer_progress,
+    upload_seaweedfs,
+    MAX_BYTES,
+    consumer_group_has_members,
+    get_kafka_producer,
+    wait_for_exp,
+)
 
 # ===============================================
 # Here we can test all of our utility functions
 # ===============================================
-
-# ==============================================================================
-# IMPORTANT:
-# Because we read "ngrok_endpoint.env" on import, we need to patch the Path globally
-# before importing all the functions we want to test.
-# ==============================================================================
-mock_env_data = "BOOTSTRAP_SERVER=localhost:9092\nSOME_OTHER_VAR=value" 
-with patch("pathlib.Path.read_text", return_value=mock_env_data):
-    from ngRadar_Website.utils import (
-        latency_calc,
-        config_func,
-        bootstrap,
-        consume,
-        create_file,
-        delete_observation_data,
-        create_s3_client,
-        ensure_bucket_exists,
-        etc_send,
-        watch_for_file,
-        produce,
-        send_kafka_message,
-        get_folder_size,
-        write_transfer_progress,
-        upload_seaweedfs,
-        MAX_BYTES,
-        consumer_group_has_members,
-
-    )
 
 # ==============================================================================
 # 1. latency_calc
@@ -127,24 +117,25 @@ def test_config_func_GBT():
                 }
     assert consumer_topic == ["GBT_notif"]
     assert consumer_config == {
-                    "bootstrap.servers": (bootstrap),
-                    "client.id": (
-                        f"{sim.name.lower()}"
-                        "-consumer"
-                    ),
-                    "group.id": (
-                        f"{sim.name.lower()}"
-                        "-consumer-group"
-                    ),
-                    "session.timeout.ms": 45000,
-                    "heartbeat.interval.ms": 15000,
-                    "socket.timeout.ms": 30000,
-                    "reconnect.backoff.ms": 100,
-                    "reconnect.backoff.max.ms": 10000,
-                    "topic.metadata.refresh.interval.ms": 300000,
-                    "metadata.max.age.ms": 300000,
-                    "enable.auto.commit": False,
-                }
+        "bootstrap.servers": bootstrap,
+        "client.id": (
+            f"{sim.name.lower()}"
+            "-consumer"
+        ),
+        "group.id": (
+            f"{sim.name.lower()}"
+            "-consumer-group"
+        ),
+        "session.timeout.ms": 45000,
+        "heartbeat.interval.ms": 15000,
+        "socket.timeout.ms": 30000,
+        "reconnect.backoff.ms": 100,
+        "reconnect.backoff.max.ms": 10000,
+        "auto.offset.reset": "earliest",
+        "topic.metadata.refresh.interval.ms": 300000,
+        "metadata.max.age.ms": 300000,
+        "enable.auto.commit": False,
+    }
 
 
 @pytest.mark.parametrize("sim", [
@@ -173,24 +164,25 @@ def test_config_func_VLBA(sim):
                     "DSOC_notif",
                 ]
     assert consumer_config == {
-                    "bootstrap.servers": (bootstrap),
-                    "client.id": (
-                        f"{sim.name.lower()}"
-                        "-consumer"
-                    ),
-                    "group.id": (
-                        f"{sim.name.lower()}"
-                        "-consumer-group"
-                    ),
-                    "session.timeout.ms": 45000,
-                    "heartbeat.interval.ms": 15000,
-                    "socket.timeout.ms": 30000,
-                    "reconnect.backoff.ms": 100,
-                    "reconnect.backoff.max.ms": 10000,
-                    "topic.metadata.refresh.interval.ms": 300000,
-                    "metadata.max.age.ms": 300000,
-                    "enable.auto.commit": False,
-                }
+        "bootstrap.servers": bootstrap,
+        "client.id": (
+            f"{sim.name.lower()}"
+            "-consumer"
+        ),
+        "group.id": (
+            f"{sim.name.lower()}"
+            "-consumer-group"
+        ),
+        "session.timeout.ms": 45000,
+        "heartbeat.interval.ms": 15000,
+        "socket.timeout.ms": 30000,
+        "reconnect.backoff.ms": 100,
+        "reconnect.backoff.max.ms": 10000,
+        "auto.offset.reset": "earliest",
+        "topic.metadata.refresh.interval.ms": 300000,
+        "metadata.max.age.ms": 300000,
+        "enable.auto.commit": False,
+    }
 
 
 def test_config_func_DSOC():
@@ -215,24 +207,25 @@ def test_config_func_DSOC():
                 "VLBA_notif",
             ]
     assert consumer_config == {
-                    "bootstrap.servers": (bootstrap),
-                    "client.id": (
-                        f"{sim.name.lower()}"
-                        "-consumer"
-                    ),
-                    "group.id": (
-                        f"{sim.name.lower()}"
-                        "-consumer-group"
-                    ),
-                    "session.timeout.ms": 45000,
-                    "heartbeat.interval.ms": 15000,
-                    "socket.timeout.ms": 30000,
-                    "reconnect.backoff.ms": 100,
-                    "reconnect.backoff.max.ms": 10000,
-                    "topic.metadata.refresh.interval.ms": 300000,
-                    "metadata.max.age.ms": 300000,
-                    "enable.auto.commit": False,
-                }
+        "bootstrap.servers": bootstrap,
+        "client.id": (
+            f"{sim.name.lower()}"
+            "-consumer"
+        ),
+        "group.id": (
+            f"{sim.name.lower()}"
+            "-consumer-group"
+        ),
+        "session.timeout.ms": 45000,
+        "heartbeat.interval.ms": 15000,
+        "socket.timeout.ms": 30000,
+        "reconnect.backoff.ms": 100,
+        "reconnect.backoff.max.ms": 10000,
+        "auto.offset.reset": "earliest",
+        "topic.metadata.refresh.interval.ms": 300000,
+        "metadata.max.age.ms": 300000,
+        "enable.auto.commit": False,
+    }
 
     
 def test_config_func_UI():
@@ -281,24 +274,25 @@ def test_config_func_PTW():
                 "progress_tracking",
             ]
     assert consumer_config == {
-                    "bootstrap.servers": (bootstrap),
-                    "client.id": (
-                        f"{sim.name.lower()}"
-                        "-consumer"
-                    ),
-                    "group.id": (
-                        f"{sim.name.lower()}"
-                        "-consumer-group"
-                    ),
-                    "session.timeout.ms": 45000,
-                    "heartbeat.interval.ms": 15000,
-                    "socket.timeout.ms": 30000,
-                    "reconnect.backoff.ms": 100,
-                    "reconnect.backoff.max.ms": 10000,
-                    "topic.metadata.refresh.interval.ms": 300000,
-                    "metadata.max.age.ms": 300000,
-                    "enable.auto.commit": False,
-                }
+        "bootstrap.servers": bootstrap,
+        "client.id": (
+            f"{sim.name.lower()}"
+            "-consumer"
+        ),
+        "group.id": (
+            f"{sim.name.lower()}"
+            "-consumer-group"
+        ),
+        "session.timeout.ms": 45000,
+        "heartbeat.interval.ms": 15000,
+        "socket.timeout.ms": 30000,
+        "reconnect.backoff.ms": 100,
+        "reconnect.backoff.max.ms": 10000,
+        "auto.offset.reset": "earliest",
+        "topic.metadata.refresh.interval.ms": 300000,
+        "metadata.max.age.ms": 300000,
+        "enable.auto.commit": False,
+    }
 
 # ==============================================================================
 # 3. bootstrap Test
@@ -483,21 +477,9 @@ def test_consume_partition_error(mock_Consumer, capsys):
     mock_consumer.subscribe.assert_called_once_with("topic")
     assert captured.out.strip() == "Consumer reached partition EOF."
 
-# ==============================================================================
-# X. create_file Test
-# ==============================================================================
-
-def test_create_file(tmp_path):
-    file_path = tmp_path / "test.bin"
-
-    create_file(file_path, file_mb=1)
-
-    assert file_path.exists()
-    assert file_path.stat().st_size == 1 * 1024 * 1024
-
 
 # ==============================================================================
-# X. delete_observation_data Test
+# 5. delete_observation_data Test
 # ==============================================================================
 
 def test_delete_observation_data_exist(tmp_path):
@@ -520,7 +502,9 @@ def test_delete_observation_data_not_exist(capsys, tmp_path):
     captured = capsys.readouterr()
 
     assert captured.out.strip() == f"File {temp_file_name} does not exists"
-# 4. create_s3_client Test
+
+# ==============================================================================
+# 6. create_s3_client Test
 # ==============================================================================
 
 @patch.dict(
@@ -640,7 +624,7 @@ def test_create_s3_client_client_error(mock_Config, mock_ensure_bucket, mock_bot
 
 
 # ==============================================================================
-# 5. ensure_bucket_exists Test
+# 7. ensure_bucket_exists Test
 # ==============================================================================
 
 @patch.dict(
@@ -690,31 +674,30 @@ def test_ensure_bucket_exists_created():
 
 
 # ==============================================================================
-# 5. etc_send Test
+# 8. expedat_send Test
 # ==============================================================================
 @patch.dict(
     "os.environ",
     {
-        "ETD_HOST": "fake_host",
-        "ETD_COMMAND_PORT": "4004",
+        "SVD_PASSWORD": "fake_password",
+        "SVD_IP": "fake_host",
+        "SVD_USER": "fake_username",
+        "RECIPIENT_DIR": "/fake/directory",
+        "MVD_LOC": "/fake/movedat/directory/",
+        "MVD_FILEPATH": "/fake/file.png",
+        "EXPEDAT_MODE": "transfer",
     },
 )
-@patch("ngRadar_Website.utils.uuid.uuid4")
 @patch("ngRadar_Website.utils.os.openpty")
 @patch("ngRadar_Website.utils.subprocess.Popen")
 @patch("ngRadar_Website.utils.os.close")
 @patch("ngRadar_Website.utils.select.select")
 @patch("ngRadar_Website.utils.os.read")
-@patch("ngRadar_Website.utils.parse_etc_progress")
-def test_etc_send(mock_parse, mock_os_read, mock_select, mock_os_close, mock_popen, mock_os_open, mock_uuid):
-    mock_frame_path = MagicMock()
-    mock_frame_path.stat.return_value.st_size = 500
-
-    mock_uuid.return_value = "fake_uuid"
+def test_expedat_send_transfer(mock_os_read, mock_select, mock_os_close, mock_popen, mock_os_open):
 
     mock_master = "fake_master_fd"
-    mock_slave = "fake_slave_fd"
-    mock_os_open.return_value = (mock_master, mock_slave)
+    mock_receiver = "fake_receiver_fd"
+    mock_os_open.return_value = (mock_master, mock_receiver)
 
     mock_process = MagicMock()
     mock_popen.return_value = mock_process
@@ -722,103 +705,138 @@ def test_etc_send(mock_parse, mock_os_read, mock_select, mock_os_close, mock_pop
     mock_os_close.return_value = None
     mock_select.return_value = ([mock_master], [], [])
     mock_os_read.return_value = b"50% 250/500\r"
-    mock_parse.return_value = None
 
     # Only run through the while loop once to avoid an infinite loop.
     mock_process.poll.side_effect = [None, 0]
     mock_process.wait.return_value = 0
-    mock_process.args = ["etc", "fake_file"]
+    mock_process.args = ["./movedat", "fake_file"]
 
-    etc_send(mock_frame_path)
+    expedat_send("/fake/file.png")
 
-    mock_uuid.assert_called_once()
     mock_os_open.assert_called_once()
 
     mock_popen.assert_called_once_with(
         [
-            "etc",
-            str(mock_frame_path),
-            "tcp://fake_host#4004:/dsoc/incoming/",
-            "--resume",
+            "./movedat",
+            "/fake/file.png",
+            "fake_username:fake_password@fake_host:" + "/fake/directory/",
         ],
-        stdin=mock_slave,
-        stdout=mock_slave,
-        stderr=mock_slave,
+        stdin=mock_receiver,
+        stdout=mock_receiver,
+        stderr=mock_receiver,
         close_fds=True,
+        cwd="/fake/movedat/directory/"
     )
 
     assert mock_os_close.call_count == 2
 
     mock_os_read.assert_called_once_with(mock_master, 4096)
 
-    mock_parse.assert_called_once_with(
-        "50% 250/500",
-        expected_num_bytes=500,
-        transfer_id="fake_uuid",
+
+@patch.dict(
+    "os.environ",
+    {
+        "SVD_PASSWORD": "fake_password",
+        "SVD_IP": "fake_host",
+        "SVD_USER": "fake_username",
+        "RECIPIENT_DIR": "/fake/directory/",
+        "MVD_LOC": "/fake/movedat/directory/",
+        "EXPEDAT_MODE": "stream",
+        "EXPEDAT_STREAM_MB": "10",
+    },
+)
+@patch("ngRadar_Website.utils.subprocess.Popen")
+@patch("ngRadar_Website.utils.subprocess.PIPE")
+@patch("ngRadar_Website.utils.subprocess.STDOUT")
+def test_expedat_send_stream(mock_stdout, mock_pipe, mock_popen):
+
+    mvd_filepath = MagicMock()
+    mvd_filepath.name.return_value.st_size = "fake_file.png"
+
+    mock_process = MagicMock()
+    mock_popen.return_value = mock_process
+
+    # Only run through the while loop once to avoid an infinite loop.
+    mock_process.poll.side_effect = [None, 0]
+    mock_process.wait.return_value = 0
+    mock_process.args = ["./movedat", "fake_file"]
+
+    expedat_send(mvd_filepath)
+
+    mock_popen.assert_called_once_with(
+        [
+            "./movedat",
+            "-s",
+            "-",
+            f"fake_username:fake_password@fake_host:/fake/directory//{Path(mvd_filepath).name}",
+        ],
+        stdin=mock_pipe,
+        stdout=mock_pipe,
+        stderr=mock_stdout,
+        cwd="/fake/movedat/directory/",
     )
 
 
 # ==============================================================================
-# 5. watch_for_file Test
+# 9. produce Test
 # ==============================================================================
 
-@patch("ngRadar_Website.utils.subprocess.run")
-@patch("ngRadar_Website.utils.time.sleep")
-def test_watch_for_file(mock_sleep, mock_subprocess):
-    file_path = "filepath"
-
-    first_result = MagicMock()
-    first_result.stdout = "exists"
-    second_result = MagicMock()
-    second_result.stdout = ""
-
-    mock_subprocess.side_effect = [first_result, second_result]
-
-    mock_sleep.return_value = None
-
-    watch_for_file(file_path)
-
-    first = mock_subprocess.call_args_list[0]
-    second = mock_subprocess.call_args_list[1]
-
-    mock_sleep.assert_called_once()
-    assert mock_subprocess.call_count == 2
-    assert first.kwargs["capture_output"] == True
-    assert second.kwargs["capture_output"] == True
-
-
-# ==============================================================================
-# 6. produce Test
-# ==============================================================================
-
-@patch("ngRadar_Website.utils.Producer")
-def test_produce(mock_Producer):
+@patch("ngRadar_Website.utils.inject")
+@patch("ngRadar_Website.utils.get_kafka_producer")
+@patch("ngRadar_Website.utils.tracer")
+def test_produce(mock_tracer, mock_get_kafka, mock_inject):
     """Scenario 1: No errors"""
     topic = "topic"
     config = "config"
     key = "key"
     value = "value"
+
+    mock_span = MagicMock()
+    mock_tracer.start_span.return_value = mock_span
+
+    mock_ctx = MagicMock()
+    mock_ctx.trace_id = 123456
+    mock_ctx.trace_flags.sampled = True
+    mock_span.get_span_context.return_value = mock_ctx
     
-    mock_producer = mock_Producer.return_value
-    mock_producer.flush.return_value = 0
+    mock_producer = mock_get_kafka.return_value
+
+    def mock_produce(topic, key, value, headers, callback):
+        mock_msg = MagicMock()
+        mock_msg.partition.return_value = 0
+        mock_msg.offset.return_value = 10
+
+        # Simulate successful Kafka delivery
+        callback(None, mock_msg)
+
+    mock_producer.produce.side_effect = mock_produce
 
     result = produce(topic, config, key, value)
 
     assert result == True
-    mock_Producer.assert_called_once_with(config)
-    mock_producer.produce.assert_called_once_with(topic, key=key, value=value, callback=mock_producer.produce.call_args.kwargs["callback"])
-    mock_producer.flush.assert_called_once_with(2)
+    mock_get_kafka.assert_called_once_with(config)
+    mock_producer.produce.assert_called_once()
 
-@patch("ngRadar_Website.utils.Producer")
-def test_produce_delivery_error(mock_Producer):
+
+@patch("ngRadar_Website.utils.inject")
+@patch("ngRadar_Website.utils.get_kafka_producer")
+@patch("ngRadar_Website.utils.tracer")
+def test_produce_delivery_error(mock_tracer, mock_get_kafka, mock_inject):
     """Scenario 2: Delivery error"""
     topic = "topic"
     config = "config"
     key = "key"
     value = "value"
+
+    mock_span = MagicMock()
+    mock_tracer.start_span.return_value = mock_span
+
+    mock_ctx = MagicMock()
+    mock_ctx.trace_id = 123456
+    mock_ctx.trace_flags.sampled = True
+    mock_span.get_span_context.return_value = mock_ctx
     
-    mock_producer = mock_Producer.return_value
-    mock_producer.flush.return_value = 0
+    mock_producer = mock_get_kafka.return_value
 
     #defining this inside a function to handle the nonlocal command:
     def produce_side_effect(topic, key, value, callback):
@@ -829,50 +847,39 @@ def test_produce_delivery_error(mock_Producer):
     result = produce(topic, config, key, value)
 
     assert result == False
-    mock_Producer.assert_called_once_with(config)
-    mock_producer.produce.assert_called_once_with(topic, key=key, value=value, callback=mock_producer.produce.call_args.kwargs["callback"])
-    mock_producer.flush.assert_called_once_with(2)
+    mock_get_kafka.assert_called_once_with(config)
+    mock_producer.produce.assert_called_once()
 
-@patch("ngRadar_Website.utils.Producer")
-def test_produce_delivery_flush_error(mock_Producer):
-    """Scenario 3: Flush error"""
+@patch("ngRadar_Website.utils.inject")
+@patch("ngRadar_Website.utils.get_kafka_producer")
+@patch("ngRadar_Website.utils.tracer")
+def test_produce_delivery_exception(mock_tracer, mock_get_kafka, mock_inject):
+    """Scenario 3: Exception raised"""
     topic = "topic"
     config = "config"
     key = "key"
     value = "value"
+
+    mock_span = MagicMock()
+    mock_tracer.start_span.return_value = mock_span
+
+    mock_ctx = MagicMock()
+    mock_ctx.trace_id = 123456
+    mock_ctx.trace_flags.sampled = True
+    mock_span.get_span_context.return_value = mock_ctx
     
-    mock_producer = mock_Producer.return_value
-    mock_producer.flush.return_value = 1
-
-    result = produce(topic, config, key, value)
-
-    assert result == False
-    mock_Producer.assert_called_once_with(config)
-    mock_producer.produce.assert_called_once_with(topic, key=key, value=value, callback=mock_producer.produce.call_args.kwargs["callback"])
-    mock_producer.flush.assert_called_once_with(2)
-
-@patch("ngRadar_Website.utils.Producer")
-def test_produce_delivery_exception(mock_Producer):
-    """Scenario 4: Exception raised"""
-    topic = "topic"
-    config = "config"
-    key = "key"
-    value = "value"
-    
-    mock_producer = mock_Producer.return_value
-    mock_producer.flush.return_value = 1
+    mock_producer = mock_get_kafka.return_value
 
     mock_producer.produce.side_effect = Exception("Kafka Exception")
 
     result = produce(topic, config, key, value)
 
     assert result == False
-    mock_Producer.assert_called_once_with(config)
-    mock_producer.produce.assert_called_once_with(topic, key=key, value=value, callback=mock_producer.produce.call_args.kwargs["callback"])
-    mock_producer.flush.assert_not_called()
+    mock_producer.produce.assert_called_once()
+    mock_get_kafka.assert_called_once_with(config)
 
 # ==============================================================================
-# 7. send_kafka_message Test
+# 10. send_kafka_message Test
 # ==============================================================================
 
 @patch("ngRadar_Website.utils.produce")
@@ -918,7 +925,7 @@ def test_send_kafka_message(mock_uuid, mock_datetime, mock_produce):
 
 
 # ==============================================================================
-# 9. get_folder_size Test
+# 11. get_folder_size Test
 # ==============================================================================
 
 def test_get_folder_size(tmp_path):
@@ -953,7 +960,7 @@ def test_get_folder_size_FileNotFoundError(tmp_path):
 
 
 # ==============================================================================
-# 10. write_transfer_progress Test
+# 12. write_transfer_progress Test
 # ==============================================================================
 
 @patch("ngRadar_Website.utils.open")
@@ -1006,7 +1013,7 @@ def test_write_transfer_progress(
     )
 
 # ==============================================================================
-# 11. consumer_group_has_members Test
+# 13. consumer_group_has_members Test
 # ==============================================================================
 
 @patch.dict(
@@ -1032,3 +1039,64 @@ def test_consumer_group_has_members(mock_adminclient):
     result = consumer_group_has_members(group_id)
 
     assert result == True
+
+
+# ==============================================================================
+# 14. get_kafka_producer Test
+# ==============================================================================
+
+@patch("ngRadar_Website.utils.Producer")
+@patch("ngRadar_Website.utils.atexit")
+def test_get_kafka_producer(mock_atexit, mock_Producer):
+    """Scenario 1: Success"""
+
+    mock_atexit.register.return_value = None
+
+    mock_producer_instance = MagicMock()
+    mock_Producer.return_value = mock_producer_instance
+
+    config = {"bootstrap.servers": "fake_server"}
+
+    producer = get_kafka_producer(config)
+
+    assert producer == mock_producer_instance
+    mock_Producer.assert_called_once_with(config)
+
+@patch("ngRadar_Website.utils._producer_instance", None)
+def test_get_kafka_producer_fail():
+    """Scenario 2: No config provided"""
+
+    config = None
+
+    with pytest.raises(ValueError) as exc_info:
+        producer = get_kafka_producer(config)
+
+    assert exc_info.value.args[0] == "Kafka configuration must be provided for initial setup."
+
+# ==============================================================================
+# 15. wait_for_exp Test
+# ==============================================================================
+
+@patch.dict(
+    "os.environ",
+    {
+        "SVD_IP": "fake_host",
+        "MVD_LOC": "/fake/directory/",
+    },
+)
+@patch("ngRadar_Website.utils.subprocess.run")
+def test_wait_for_exp(mock_subprocess):
+
+    mock_subprocess.return_value = MagicMock(returncode=0)
+
+    result = wait_for_exp()
+
+    assert result == True
+    mock_subprocess.assert_called_once_with(
+        [
+            "./mtping",
+            "fake_host",
+        ],
+        capture_output=True,
+        cwd="/fake/directory/",
+    )

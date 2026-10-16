@@ -32,6 +32,7 @@
                     <option value="10" {% if selected_number == 10 %}selected{% endif %}>10</option>
                     <option value="25" {% if selected_number == 25 %}selected{% endif %}>25</option>
                     <option value="50" {% if selected_number == 50 %}selected{% endif %}>50</option>
+                    <option value="75" {% if selected_number == 75 %}selected{% endif %}>75</option>
                 </select>
             </div>
         </form>
@@ -40,7 +41,7 @@
             id="dashboard-content"
             class="w-100"
         >
-            {% include 'ngRadar_Website/partials/dashboard_updates.html' %}
+            {% include 'ngRadar_Website/partials/history_updates.html' %}
         </div>
 
     </main>

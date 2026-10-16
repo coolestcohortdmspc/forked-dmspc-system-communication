@@ -9,6 +9,7 @@ import select
 import subprocess
 import time
 import uuid
+import atexit
 
 import boto3
 
@@ -18,24 +19,44 @@ from botocore.exceptions import (
     ConnectionError,
     EndpointConnectionError,
 )
+from ngRadar_Website.enums import Stations
 
+from opentelemetry import trace
+from opentelemetry.propagate import inject
+from opentelemetry.trace import SpanKind, StatusCode
+from opentelemetry.trace.status import Status as TraceStatus
 from confluent_kafka import (
     Consumer,
     KafkaError,
     Producer,
 )
-
 from confluent_kafka.admin import AdminClient
 
 from dotenv import load_dotenv
 
-from ngRadar_Website.enums import (
-    Stations,
-    Status,
-)
-
-from ngRadar_Website.models.models import ObservatoryEvent
-
+# =============================================================
+# FUNCTIONS IN THIS FILE
+# =============================================================
+"""
+latency_calc
+config_func
+bootstrap
+get_kafka_producer
+shutdown_kafka_producer
+produce
+consume
+send_kafka_message
+consumer_group_has_members
+create_s3_client
+ensure_bucket_exists
+create_presigned_url
+upload_seaweedfs
+write_transfer_progress
+wait_for_exp
+expedat_send
+delete_observation_data
+get_folder_size
+"""
 
 # =============================================================
 # CONSTANTS
@@ -44,29 +65,10 @@ from ngRadar_Website.models.models import ObservatoryEvent
 SESSION_TIMEOUT_MS = 10_000
 MAX_BYTES = 8_388_608
 
-ETD_MAX_CONN_RETRY = 90
-ETD_RETRY_CONN_DELAY = 10
+EXPEDAT_MAX_CONN_RETRY = 90
+EXPEDAT_RETRY_CONN_DELAY = 10
 
-
-# =============================================================
-# REGEX PATTERNS
-# =============================================================
-
-# Matches progress output from the etc CLI.
-PROGRESS_RE = re.compile(
-    r"\]\s+"
-    r"(?P<percent>\d+(?:\.\d+)?)%\s+"
-    r"(?P<received>\d+(?:\.\d+)?)\s+"
-    r"(?P<received_unit>\S+)\s+/\s+"
-    r"(?P<total>\d+(?:\.\d+)?)\s+"
-    r"(?P<total_unit>\S+)"
-)
-
-# Removes terminal escape sequences such as ESC[K.
-ANSI_RE = re.compile(
-    r"\x1b\[[0-9;]*[A-Za-z]"
-)
-
+tracer = trace.get_tracer(f"kafka.producer")
 
 # =============================================================
 # GENERAL HELPERS
@@ -164,8 +166,6 @@ def config_func(
 
         producer_config = {
             "bootstrap.servers": (bootstrap_server),
-            # "message.max.bytes": (MAX_BYTES),
-            # "message.timeout.ms": 2000,
             "client.id": (
                 f"{sim.name.lower()}"
                 "-producer"
@@ -220,8 +220,6 @@ def config_func(
 
     consumer_config = {
         "bootstrap.servers": (bootstrap_server),
-        # "fetch.max.bytes": (MAX_BYTES),
-        # "session.timeout.ms": (SESSION_TIMEOUT_MS),
         "client.id": (
             f"{sim.name.lower()}"
             "-consumer"
@@ -230,22 +228,21 @@ def config_func(
             f"{sim.name.lower()}"
             "-consumer-group"
         ),
-        # "auto.offset.reset": (
-        #     "earliest"
-        # ),
+
         # Consumer failover/recovery
         "session.timeout.ms": 45000,
         "heartbeat.interval.ms": 15000,
         "socket.timeout.ms": 30000,
         "reconnect.backoff.ms": 100,
         "reconnect.backoff.max.ms": 10000,
+        "auto.offset.reset": "earliest",
 
         # Usually useful for clients that must discover changed leaders
         "topic.metadata.refresh.interval.ms": 300000,
         "metadata.max.age.ms": 300000,
 
         "enable.auto.commit": False,
-    } # TODO make sure this works
+    } 
 
     return (
         producer_topic,
@@ -274,67 +271,133 @@ def bootstrap(sim):
 # KAFKA PRODUCER / CONSUMER
 # =============================================================
 
+# Internal reference to hold a single producer instance
+_producer_instance = None
+
+def get_kafka_producer(config: dict = None) -> Producer:
+    """
+    Thread-safe lazy initializer for the Kafka Producer singleton.
+    Guarantees only one instance lives per service process.
+
+    We previously were creating a new Producer for EVERY MESSAGE, which is inefficient and can lead to resource exhaustion.
+    """
+    global _producer_instance
+    
+    if _producer_instance is None:
+        if config is None:
+            # Fallback or lookup configuration if not passed explicitly
+            raise ValueError("Kafka configuration must be provided for initial setup.")
+            
+        print("Initializing persistent Kafka Producer...")
+        _producer_instance = Producer(config)
+        
+        # Automatically register a hook to flush messages when the service exits
+        atexit.register(shutdown_kafka_producer)
+        
+    return _producer_instance
+
+
+def shutdown_kafka_producer():
+    """Flushes remaining messages right before the service shuts down."""
+    global _producer_instance
+    if _producer_instance is not None:
+        print("Service shutting down: flushing outstanding Kafka messages...")
+        # Block up to 10 seconds to make sure all in-flight spans/messages clear out
+        _producer_instance.flush(10)
+        _producer_instance = None
+
+
 def produce(topic, config, key, value):
     """
-    Produce one Kafka message.
+    Produce one Kafka message. Synchronously awaits delivery to ensure accurate OpenTelemetry span timings and correct delivery status.
 
     Returns:
         True  - message delivered successfully
         False - delivery failed
     """
 
-    delivery_error = None
+    delivery_status = {"success": True, "error": None}
+    callback_completed = {"done": False} # tracking that delivery_report is finished
+
+    # grabbing the context from the current trace to propagate it downstream into the child span
+    parent_span = trace.get_current_span()
+
+    # child span to trace our produce operation
+    with trace.use_span(parent_span, end_on_exit=False):
+        span = tracer.start_span(
+            f"send message to {topic}",
+            kind=SpanKind.PRODUCER,
+            attributes={
+                "messaging.system": "kafka",
+                "messaging.destination.name": topic,
+                "messaging.operation.name": "send",
+            },
+        )
+    # Inject the child span's info into the outbound Kafka headers
+    with trace.use_span(span, end_on_exit=False):
+        headers = {}
+        inject(headers)
+        kafka_headers = [(k, v.encode('utf-8')) for k, v in headers.items()]
 
     def delivery_report(err, msg):
-        nonlocal delivery_error
-
+        print("Checking if message was delivered...")
         if err is not None:
-            delivery_error = err
+            # Record the error in the delivery_status dictionary and mark the span as errored
+            delivery_status["error"] = err
+            delivery_status["success"] = False
+            span.record_exception(err)
+            span.set_status(TraceStatus(StatusCode.ERROR, str(err)))
+        else:
+            # Record the successful delivery in the span attributes
+            span.set_attribute("messaging.kafka.partition", msg.partition())
+            span.set_attribute("messaging.kafka.offset", msg.offset())
+            span.set_status(trace.Status(StatusCode.OK))
+
+        ctx = span.get_span_context()
+        print(
+            "delivery callback:",
+            "error=", err,
+            "trace_id=", f"{ctx.trace_id:032x}",
+            "sampled=", ctx.trace_flags.sampled,
+        )
+        callback_completed["done"] = True
 
     try:
-        producer = Producer(config)
+        producer = get_kafka_producer(config)
 
         producer.produce(
             topic,
             key=key,
             value=value,
+            headers=kafka_headers,
             callback=delivery_report,
         )
 
-        remaining = (producer.flush(2))
+        # Block until the message is acknowledged so the callback executes.
+        # This guarantees the span reflects the real network duration and records any errors.
+        start_time = time.time()
+        while not callback_completed["done"]:
+            producer.poll(0.1) # Process background callbacks
+            if time.time() - start_time > 2.0: # 2-second safety timeout
+                raise RuntimeError("Delivery callback timed out.")
 
-        if delivery_error is not None:
-            print(
-                "Failed to produce message "
-                f"to {topic}: "
-                f"{delivery_error}"
-            )
+        # span.end() # ending span after delivery callback is complete to ensure accurate timing
+        print(f"Produced message to topic {topic} with key {key}.")
+        
+        return delivery_status["success"] # returns True
 
-            return False
-
-        if remaining > 0:
-            print(
-                "Kafka broker did not "
-                "respond while publishing "
-                f"to {topic}."
-            )
-
-            return False
-
-        print(
-            "Produced message to topic "
-            f"{topic} with key {key}."
-        )
-
-        return True
 
     except Exception as exc:
-        print(
-            "Failed to send Kafka message "
-            f"to {topic}: {exc}"
-        )
-
+        print(f"Failed to send Kafka message to {topic}: {exc}")
+        span.record_exception(exc)
+        span.set_status(TraceStatus(StatusCode.ERROR, str(exc)))
+        # span.end()
         return False
+
+
+    finally:
+        span.end()
+
 
 
 def consume(
@@ -458,6 +521,7 @@ def send_kafka_message(
             else None
         ),
         "retry_count": (int(retry_count)),
+        
         "object_id": (
             object_id
             if object_id is not None
@@ -722,7 +786,7 @@ def upload_seaweedfs(s3, image_key, file_data,):
 
 
 # =============================================================
-# E-TRANSFER PROGRESS
+# EXPEDAT PROGRESS
 # =============================================================
 
 def write_transfer_progress(
@@ -756,169 +820,172 @@ def write_transfer_progress(
 
     os.replace(temp_path, progress_path)
 
-
-# Intercepts etc CLI and parses output:
-def parse_etc_progress(line, *, expected_num_bytes, transfer_id):
-    # Remove terminal escape sequences such as ESC[K.
-    clean_line = ANSI_RE.sub("", line)
-
-    match = PROGRESS_RE.search(clean_line)
-
-    if not match:
-        return
-
-    percent = float(match.group("percent"))
-
-    received_bytes = round(
-        expected_num_bytes * (percent / 100.0)
-    )
-
-    if percent >= 100.0:
-        received_bytes = expected_num_bytes
-
-    print(
-        f"Transfer progress: "
-        f"{received_bytes}/{expected_num_bytes} bytes "
-        f"({percent:.1f}%)"
-    )
-
-    # Progress currently also gets measured from
-    # the receiving DSOC side.
-    #
-    # Re-enable this later if etc should become
-    # the authoritative progress source.
-    #
-    # write_transfer_progress(
-    #     received_bytes=received_bytes,
-    #     total_bytes=expected_num_bytes,
-    #     percent=percent,
-    #     transfer_id=transfer_id,
-    # )
-
-
-# =============================================================
-# E-TRANSFER CONNECTION / COMMANDS
-# =============================================================
-
-def wait_for_etd():
+def wait_for_exp():
     """
-    Wait for the e-transfer daemon to become reachable again.
+    Wait for the expedat server to become reachable again.
+
+    Use only for expedat!
 
     Returns:
-        True  - daemon responded
+        True  - server responded
         False - retry limit exhausted
     """
 
     result = subprocess.run(
         [
-            "etc",
-            "--list",
-            os.environ["ETD_DESTINATION"],
-            "--max-conn-retry", str(ETD_MAX_CONN_RETRY),
-            "--retry-conn-delay", str(ETD_RETRY_CONN_DELAY),
+            "./mtping",
+            os.environ["SVD_IP"],
         ],
-        capture_output=True,
+        capture_output=True,cwd=os.environ["MVD_LOC"],
     )
     return result.returncode == 0
 
-
-# etransfer command to send data from client -> daemon
-def etc_send(frame_path):
+def expedat_send(mvd_filepath):
     """
-    Send one raw-data file from VLBA to DSOC using e-transfer.
+    Send one raw-data file from one directory/machine to another using expedat.
+    Supports both Transfer and Stream methods
 
-    Uses --resume so an interrupted transfer can continue
-    using the partially received destination file.
+    movedat (mvd): sender
+    servedat (svd): receiver
+
     """
 
-    expected_num_bytes = frame_path.stat().st_size
-    transfer_id = str(uuid.uuid4())
-    # Reset progress at the beginning of a new transfer.
-    # write_transfer_progress(
-    #     received_bytes=0,
-    #     total_bytes=expected_num_bytes,
-    #     percent=0.0,
-    #     transfer_id=transfer_id,
-    # )
+    svd_password = os.environ["SVD_PASSWORD"]
+    svd_ip = os.environ["SVD_IP"]
+    svd_user = os.environ["SVD_USER"]
+    recipient_directory = os.environ["RECIPIENT_DIR"]
 
-    master_fd, slave_fd = os.openpty()
+    #location where movedat is saved on my computer:
+    mvd_location = os.environ["MVD_LOC"]
 
-    etd_host = os.environ["ETD_HOST"]
-    etd_command_port = os.environ.get("ETD_COMMAND_PORT", "4004")
+    expedat_mode = os.environ["EXPEDAT_MODE"]
 
-    etd_destination = (
-        f"tcp://{etd_host}#{etd_command_port}:/dsoc/incoming/"
+    if expedat_mode == "transfer":
+
+        master_fd, receiver_fd = os.openpty()
+
+        # transfer method requires a filepath to retrieve the completed file
+        terminal_command = [
+            "./movedat",
+            mvd_filepath,
+            f"{svd_user}:{svd_password}@{svd_ip}:{recipient_directory}/",
+        ]
+        
+        process = subprocess.Popen(
+            terminal_command,
+            stdin=receiver_fd,
+            stdout=receiver_fd,
+            stderr=receiver_fd,
+            close_fds=True,
+            cwd=mvd_location
+        )
+
+        os.close(receiver_fd)
+
+        try:
+            while process.poll() is None:
+                readable, _, _ = select.select(
+                    [master_fd],
+                    [],
+                    [],
+                    0.5,
+                )
+    
+                if not readable:
+                    continue
+    
+                try:
+    
+                    terminal_output = os.read(master_fd, 4096).decode(
+                        "utf-8",
+                        errors="replace",
+                    )
+    
+                except OSError:
+                    break
+    
+                # Print the actual output to Docker logs.
+                print(terminal_output, end="", flush=True)
+    
+        finally:
+            os.close(master_fd)
+
+    elif expedat_mode == "stream":
+
+        # stream method uses "-" in place of filepath, because the file does not exist anywhere yet
+        # flag -s displays progress of transfer
+        terminal_command = [
+            "./movedat",
+            "-s",
+            "-",
+            f"{svd_user}:{svd_password}@{svd_ip}:{recipient_directory}/{Path(mvd_filepath).name}",
+        ]
+
+        # Standard Input IN (stdin) and Standard Input OUT (stdout):
+        # creates a pipe connecting the Python process to the movedat process
+        # allows the Python file generation to inform movedat, and vice versa
+        process = subprocess.Popen(
+            terminal_command,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            cwd=mvd_location,
+        )
+        try:
+            num_mb = int(os.environ["EXPEDAT_STREAM_MB"])
+            file_size_bytes = num_mb * 1024 * 1024
+            num_buffers = num_mb
+
+            # X amount of buffers divides the file into X pieces to be
+            # sent to movedat as each piece is written
+            buffer_size = file_size_bytes // num_buffers
+            remainder = file_size_bytes % num_buffers
+
+            with open(mvd_filepath, "wb") as file:
+                for index in range(num_buffers):
+                    size = buffer_size + (
+                        1 if index < remainder else 0
+                    )
+
+                    # the randomly generated data:
+                    buffer = random.randbytes(size)
+                    process.stdin.write(buffer)
+                    process.stdin.flush()
+
+                    file.write(buffer)
+
+                # No more data is coming.
+                process.stdin.close()
+
+            print(
+                "Successfully created a "
+                f"{num_mb}MB random binary "
+                f"file at {mvd_filepath}"
     )
 
-    os.environ["ETD_DESTINATION"] = etd_destination
-
-    process = subprocess.Popen(
-        [
-            "etc",
-            str(frame_path),
-            etd_destination,
-            "--resume",
-        ],
-        stdin=slave_fd,
-        stdout=slave_fd,
-        stderr=slave_fd,
-        close_fds=True,
-    )
-
-    os.close(slave_fd)
-
-    buffer = ""
-
-    try:
-        while process.poll() is None:
-            readable, _, _ = select.select(
-                [master_fd],
-                [],
-                [],
-                0.5,
-            )
-
-            if not readable:
-                continue
-
-            try:
-
-                terminal_output = os.read(master_fd, 4096).decode(
-                    "utf-8",
-                    errors="replace",
+            # Read movedat output after sending the data.
+            for output in process.stdout:
+                print(
+                    output.decode(
+                        "utf-8",
+                        errors="replace",
+                    ),
+                    end="",
+                    flush=True,
                 )
 
-            except OSError:
-                break
+        finally:
+            if process.stdin and not process.stdin.closed:
+                process.stdin.close()
 
-            # Print the actual etc output to Docker logs.
-            print(terminal_output, end="", flush=True)
+            if process.stdout:
+                process.stdout.close()
 
-            buffer += terminal_output
-
-            # etc redraws the same terminal line using carriage returns.
-            parts = re.split(r"[\r\n]", buffer)
-
-            # Save any incomplete piece for the next chunk.
-            buffer = parts.pop()
-
-            for line in parts:
-                parse_etc_progress(
-                    line,
-                    expected_num_bytes=expected_num_bytes,
-                    transfer_id=transfer_id,
-                )
-
-        # Process anything left in the buffer.
-        if buffer:
-            parse_etc_progress(
-                buffer,
-                expected_num_bytes=expected_num_bytes,
-                transfer_id=transfer_id,
-            )
-
-    finally:
-        os.close(master_fd)
+    else:
+        raise ValueError(
+            "Invalid method: expected "
+            "'transfer' or 'stream'."
+        )
 
     return_code = process.wait()
 
@@ -928,14 +995,12 @@ def etc_send(frame_path):
             process.args,
         )
 
-
 # =============================================================
 # FILE / STORAGE HELPERS
 # =============================================================
-
 def create_file(
     file_path,
-    file_mb=20,
+    file_mb=5,
 ):
     """
     Create a random binary file for simulated VLBA data.
@@ -968,7 +1033,6 @@ def create_file(
         f"{file_mb}MB random binary "
         f"file at {file_path}"
     )
-
 
 def watch_for_file(
     file_path,
