@@ -80,7 +80,7 @@ def get_latest_image_event():
 
 def get_latest_image_events():
     """
-    Return the most recent events with a SeaweedFS image (from 10 vlba etransfers).
+    Return the most recent events with a SeaweedFS image (from 10 vlba ExpeDat transfers).
     """
 
     vlba_stations = [
@@ -159,7 +159,7 @@ def get_home_context():
 
 def get_dashboard_context(message_number=None):
     """
-    Persisted history for dashboard.html.
+    Persisted history for history.html.
 
     ObservatoryEvent is the only source of truth here.
     """
@@ -574,7 +574,7 @@ def dashboard_view(request):
 
     return render(
         request,
-        "ngRadar_Website/dashboard.html",
+        "ngRadar_Website/history.html",
         context,
     )
 
@@ -595,7 +595,7 @@ def event_table_partial(request):
 
     return render(
         request,
-            "ngRadar_Website/partials/dashboard_updates.html",
+        "ngRadar_Website/partials/history_updates.html",
             get_dashboard_context(message_number=message_number),
     )
 

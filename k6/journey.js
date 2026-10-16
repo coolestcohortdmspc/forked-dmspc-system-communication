@@ -185,50 +185,6 @@ export default function () {
   }
 
 // ------------------------------------------------------------
-//   group('submit-waveform', () => {
-//     const waveformResponse = http.post(
-//       `${baseUrl}/home/submit-waveform/`,
-//       {
-//         [waveformField]: waveformValue,
-//         csrfmiddlewaretoken: csrfToken,
-//       },
-//       {
-//         headers: {
-//           Referer: `${baseUrl}/home/`,
-//           'Content-Type': 'application/x-www-form-urlencoded',
-//         },
-//         redirects: 0,
-//         tags: {
-//           endpoint: 'submit_waveform',
-//         },
-//       }
-//     );
-//
-//     check(waveformResponse, {
-//       'waveform submission redirects': (r) =>
-//         r.status === 302 || r.status === 303,
-//
-//       'waveform redirects to home': (r) => {
-//         const location = r.headers.Location || '';
-//
-//         return (
-//           location === '/home/' ||
-//           location.endsWith('/home/')
-//         );
-//       },
-//     });
-//
-//     if (
-//       waveformResponse.status !== 302 &&
-//       waveformResponse.status !== 303
-//     ) {
-//       fail(
-//         `Waveform submission failed with HTTP ${waveformResponse.status}`
-//       );
-//     }
-//   });
-
-// ------------------------------------------------------------
   group('submit-waveform', () => {
     const waveformResponse = http.post(
       `${baseUrl}/home/submit-waveform/`,

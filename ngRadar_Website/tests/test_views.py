@@ -15,29 +15,21 @@ from unittest.mock import call
 import json
 import uuid
 
-
-# ==============================================================================
-# IMPORTANT:
-# Because we read "ngrok_endpoint.env" on import, we need to patch the Path globally
-# before importing all the functions we want to test.
-# ==============================================================================
-mock_env_data = "BOOTSTRAP_SERVER=localhost:9092\nSOME_OTHER_VAR=value" 
-with patch("pathlib.Path.read_text", return_value=mock_env_data):
-    from ngRadar_Website.views.views import (
-        serve_image,
-        lock_status,
-        submit_waveform,
-        login_view,
-        logout_view,
-        home_view,
-        dashboard_view,
-        event_table_partial,
-        RECORDS_TO_DISPLAY,
-        get_latest_image_events,
-        get_dashboard_context,
-        latency_data,
-        sse_stream,
-    )
+from ngRadar_Website.views.views import (
+    serve_image,
+    lock_status,
+    submit_waveform,
+    login_view,
+    logout_view,
+    home_view,
+    dashboard_view,
+    event_table_partial,
+    RECORDS_TO_DISPLAY,
+    get_latest_image_events,
+    get_dashboard_context,
+    latency_data,
+    sse_stream,
+)
 
 # ==============================================================================
 # 2. serve_image Test
@@ -402,7 +394,7 @@ def test_dashboard_view(mock_get_dashboard_context, mock_render):
     output = dashboard_view(request)
 
     assert output == response
-    mock_render.assert_called_once_with(request, "ngRadar_Website/dashboard.html", mock_get_dashboard_context())
+    mock_render.assert_called_once_with(request, "ngRadar_Website/history.html", mock_get_dashboard_context())
 
 
 # ==============================================================================
@@ -425,7 +417,7 @@ def test_event_table_partial(mock_get_dashboard_context, mock_render):
     output = event_table_partial(request)
 
     assert output == response
-    mock_render.assert_called_once_with(request, "ngRadar_Website/partials/dashboard_updates.html", mock_get_dashboard_context.return_value)
+    mock_render.assert_called_once_with(request, "ngRadar_Website/partials/history_updates.html", mock_get_dashboard_context.return_value)
 
 # ==============================================================================
 # 11. get_latest_image_events Test

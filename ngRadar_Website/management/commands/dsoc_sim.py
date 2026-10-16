@@ -51,12 +51,7 @@ This simulator:
 - Stores the DDM image in SeaweedFS.
 - Sends DSOC state/workflow events to Kafka.
 
-This simulator does NOT write directly to:
-
-- gbtEvent
-- dsocEvent
-- ETransferEvent
-- ObservatoryEvent
+This simulator does NOT write directly to the database (the ObservatoryEvent table).
 
 The db_consumer is solely responsible for persisting
 Kafka events to ObservatoryEvent.
@@ -395,7 +390,7 @@ def process_msg(
                         rcvr_station=(vlba_station),
                         message=(
                             f"{vlba_station.name} requested a storage check at DSOC. "
-                            f"DSOC responded that it does not have enough storage and cannot begin the etransfer."
+                            f"DSOC responded that it does not have enough storage and cannot begin the expedat stream."
                             f"Failed after "
                             f"{next_retry_count} "
                             "storage checks."
@@ -438,7 +433,7 @@ def process_msg(
                     xmit_station=(Stations.GBT),
                     rcvr_station=(vlba_station),
 
-                    message=f"{vlba_station.name} requested a storage check at DSOC. DSOC responded that it does not have enough storage and cannot begin the etransfer.",
+                    message=f"{vlba_station.name} requested a storage check at DSOC. DSOC responded that it does not have enough storage and cannot begin the expedat stream.",
                 )
 
                 print(
@@ -476,21 +471,20 @@ def process_msg(
                     retry_count=(retry_count),
                     xmit_station=(Stations.GBT),
                     rcvr_station=(vlba_station),
-
-                    message=f"DSOC reponded that it has enough storage. {vlba_station.name} may begin the etransfer.",
+                    message=f"DSOC responded that it has enough storage. {vlba_station.name} may begin the expedat stream.",
                 )
 
                 print(
                     "DSOC has enough storage "
                     "to accept the incoming "
                     "data. Awaiting "
-                    "e-transfer..."
+                    "expedat stream..."
                 )
 
         # =========================================================
         # VLBA -> DSOC
         #
-        # VLBA has started the e-transfer.
+        # VLBA has started the expedat stream.
         # =========================================================
 
         elif incoming_key == Message.PROGRESS_COMPLETE.value:

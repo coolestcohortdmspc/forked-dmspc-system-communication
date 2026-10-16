@@ -4,21 +4,13 @@ from unittest.mock import ANY
 from ngRadar_Website.enums import Stations, Message
 from uuid import uuid4
 
+from ngRadar_Website.management.commands.gbt_sim import (
+    process_msg,
+)
 
 # =============================================
 # TEST THE STANDALONE FUNCTIONS FROM GBT_SIM
 # =============================================
-
-# ==============================================================================
-# IMPORTANT:
-# Because we read "ngrok_endpoint.env" on import, we need to patch the Path globally
-# before importing all the functions we want to test.
-# ==============================================================================
-mock_env_data = "BOOTSTRAP_SERVER=localhost:9092\nSOME_OTHER_VAR=value" 
-with patch("pathlib.Path.read_text", return_value=mock_env_data):
-    from ngRadar_Website.management.commands.gbt_sim import (
-        process_msg,
-    )
 
 # ==============================================================================
 # 1. process_msg Test

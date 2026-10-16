@@ -499,58 +499,12 @@ export function waveformUser() {
         tags: {
           endpoint: 'submit_waveform',
         },
-        // responseCallback: http.expectedStatuses(
-        //   200,
-        //   201,
-        //   202,
-        //   204,
-        //   302,
-        //   303,
-        //   409
-        // ),
         responseCallback: http.expectedStatuses(
           202,
           409
         ),
       }
     );
-
-    
-    // const isRedirect =
-    //   waveformResponse.status === 302 ||
-    //   waveformResponse.status === 303;
-    //
-    // const isLocked = waveformResponse.status === 409;
-    //
-    // check(waveformResponse, {
-    //   'waveform submission succeeds or is explicitly locked': (r) =>
-    //     isRedirect || r.status === 409,
-    //
-    //   'waveform redirects to home': (r) => {
-    //     if (!isRedirect) {
-    //       return true; // Not applicable when the action is locked
-    //     }
-    //
-    //     const location = r.headers.Location || '';
-    //
-    //     return (
-    //       location === '/home/' ||
-    //       location.endsWith('/home/')
-    //     );
-    //   },
-    // });
-    //
-    // if (isLocked) {
-    //   console.warn(
-    //     'Waveform submission was rejected because processing is still in progress'
-    //   );
-    //
-    //   // Do not run assertions that require a successful submission.
-    // } else if (!isRedirect) {
-    //   fail(
-    //     `Unexpected waveform submission response: ${waveformResponse.status}`
-    //   );
-    // }
 
     const isAccepted =
       waveformResponse.status === 202;
